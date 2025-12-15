@@ -1,6 +1,7 @@
 import asyncio
 import os
 import subprocess
+from ctypes.util import find_library
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -15,6 +16,19 @@ DEFAULT_GROUP_FILTER = "Toowoomba Regional Council"
 DEFAULT_TZ = "Australia/Brisbane"
 LOGIN_URL = "http://www.m2m-iot.cc/sign/showLogin#"
 HISTORY_STATE_KEY = "m2m_history"
+REQUIRED_CHROMIUM_LIBS = ["nspr4", "nss3", "atk-1.0", "atk-bridge-2.0"]
+
+
+def missing_system_libs() -> List[str]:
+    """Return list of shared libraries Playwright Chromium expects but cannot find."""
+    missing: List[str] = []
+    for lib in REQUIRED_CHROMIUM_LIBS:
+        try:
+            if not find_library(lib):
+                missing.append(lib)
+        except Exception:
+            missing.append(lib)
+    return missing
 
 
 def ensure_chromium_installed() -> None:
@@ -238,6 +252,17 @@ if run_button:
     except Exception:
         st.warning(f"Timezone '{tz_choice}' not recognised. Falling back to {DEFAULT_TZ}.")
         tz_choice = DEFAULT_TZ
+
+    missing_libs = missing_system_libs()
+    if missing_libs:
+        st.error(
+            "Chromium cannot start because required system libraries are missing: "
+            + ", ".join(missing_libs)
+            + ".\nDeploy on infrastructure where these libraries are installed "
+            "(e.g. Debian/Ubuntu with libnspr4, libnss3, libatk-1.0, libatk-bridge-2.0) "
+            "or switch to a managed browser service."
+        )
+        st.stop()
 
     try:
         ensure_chromium_installed()

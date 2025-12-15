@@ -49,5 +49,6 @@ The Playwright-powered Streamlit interface lives in [m2m-downloader/streamlit_ap
 ### Streamlit Cloud Deployment
 1. Add the credentials to Streamlit Cloud secrets.
 2. Deploy the repo and point it at `m2m-downloader/streamlit_app.py`.
-3. The app will install Chromium on first launch; subsequent runs reuse the cached bundle.
-4. Trigger downloads via the "Fetch latest readings" button whenever fresh data is required.
+3. Streamlit Cloud currently lacks several system libraries (`libnspr4`, `libnss3`, `libatk-1.0`, `libatk-bridge-2.0`) required by Playwright’s Chromium build. Run the scraper on infrastructure where you can install those packages, or integrate with a managed browser service.
+4. The app installs Chromium on first launch; subsequent runs reuse the cached bundle.
+5. Trigger downloads via the "Fetch latest readings" button whenever fresh data is required.
