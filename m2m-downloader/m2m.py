@@ -2,6 +2,7 @@ import os
 import time
 import pathlib
 from datetime import datetime
+from typing import Tuple
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,16 +13,19 @@ from selenium.webdriver.support import expected_conditions as EC
 
 LOGIN_URL = "http://www.m2m-iot.cc/sign/showLogin#"
 
-USERNAME = os.environ.get("M2M_USERNAME", "")
-PASSWORD = os.environ.get("M2M_PASSWORD", "")
-if not USERNAME or not PASSWORD:
-    raise RuntimeError("Missing M2M_USERNAME / M2M_PASSWORD env vars")
-
 BROWSER = os.environ.get("M2M_BROWSER", "firefox")
 HEADLESS = os.environ.get("M2M_HEADLESS", "false").lower() in {"1", "true", "yes"}
 
 OUT_DIR = pathlib.Path.cwd() / "m2m_outputs"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_credentials() -> Tuple[str, str]:
+    username = os.environ.get("M2M_USERNAME", "")
+    password = os.environ.get("M2M_PASSWORD", "")
+    if not username or not password:
+        raise RuntimeError("Missing M2M_USERNAME / M2M_PASSWORD env vars")
+    return username, password
 
 
 def ts() -> str:
@@ -93,7 +97,7 @@ def try_click(driver, locators, timeout: int = 8) -> bool:
     return False
 
 
-def login(driver) -> None:
+def login(driver, username: str, password: str) -> None:
     driver.get(LOGIN_URL)
 
     WebDriverWait(driver, 20).until(
@@ -149,10 +153,10 @@ def login(driver) -> None:
         raise err
 
     user_el.clear()
-    user_el.send_keys(USERNAME)
+    user_el.send_keys(username)
 
     pass_el.clear()
-    pass_el.send_keys(PASSWORD)
+    pass_el.send_keys(password)
 
     login_button_locators = [
         (By.ID, "loginButton"),
@@ -206,9 +210,10 @@ def export_data(driver) -> None:
 
 
 def main() -> None:
+    username, password = get_credentials()
     driver = make_driver()
     try:
-        login(driver)
+        login(driver, username, password)
         export_data(driver)
     finally:
         try:
