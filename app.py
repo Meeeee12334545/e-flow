@@ -14,23 +14,23 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from database import FlowDatabase
-from scraper import DataScraper
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
+@st.cache_resource
 def ensure_playwright_installed():
     """Install Playwright browsers if not already installed."""
     try:
         # Try to install Playwright browsers
-        subprocess.run(
+        result = subprocess.run(
             [sys.executable, "-m", "playwright", "install", "chromium"],
             capture_output=True,
             timeout=120
         )
     except Exception as e:
-        print(f"Note: Playwright installation returned: {e}")
+        pass  # Silent fail - monitoring happens elsewhere
     return True
 
-# Install on startup
+# Install on startup (cached so only runs once)
 ensure_playwright_installed()
 
 logging.basicConfig(level=logging.INFO)
@@ -38,9 +38,8 @@ logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Flow Data Dashboard", layout="wide")
 
-# Initialize database and scraper
+# Initialize database only (scraper runs separately as monitor.py)
 db = FlowDatabase()
-scraper = DataScraper(db)
 
 DEFAULT_TZ = "Australia/Brisbane"
 
@@ -59,17 +58,7 @@ st.markdown("Real-time depth, velocity, and flow monitoring data")
 with st.sidebar:
     st.header("⚙️ Settings")
     
-    # Manual data refresh
-    if st.button("🔄 Refresh Data", use_container_width=True):
-        st.info("Fetching latest data from monitor...")
-        try:
-            data = asyncio.run(scraper.fetch_monitor_data())
-            if data:
-                st.success("✅ Data refreshed successfully!")
-            else:
-                st.warning("⚠️ Could not fetch data. Please check the monitor URL.")
-        except Exception as e:
-            st.error(f"❌ Error: {e}")
+    st.info("💡 Data is collected by the continuous monitor (monitor.py) running separately. This dashboard displays the collected data.")
     
     # Select device to view
     devices = db.get_devices()
