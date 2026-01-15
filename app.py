@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
@@ -14,6 +15,23 @@ import plotly.graph_objects as go
 
 from database import FlowDatabase
 from scraper import DataScraper
+
+# Ensure Playwright browsers are installed for Streamlit Cloud
+def ensure_playwright_installed():
+    """Install Playwright browsers if not already installed."""
+    try:
+        # Try to install Playwright browsers
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            capture_output=True,
+            timeout=120
+        )
+    except Exception as e:
+        print(f"Note: Playwright installation returned: {e}")
+    return True
+
+# Install on startup
+ensure_playwright_installed()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
