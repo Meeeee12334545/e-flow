@@ -4,7 +4,6 @@ streamlit>=1.38.0
 pandas>=2.1.0
 pytz>=2024.1
 plotly>=5.22.0
-sqlite3-python>=0.0.1
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
