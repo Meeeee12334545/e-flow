@@ -284,9 +284,8 @@ class DataScraper:
         else:
             logger.info(f"✅ Stored changed data for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
         
-        # Update last_data for change tracking
-        if not STORE_ALL_READINGS:
-            self.last_data[device_id] = new_data
+        # Always update last_data for tracking purposes
+        self.last_data[device_id] = new_data
         
         return True
 
