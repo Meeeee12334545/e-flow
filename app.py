@@ -55,31 +55,41 @@ def start_background_monitor():
         from scraper import DataScraper
         from config import DEVICES, MONITOR_URL
         import time
+        import traceback
         
         def run_simple_monitor():
-            """Simple monitor loop that runs every 60 seconds."""
-            db = FlowDatabase()
-            scraper = DataScraper(db)
-            
-            device_id = "FIT100"
-            device_info = DEVICES.get(device_id, {})
-            device_name = device_info.get("name", "FIT100 Main Inflow Lismore STP")
-            device_selectors = device_info.get("selectors")
-            url = device_info.get("url") or MONITOR_URL
-            
+            """Simple monitor loop that runs every 60 seconds with robust error handling."""
             check_count = 0
+            consecutive_errors = 0
+            max_consecutive_errors = 10
+            
             logger.info("🚀 Simple background monitor started")
             
             while True:
+                db = None
+                scraper = None
                 try:
                     check_count += 1
+                    
+                    # Create fresh instances each iteration to avoid stale connections
+                    db = FlowDatabase()
+                    scraper = DataScraper(db)
+                    
+                    device_id = "FIT100"
+                    device_info = DEVICES.get(device_id, {})
+                    device_name = device_info.get("name", "FIT100 Main Inflow Lismore STP")
+                    device_selectors = device_info.get("selectors")
+                    url = device_info.get("url") or MONITOR_URL
+                    
                     logger.info(f"[Check #{check_count}] Fetching device data...")
                     
                     # Fetch data
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    data = loop.run_until_complete(scraper.fetch_monitor_data(url, device_selectors))
-                    loop.close()
+                    try:
+                        data = loop.run_until_complete(scraper.fetch_monitor_data(url, device_selectors))
+                    finally:
+                        loop.close()
                     
                     if data and data.get("data"):
                         payload = data.get("data", {})
@@ -98,26 +108,39 @@ def start_background_monitor():
                             
                             if stored:
                                 logger.info(f"✅ Data stored: D={depth_mm}mm, V={velocity_mps}m/s, F={flow_lps}L/s")
+                                consecutive_errors = 0  # Reset error counter on success
                             else:
                                 logger.info(f"ℹ️  Data unchanged, not stored")
+                                consecutive_errors = 0  # Not an error, just no change
                         else:
                             logger.warning("No valid data extracted")
+                            consecutive_errors += 1
                     else:
                         logger.warning("Failed to fetch data")
-                        
-                except Exception as e:
-                    logger.error(f"Monitor error: {e}")
+                        consecutive_errors += 1
+                    
+                    # Note: Database connection closes automatically when scraper goes out of scope
+                    consecutive_errors += 1
+                    logger.error(f"Monitor error (attempt {consecutive_errors}/{max_consecutive_errors}): {e}")
+                    logger.error(traceback.format_exc())
+                    
+                    if consecutive_errors >= max_consecutive_errors:
+                        logger.critical("Too many consecutive errors, monitor stopping")
+                        break
                 
                 # Wait 60 seconds before next check
                 time.sleep(60)
+            
+            logger.error("❌ Background monitor stopped")
         
         # Start monitor in daemon thread
         monitor_thread = threading.Thread(target=run_simple_monitor, daemon=True, name="SimpleMonitor")
         monitor_thread.start()
-        logger.info("✅ Background monitor started successfully")
+        logger.info("✅ Background monitor thread started")
         return True
     except Exception as e:
-        logger.warning(f"Could not start background monitor: {e}")
+        logger.error(f"Failed to start background monitor: {e}")
+        logger.error(traceback.format_exc())
         return False
 
 # Start background monitor (cached so only runs once per Streamlit session)
@@ -482,10 +505,7 @@ with st.sidebar:
             # Manual refresh to pull the newest reading into the app
             refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
             
-            # Add a button to manually store data to database
-            store_clicked = st.button("📥 Store Reading to Database", key="store_button", help="Manually store current reading to database")
-            
-            if refresh_clicked or store_clicked:
+            if refresh_clicked:
                 with st.spinner("Requesting data from device..."):
                     success, message, ts = fetch_latest_reading(selected_device_id)
                     
@@ -514,22 +534,8 @@ with st.sidebar:
                             'timestamp': ts
                         }
                         
-                        # If store button was clicked, actually save to database
-                        if store_clicked:
-                            stored = scraper.store_measurement(
-                                device_id=selected_device_id,
-                                device_name=device_config.get("name", selected_device_id),
-                                depth_mm=payload.get("depth_mm"),
-                                velocity_mps=payload.get("velocity_mps"),
-                                flow_lps=payload.get("flow_lps")
-                            )
-                            if stored:
-                                st.success(f"✅ Data stored to database at {ts.strftime('%Y-%m-%d %H:%M:%S')}")
-                            else:
-                                st.info("ℹ️ Data unchanged from last reading - not stored")
-                        else:
-                            ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
-                            st.success(f"{message} at {ts_str}")
+                        ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
+                        st.success(f"{message} at {ts_str}")
                     else:
                         st.error(message)
             
