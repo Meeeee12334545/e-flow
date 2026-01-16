@@ -13,8 +13,8 @@ DEVICES = {
         "name": "FIT100 Main Inflow Lismore STP",
         "location": "Lismore",
         "xpaths": {
-            "depth_mm": "//*[@id='div_varvalue_41']/span",  # Adjust ID if different
-            "velocity_mps": "//*[@id='div_varvalue_43']/span",  # Adjust ID if different
+            "depth_mm": "//*[@id='div_varvalue_10']/span",
+            "velocity_mps": "//*[@id='div_varvalue_6']/span",
             "flow_lps": "//*[@id='div_varvalue_42']/span"
         }
     }
