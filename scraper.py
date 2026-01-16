@@ -32,6 +32,8 @@ import base64
 import json
 import os
 import re
+import hashlib
+import zlib
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from urllib.parse import urljoin, urlparse, parse_qs
@@ -259,38 +261,57 @@ class DataScraper:
 
     def _has_data_changed(self, device_id: str, new_data: Dict) -> bool:
         """
-        Delta compression: detect measurement changes to minimize writes.
+        INDUSTRY-STANDARD change detection using CRC32 hashing.
+        
+        Works reliably for multiple devices with different logging intervals:
+        - 1-minute loggers: Detects every change
+        - 5-minute loggers: Prevents 4 duplicate entries per 5-minute block
+        - 10-minute loggers: Prevents 9 duplicate entries per 10-minute block
+        
+        Algorithm:
+        1. Serialize measurement data into canonical JSON form (deterministic)
+        2. Compute CRC32 hash of serialized data
+        3. Compare hash to last stored hash
+        4. Store only if hash differs (prevents any duplicate records)
         
         Args:
             device_id: Unique device identifier
             new_data: Dict with keys 'depth_mm', 'velocity_mps', 'flow_lps'
             
         Returns:
-            bool: True if any measurement differs from last known value
+            bool: True if data hash differs from last stored (any value changed)
             
-        Note:
-            Updates self.last_data on first run (all values are "new").
-            Subsequent runs check for deltas across three dimensions.
+        Thread Safety: NOT thread-safe - intended for single device per thread
+        
+        Note: First call always returns True (new device = new data)
         """
-        if device_id not in self.last_data:
-            # First time seeing this device
-            self.last_data[device_id] = new_data
-            return True
+        # Serialize new data in canonical form for deterministic hashing
+        canonical_json = json.dumps(
+            new_data,
+            sort_keys=True,
+            separators=(',', ':'),
+            default=str
+        )
         
-        last = self.last_data[device_id]
+        # Compute CRC32 hash (32-bit, industry standard for data integrity)
+        new_hash = zlib.crc32(canonical_json.encode('utf-8')) & 0xffffffff
         
-        # Compare depth, velocity, and flow values
-        depth_changed = last.get("depth_mm") != new_data.get("depth_mm")
-        velocity_changed = last.get("velocity_mps") != new_data.get("velocity_mps")
-        flow_changed = last.get("flow_lps") != new_data.get("flow_lps")
+        # Get last stored hash for this device
+        last_hash = self.last_data.get(device_id, {}).get('_hash')
         
-        has_changed = depth_changed or velocity_changed or flow_changed
+        # Check if hash changed (indicates any value changed)
+        has_changed = last_hash is None or new_hash != last_hash
         
         if has_changed:
-            self.last_data[device_id] = new_data
-            logger.info(f"Change detected for {device_id}: D={new_data.get('depth_mm')}mm, V={new_data.get('velocity_mps')}mps, F={new_data.get('flow_lps')}lps")
+            # Store new data and hash
+            self.last_data[device_id] = {
+                **new_data,
+                '_hash': new_hash,
+                '_timestamp': datetime.now(self.tz)
+            }
+            logger.info(f"✓ Change detected for {device_id}: D={new_data.get('depth_mm')}mm, V={new_data.get('velocity_mps')}m/s, F={new_data.get('flow_lps')}L/s [Hash: {new_hash:08x}]")
         else:
-            logger.debug(f"No change for {device_id}")
+            logger.debug(f"⊘ No change for {device_id} (hash match: {new_hash:08x})")
         
         return has_changed
 

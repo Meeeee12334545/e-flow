@@ -473,16 +473,15 @@ with st.sidebar:
         </p>
     </div>
     """, unsafe_allow_html=True)
-            
-            # Background monitor status
-            thread_alive = monitor_thread and monitor_thread.is_alive() if monitor_thread else False
-            if monitor_started and thread_alive:
-                st.success("🟢 Auto-collect: Active")
-            elif monitor_started and not thread_alive:
-                st.error("🔴 Auto-collect: Thread died - Restart app to fix")
-            else:
-                st.warning(f"⚠️ Auto-collect: {monitor_status.get('reason', 'Inactive')}")
-        </p>
+        
+        # Background monitor status
+        thread_alive = monitor_thread and monitor_thread.is_alive() if monitor_thread else False
+        if monitor_started and thread_alive:
+            st.success("🟢 Auto-collect: Active")
+        elif monitor_started and not thread_alive:
+            st.error("🔴 Auto-collect: Thread died - Restart app to fix")
+        else:
+            st.warning(f"⚠️ Auto-collect: {monitor_status.get('reason', 'Inactive')}")
         """, unsafe_allow_html=True)
         selected_device_name = st.selectbox(
             "Select Device",
