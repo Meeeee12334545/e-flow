@@ -3,6 +3,10 @@
 Continuous monitoring service for the USRIOT monitor.
 Runs every 1 minute and only stores data when changes are detected.
 
+⚠️  DISABLED - Use Streamlit built-in monitor instead!
+The Streamlit app (app.py) has a persistent background thread with proper change detection.
+Running both this AND the app would create duplicate entries.
+
 PRODUCTION-READY FEATURES:
 - Automatic retry on failures
 - Graceful error recovery
@@ -10,6 +14,12 @@ PRODUCTION-READY FEATURES:
 - Automatic restart on critical errors
 - Comprehensive logging
 """
+
+if __name__ == "__main__":
+    print("⚠️  Standalone monitor.py is DISABLED.")
+    print("The Streamlit app has a built-in background monitor.")
+    print("Do NOT run both simultaneously to avoid duplicate data.")
+    exit(1)
 
 import asyncio
 import sys
