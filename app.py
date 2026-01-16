@@ -14,6 +14,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from database import FlowDatabase
+from config import DEVICES
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
 @st.cache_resource
@@ -41,6 +42,21 @@ st.set_page_config(page_title="Flow Data Dashboard", layout="wide")
 # Initialize database only (scraper runs separately as monitor.py)
 db = FlowDatabase()
 
+# Initialize devices from config on startup
+@st.cache_resource
+def init_devices():
+    """Initialize devices from config into database."""
+    for device_id, device_info in DEVICES.items():
+        db.add_device(
+            device_id=device_id,
+            device_name=device_info.get("name", device_id),
+            location=device_info.get("location", "")
+        )
+    return True
+
+# Initialize devices (runs once per session)
+init_devices()
+
 DEFAULT_TZ = "Australia/Brisbane"
 
 
@@ -66,12 +82,13 @@ with st.sidebar:
         device_names = {d["device_name"]: d["device_id"] for d in devices}
         selected_device_name = st.selectbox(
             "Select Device",
-            options=device_names.keys(),
+            options=sorted(device_names.keys()),
             key="device_selector"
         )
         selected_device_id = device_names[selected_device_name]
     else:
-        st.info("No devices found. Please refresh data first.")
+        st.error("⚠️ No devices found in database. Please ensure monitor.py is running or check configuration.")
+        st.info("Expected devices: " + ", ".join(DEVICES.keys()))
         selected_device_id = None
     
     # Time range selection

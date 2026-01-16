@@ -22,7 +22,7 @@ DATABASE_TIMEOUT = 30  # seconds
 # Scraper settings
 SCRAPER_TIMEOUT = 15000  # milliseconds
 SCRAPER_HEADLESS = True
-SCRAPER_WAIT_AFTER_LOAD = 2000  # milliseconds
+SCRAPER_WAIT_AFTER_LOAD = 3000  # milliseconds - increased for better loading
 MONITOR_INTERVAL = 60  # seconds (1 minute for continuous monitoring)
 MONITOR_ENABLED = True  # Enable continuous monitoring
 

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from urllib.parse import urljoin
@@ -57,56 +58,122 @@ class DataScraper:
 
     async def extract_data_from_page(self, page: Page) -> Optional[Dict]:
         """
-        Extract depth, velocity, and flow data from the page.
+        Extract depth, velocity, and flow data from the USRIOT dashboard.
         
-        This method looks for data in various formats:
-        - JSON in script tags
-        - Data attributes
-        - Text content
+        The dashboard loads data dynamically via JavaScript.
+        We'll look for:
+        1. JSON data in window objects
+        2. Common data attributes
+        3. Text content in specific elements
         """
         try:
             await page.wait_for_load_state("networkidle", timeout=10000)
             
-            # Try to extract data from the page
-            # This is a flexible approach that tries multiple extraction methods
+            # Wait additional time for charts/data to fully render
+            await page.wait_for_timeout(3000)
             
-            # Method 1: Look for JSON data in script tags
-            scripts = await page.query_selector_all("script")
             page_data = {}
             
-            for script in scripts:
-                try:
-                    content = await script.get_attribute("innerHTML")
-                    if content and ("depth" in content.lower() or "velocity" in content.lower()):
-                        # Try to parse JSON from script content
-                        text = content.strip()
-                        if text.startswith("{") or text.startswith("["):
-                            page_data = json.loads(text)
-                            logger.info(f"Extracted JSON data: {page_data}")
-                            break
-                except Exception as e:
-                    continue
+            # Method 1: Try to get data from JavaScript window object
+            try:
+                # Attempt to extract data from various window properties
+                window_data = await page.evaluate("""
+                    () => {
+                        const data = {};
+                        
+                        // Look for common data containers in USRIOT
+                        if (window.chartData) data.chartData = window.chartData;
+                        if (window.deviceData) data.deviceData = window.deviceData;
+                        if (window.sensorData) data.sensorData = window.sensorData;
+                        if (window.__data) data.__data = window.__data;
+                        if (window.config) data.config = window.config;
+                        
+                        return data;
+                    }
+                """)
+                
+                if window_data and any(window_data.values()):
+                    page_data['window'] = window_data
+                    logger.debug(f"Extracted window data: {window_data}")
+            except Exception as e:
+                logger.debug(f"Could not extract window data: {e}")
             
-            # Method 2: Check for data in page attributes or elements
-            if not page_data:
-                depth_elem = await page.query_selector('[data-depth], [data-value*="depth"], .depth')
-                velocity_elem = await page.query_selector('[data-velocity], [data-value*="velocity"], .velocity')
-                flow_elem = await page.query_selector('[data-flow], [data-value*="flow"], .flow')
+            # Method 2: Look for data in all text content on page
+            # Get all visible text and look for patterns with numbers
+            try:
+                body_text = await page.inner_text("body")
                 
-                if depth_elem:
-                    depth_text = await depth_elem.inner_text()
-                    page_data["depth"] = depth_text
+                # Look for common patterns in the text
+                import re
                 
-                if velocity_elem:
-                    velocity_text = await velocity_elem.inner_text()
-                    page_data["velocity"] = velocity_text
+                # Pattern for depth values (e.g., "Depth: 150.5 mm" or "150.5mm")
+                depth_match = re.search(r'(?:depth|D)[\s:]*(\d+\.?\d*)\s*(?:mm|m)(?:\s|$)', body_text, re.IGNORECASE)
+                if depth_match:
+                    try:
+                        page_data['depth'] = float(depth_match.group(1))
+                        logger.debug(f"Found depth: {page_data['depth']} mm")
+                    except ValueError:
+                        pass
                 
-                if flow_elem:
-                    flow_text = await flow_elem.inner_text()
-                    page_data["flow"] = flow_text
+                # Pattern for velocity values (e.g., "Velocity: 0.5 m/s")
+                velocity_match = re.search(r'(?:velocity|V)[\s:]*(\d+\.?\d*)\s*(?:m/s|mps|m)?(?:\s|$)', body_text, re.IGNORECASE)
+                if velocity_match:
+                    try:
+                        page_data['velocity'] = float(velocity_match.group(1))
+                        logger.debug(f"Found velocity: {page_data['velocity']} m/s")
+                    except ValueError:
+                        pass
+                
+                # Pattern for flow values (e.g., "Flow: 25.5 L/s" or "25.5 lps")
+                flow_match = re.search(r'(?:flow|F)[\s:]*(\d+\.?\d*)\s*(?:L/s|lps|l/s)(?:\s|$)', body_text, re.IGNORECASE)
+                if flow_match:
+                    try:
+                        page_data['flow'] = float(flow_match.group(1))
+                        logger.debug(f"Found flow: {page_data['flow']} L/s")
+                    except ValueError:
+                        pass
+                        
+            except Exception as e:
+                logger.debug(f"Error extracting from body text: {e}")
+            
+            # Method 3: Look for elements with specific data attributes or classes
+            try:
+                elements = await page.query_selector_all('[data-value], [data-metric], span, div')
+                
+                for elem in elements[:50]:  # Check first 50 elements to avoid performance issues
+                    try:
+                        text = await elem.inner_text()
+                        text_lower = text.lower()
+                        
+                        # Check for depth indicators
+                        if any(x in text_lower for x in ['depth', 'd:', 'depth:']):
+                            # Extract numbers from the text
+                            nums = re.findall(r'\d+\.?\d*', text)
+                            if nums and 'depth' not in page_data:
+                                page_data['depth'] = float(nums[0])
+                        
+                        # Check for velocity indicators  
+                        if any(x in text_lower for x in ['velocity', 'v:', 'velocity:']):
+                            nums = re.findall(r'\d+\.?\d*', text)
+                            if nums and 'velocity' not in page_data:
+                                page_data['velocity'] = float(nums[0])
+                        
+                        # Check for flow indicators
+                        if any(x in text_lower for x in ['flow', 'f:', 'flow:']):
+                            nums = re.findall(r'\d+\.?\d*', text)
+                            if nums and 'flow' not in page_data:
+                                page_data['flow'] = float(nums[0])
+                                
+                    except Exception as e:
+                        continue
+                        
+            except Exception as e:
+                logger.debug(f"Error querying elements: {e}")
             
             # Get the page title (may contain device info)
             title = await page.title()
+            
+            logger.info(f"Extracted data: {page_data}")
             
             return {
                 "data": page_data,

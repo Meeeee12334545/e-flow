@@ -44,7 +44,7 @@ class ContinuousMonitor:
         self.error_count = 0
 
     async def check_for_updates(self):
-        """Check the monitor website for updates."""
+        """Check the monitor website for updates every 1 minute."""
         self.check_count += 1
         
         try:
@@ -58,51 +58,75 @@ class ContinuousMonitor:
                 self.error_count += 1
                 return
             
-            # Parse and store if changed
+            # Parse and store data
             device_id = "FIT100"
             device_name = "FIT100 Main Inflow Lismore STP"
             
-            # Try to extract actual values from the page data
-            # For now using placeholder values - adjust based on actual data structure
-            depth_mm = 0.0
-            velocity_mps = 0.0
-            flow_lps = 0.0
+            # Extract actual values from the page data
+            depth_mm = None
+            velocity_mps = None
+            flow_lps = None
             
             # Attempt to parse from extracted data
             page_data = data.get("data", {})
             if isinstance(page_data, dict):
+                # Extract depth (should be in mm)
                 if "depth" in page_data:
                     try:
-                        depth_mm = float(str(page_data["depth"]).replace("mm", "").strip())
-                    except (ValueError, AttributeError):
-                        pass
+                        val = page_data["depth"]
+                        # Handle if it's already a float or needs conversion
+                        if isinstance(val, (int, float)):
+                            depth_mm = float(val)
+                        else:
+                            # Remove any unit strings and convert
+                            depth_mm = float(str(val).replace("mm", "").replace("m", "").strip())
+                        logger.info(f"  Depth: {depth_mm} mm")
+                    except (ValueError, AttributeError, TypeError) as e:
+                        logger.warning(f"Could not parse depth value: {page_data['depth']} - {e}")
                 
+                # Extract velocity (should be in m/s)
                 if "velocity" in page_data:
                     try:
-                        velocity_mps = float(str(page_data["velocity"]).replace("mps", "").strip())
-                    except (ValueError, AttributeError):
-                        pass
+                        val = page_data["velocity"]
+                        if isinstance(val, (int, float)):
+                            velocity_mps = float(val)
+                        else:
+                            # Remove any unit strings and convert
+                            velocity_mps = float(str(val).replace("mps", "").replace("m/s", "").replace("m", "").strip())
+                        logger.info(f"  Velocity: {velocity_mps} m/s")
+                    except (ValueError, AttributeError, TypeError) as e:
+                        logger.warning(f"Could not parse velocity value: {page_data['velocity']} - {e}")
                 
+                # Extract flow (should be in L/s)
                 if "flow" in page_data:
                     try:
-                        flow_lps = float(str(page_data["flow"]).replace("lps", "").strip())
-                    except (ValueError, AttributeError):
-                        pass
+                        val = page_data["flow"]
+                        if isinstance(val, (int, float)):
+                            flow_lps = float(val)
+                        else:
+                            # Remove any unit strings and convert
+                            flow_lps = float(str(val).replace("lps", "").replace("l/s", "").replace("L/s", "").strip())
+                        logger.info(f"  Flow: {flow_lps} L/s")
+                    except (ValueError, AttributeError, TypeError) as e:
+                        logger.warning(f"Could not parse flow value: {page_data['flow']} - {e}")
             
-            # Store if changed
-            stored = self.scraper.store_measurement(
-                device_id=device_id,
-                device_name=device_name,
-                depth_mm=depth_mm,
-                velocity_mps=velocity_mps,
-                flow_lps=flow_lps
-            )
-            
-            if stored:
-                self.update_count += 1
-                logger.info(f"✅ Data updated! (Update #{self.update_count})")
+            # Only store if we have at least one value
+            if depth_mm is not None or velocity_mps is not None or flow_lps is not None:
+                stored = self.scraper.store_measurement(
+                    device_id=device_id,
+                    device_name=device_name,
+                    depth_mm=depth_mm,
+                    velocity_mps=velocity_mps,
+                    flow_lps=flow_lps
+                )
+                
+                if stored:
+                    self.update_count += 1
+                    logger.info(f"✅ Data updated! (Update #{self.update_count})")
+                else:
+                    logger.debug("No changes detected from previous measurement")
             else:
-                logger.info("No changes detected")
+                logger.warning("⚠️  Could not extract any data values from the page")
                 
         except Exception as e:
             logger.error(f"❌ Error during check: {e}", exc_info=True)
