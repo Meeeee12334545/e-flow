@@ -37,6 +37,7 @@ import zlib
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from urllib.parse import urljoin, urlparse, parse_qs
+from pathlib import Path
 import logging
 import requests
 from bs4 import BeautifulSoup
@@ -85,9 +86,42 @@ class DataScraper:
         """Initialize scraper with optional database instance."""
         self.db = db or FlowDatabase()
         self.tz = pytz.timezone(DEFAULT_TZ)
-        self.last_data = {}  # Track last known values for change detection
+        
+        # File-based persistence for change detection state
+        self.state_file = Path(__file__).parent / ".scraper_state.json"
+        self.last_data = self._load_state()
+        
         # Allow forcing requests-only mode via environment to avoid browser launches in constrained runtimes
         self.force_requests = os.getenv("SCRAPER_FORCE_REQUESTS", "").lower() in ("1", "true", "yes")
+    
+    def _load_state(self) -> Dict:
+        """Load change detection state from disk."""
+        try:
+            if self.state_file.exists():
+                with open(self.state_file, 'r') as f:
+                    state = json.load(f)
+                    logger.debug(f"Loaded change detection state from disk: {len(state)} devices")
+                    return state
+        except Exception as e:
+            logger.warning(f"Failed to load state file: {e}")
+        return {}
+    
+    def _save_state(self):
+        """Save change detection state to disk."""
+        try:
+            # Convert datetime objects to strings for JSON serialization
+            serializable_state = {}
+            for device_id, data in self.last_data.items():
+                serializable_state[device_id] = {
+                    k: v.isoformat() if isinstance(v, datetime) else v
+                    for k, v in data.items()
+                }
+            
+            with open(self.state_file, 'w') as f:
+                json.dump(serializable_state, f, indent=2)
+            logger.debug(f"Saved change detection state to disk")
+        except Exception as e:
+            logger.warning(f"Failed to save state file: {e}")
 
     def _decrypt_share_token(self, share_param: str, pwd: str = "usr.cn") -> Optional[str]:
         """Replicate the secret_Key decryption used by the USRIOT share link to obtain the API token."""
@@ -309,6 +343,8 @@ class DataScraper:
                 '_hash': new_hash,
                 '_timestamp': datetime.now(self.tz)
             }
+            # Persist state to disk so it survives app restarts
+            self._save_state()
             logger.info(f"✓ Change detected for {device_id}: D={new_data.get('depth_mm')}mm, V={new_data.get('velocity_mps')}m/s, F={new_data.get('flow_lps')}L/s [Hash: {new_hash:08x}]")
         else:
             logger.debug(f"⊘ No change for {device_id} (hash match: {new_hash:08x})")

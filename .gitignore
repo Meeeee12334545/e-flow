@@ -33,6 +33,9 @@ flow_data.db-backup
 # Monitor lock file
 .monitor_lock
 
+# Change detection state
+.scraper_state.json
+
 # Logs
 *.log
 e-flow.log
