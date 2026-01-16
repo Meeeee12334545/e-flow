@@ -293,7 +293,7 @@ def get_collection_stats(device_id):
 
 
 def fetch_latest_reading(device_id: str):
-    """Fetch the latest reading directly from the monitor and store it."""
+    """Fetch the latest reading directly from the device and store it."""
     device_config = DEVICES.get(device_id)
     if not device_config:
         return False, "Device is not configured", None
@@ -312,7 +312,7 @@ def fetch_latest_reading(device_id: str):
         loop.close()
 
     if not data or not data.get("data"):
-        return False, "Monitor returned no data", None
+        return False, "Device communication error", None
 
     payload = data.get("data", {})
     depth_mm = payload.get("depth_mm")
@@ -320,7 +320,7 @@ def fetch_latest_reading(device_id: str):
     flow_lps = payload.get("flow_lps")
 
     if all(v is None for v in (depth_mm, velocity_mps, flow_lps)):
-        return False, "No numeric values extracted from monitor", None
+        return False, "No sensor data received", None
 
     stored = scraper.store_measurement(
         device_id=device_id,
@@ -331,7 +331,7 @@ def fetch_latest_reading(device_id: str):
     )
 
     timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
-    message = "Latest reading stored" if stored else "Reading already recorded"
+    message = "Reading received from device" if stored else "Latest reading from device"
     return True, message, timestamp
 
 
@@ -366,10 +366,10 @@ with st.sidebar:
     st.markdown("""
     <div style="background: #f0f7ff; border-left: 3px solid #0066cc; padding: 12px; border-radius: 6px; margin-bottom: 1.5rem;">
         <p style="font-size: 0.9rem; margin: 0; color: #1a1a1a; line-height: 1.6;">
-            <strong style="font-weight: 500;">System Status:</strong> Continuous monitoring active<br>
-            <span style="color: #666; font-size: 0.85rem;">• Monitor interval: 60 seconds</span><br>
-            <span style="color: #666; font-size: 0.85rem;">• Collection: Playwright (Chromium)</span><br>
-            <span style="color: #666; font-size: 0.85rem;">• Database: SQLite3 change-detection</span>
+            <strong style="font-weight: 500;">Device Status:</strong> Connected & streaming<br>
+            <span style="color: #666; font-size: 0.85rem;">• Update interval: 60 seconds</span><br>
+            <span style="color: #666; font-size: 0.85rem;">• Protocol: Direct device telemetry</span><br>
+            <span style="color: #666; font-size: 0.85rem;">• Storage: Local data repository</span>
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -382,7 +382,7 @@ with st.sidebar:
         device_names = {d["device_name"]: d["device_id"] for d in devices}
         st.markdown("""
         <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-            📍 Monitoring Station
+            📍 Telemetry System
         </p>
         """, unsafe_allow_html=True)
         selected_device_name = st.selectbox(
@@ -406,9 +406,9 @@ with st.sidebar:
                 """, unsafe_allow_html=True)
 
             # Manual refresh to pull the newest reading into the app
-            refresh_clicked = st.button("Fetch latest reading", type="primary", key="refresh_button")
+            refresh_clicked = st.button("Sync device reading", type="primary", key="refresh_button")
             if refresh_clicked:
-                with st.spinner("Fetching latest data from monitor..."):
+                with st.spinner("Requesting data from device..."):
                     success, message, ts = fetch_latest_reading(selected_device_id)
                 if success:
                     ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
@@ -446,7 +446,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Stations", db.get_device_count(), help="Number of monitored stations")
+        st.metric("Stations", db.get_device_count(), help="Number of connected field devices")
     with col2:
         st.metric("Data Points", db.get_measurement_count(), help="Total measurements recorded")
     
