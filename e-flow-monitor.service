@@ -1,0 +1,41 @@
+[Unit]
+Description=e-flow Hydrological Data Monitor Service
+After=network-online.target
+Wants=network-online.target
+Documentation=https://github.com/Meeeee12334545/e-flow
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/e-flow
+Environment="PATH=/opt/e-flow/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/opt/e-flow/.venv/bin/python monitor.py
+
+# Automatic restart configuration
+Restart=always
+RestartSec=30s
+StartLimitInterval=300
+StartLimitBurst=10
+
+# Resource limits
+MemoryLimit=512M
+CPUQuota=50%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=e-flow-monitor
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/e-flow
+
+# Health monitoring
+WatchdogSec=300s
+
+[Install]
+WantedBy=multi-user.target

@@ -24,7 +24,21 @@ This will:
 - ✅ Connect to the USRIOT dashboard website
 - ✅ Extract depth, velocity, and flow data every 1 minute
 - ✅ Store data in the database only when values change
+- ✅ **Automatically retry on failures** (3 attempts with 5s delay)
+- ✅ **Auto-restart on crashes** (up to 5 times)
+- ✅ **Health monitoring** (status checks every 5 minutes)
 - ✅ Run continuously until you press Ctrl+C
+
+**Production Features:**
+- Maximum 10 consecutive failures before alert
+- Comprehensive logging to monitor.log
+- Graceful shutdown on signals
+- Success rate tracking
+
+**For 24/7 production use, see:** [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md)
+- Systemd service (Linux)
+- Docker deployment (cross-platform)
+- Health monitoring and alerting
 
 ### 2. **Web Dashboard** (View the data)
 

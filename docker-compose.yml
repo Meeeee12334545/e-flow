@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Data collection service
+  monitor:
+    build: .
+    container_name: e-flow-monitor
+    restart: unless-stopped
+    volumes:
+      - ./flow_data.db:/app/flow_data.db
+      - ./monitor.log:/app/monitor.log
+    environment:
+      - MONITOR_ENABLED=true
+      - MONITOR_INTERVAL=60
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; conn = sqlite3.connect('flow_data.db'); conn.execute('SELECT 1'); conn.close()"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Dashboard service (optional)
+  dashboard:
+    build: .
+    container_name: e-flow-dashboard
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./flow_data.db:/app/flow_data.db:ro
+    depends_on:
+      - monitor
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
