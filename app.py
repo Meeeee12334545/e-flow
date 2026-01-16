@@ -14,7 +14,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from database import FlowDatabase
-from config import DEVICES
+from scraper import DataScraper
+from config import DEVICES, MONITOR_URL
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
 @st.cache_resource
@@ -286,6 +287,49 @@ def get_collection_stats(device_id):
     }
 
 
+def fetch_latest_reading(device_id: str):
+    """Fetch the latest reading directly from the monitor and store it."""
+    device_config = DEVICES.get(device_id)
+    if not device_config:
+        return False, "Device is not configured", None
+
+    scraper = DataScraper(db)
+    url = device_config.get("url") or MONITOR_URL
+    selectors = device_config.get("selectors")
+
+    try:
+        data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
+    except RuntimeError:
+        # Fallback if an event loop is already running
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
+        loop.close()
+
+    if not data or not data.get("data"):
+        return False, "Monitor returned no data", None
+
+    payload = data.get("data", {})
+    depth_mm = payload.get("depth_mm")
+    velocity_mps = payload.get("velocity_mps")
+    flow_lps = payload.get("flow_lps")
+
+    if all(v is None for v in (depth_mm, velocity_mps, flow_lps)):
+        return False, "No numeric values extracted from monitor", None
+
+    stored = scraper.store_measurement(
+        device_id=device_id,
+        device_name=device_config.get("name", device_id),
+        depth_mm=depth_mm,
+        velocity_mps=velocity_mps,
+        flow_lps=flow_lps
+    )
+
+    timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
+    message = "Latest reading stored" if stored else "Reading already recorded"
+    return True, message, timestamp
+
+
 # Page header
 col1, col2 = st.columns([3, 1])
 with col1:
@@ -355,6 +399,17 @@ with st.sidebar:
                     <p><strong style="font-weight: 500;">Initialized</strong><br><code>{device_info['created_at']}</code></p>
                 </div>
                 """, unsafe_allow_html=True)
+
+            # Manual refresh to pull the newest reading into the app
+            refresh_clicked = st.button("Fetch latest reading", type="primary", key="refresh_button")
+            if refresh_clicked:
+                with st.spinner("Fetching latest data from monitor..."):
+                    success, message, ts = fetch_latest_reading(selected_device_id)
+                if success:
+                    ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
+                    st.success(f"{message} at {ts_str}")
+                else:
+                    st.error(message)
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
@@ -395,19 +450,6 @@ with st.sidebar:
         if stats:
             st.metric("Collection Rate", f"{stats.get('collection_rate', 0):.1f}/min", help="Average points per minute")
 
-# Main content area
-if selected_device_id:
-    # Get measurements for selected device
-    measurements = db.get_measurements(device_id=selected_device_id)
-    
-    if measurements:
-        df = pd.DataFrame(measurements)
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        
-        # Filter by time range
-        cutoff_time = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=time_range)
-        df = df[df["timestamp"] >= cutoff_time].sort_values("timestamp")
-        
 # Main content area
 if selected_device_id:
     # Get measurements for selected device
@@ -532,7 +574,7 @@ if selected_device_id:
                     )
                     fig_depth.update_traces(line=dict(color="#1f77b4", width=2), marker=dict(size=4))
                     fig_depth.update_layout(hovermode="x unified", height=400)
-                    st.plotly_chart(fig_depth, use_container_width=True)
+                    st.plotly_chart(fig_depth, width="stretch")
                     
                     if len(df) > 0:
                         col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
@@ -554,7 +596,7 @@ if selected_device_id:
                         markers=True
                     )
                     fig_velocity.update_layout(hovermode="x unified")
-                    st.plotly_chart(fig_velocity, use_container_width=True)
+                    st.plotly_chart(fig_velocity, width="stretch")
                 
                 with tab3:
                     fig_flow = px.line(
@@ -564,7 +606,7 @@ if selected_device_id:
                         markers=True
                     )
                     fig_flow.update_layout(hovermode="x unified")
-                    st.plotly_chart(fig_flow, use_container_width=True)
+                    st.plotly_chart(fig_flow, width="stretch")
             
             # Data table
             st.markdown("""
@@ -575,7 +617,7 @@ if selected_device_id:
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.dataframe(display_df, width="stretch", hide_index=True)
             
             # Export functionality
             st.markdown("""
