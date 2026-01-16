@@ -514,12 +514,6 @@ with st.sidebar:
             
             # Display real-time data if available
             if 'realtime_data' in st.session_state:
-                st.markdown("""
-                <p style="font-weight: 500; font-size: 0.95rem; margin-top: 1.5rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-                    🔴 Live Real-Time Data
-                </p>
-                """, unsafe_allow_html=True)
-                
                 rtd = st.session_state['realtime_data']
                 depth = rtd.get('depth_mm')
                 velocity = rtd.get('velocity_mps')
