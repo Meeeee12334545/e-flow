@@ -132,9 +132,16 @@ class DataScraper:
             if not token:
                 return {}
 
+            # Cache-busting headers for fresh data on every request
+            cache_headers = {
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+
             # Refresh the token (the decrypted one is often expired in embeds)
-            refresh_url = f"https://api.mp.usriot.com/usrCloud/user/refreshShareToken?token={token}"
-            refresh_resp = requests.get(refresh_url, timeout=10)
+            refresh_url = f"https://api.mp.usriot.com/usrCloud/user/refreshShareToken?token={token}&t={int(datetime.utcnow().timestamp() * 1000)}"
+            refresh_resp = requests.get(refresh_url, timeout=10, headers=cache_headers)
             if refresh_resp.status_code == 200:
                 try:
                     refreshed = refresh_resp.json()
@@ -156,13 +163,17 @@ class DataScraper:
                 "languagetype": "0",
                 "traceid": "ODg4MzE=",
                 "content-type": "application/json",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
             }
 
             resp = requests.post(datapoint_url, json={"dataPointQueryList": query_list, "token": token}, headers=headers, timeout=10)
             resp.raise_for_status()
             payload = resp.json()
             if payload.get("status") == 4010:  # token expired
-                refresh_resp = requests.get(refresh_url, timeout=10)
+                refresh_url_retry = f"https://api.mp.usriot.com/usrCloud/user/refreshShareToken?token={token}&t={int(datetime.utcnow().timestamp() * 1000)}"
+                refresh_resp = requests.get(refresh_url_retry, timeout=10, headers=cache_headers)
                 if refresh_resp.status_code == 200:
                     refreshed = refresh_resp.json()
                     if refreshed.get("status") == 0:
@@ -277,7 +288,12 @@ class DataScraper:
     def _fetch_via_requests(self, url: str, selectors: Dict) -> Dict:
         """Lightweight fallback that pulls values via plain HTTP and CSS selectors."""
         try:
-            resp = requests.get(url, timeout=10)
+            cache_headers = {
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+            resp = requests.get(url, timeout=10, headers=cache_headers)
             resp.raise_for_status()
         except Exception as e:
             logger.warning(f"Requests fallback failed to fetch page: {e}")

@@ -32,7 +32,7 @@ SCRAPER_WAIT_AFTER_LOAD = 3000  # milliseconds - increased for better loading
 # Monitor settings
 MONITOR_INTERVAL = 60  # seconds (1 minute for continuous monitoring)
 MONITOR_ENABLED = True  # Enable continuous monitoring
-STORE_ALL_READINGS = True  # If True, stores every reading. If False, only stores when values change
+STORE_ALL_READINGS = False  # If True, stores every reading. If False, only stores when values change
 
 # Streamlit settings
 STREAMLIT_DEFAULT_TIME_RANGE = 24  # hours
