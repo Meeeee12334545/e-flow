@@ -483,6 +483,17 @@ with st.sidebar:
     else:
         st.warning(f"⚠️ Auto-collect: {monitor_status.get('reason', 'Inactive')}")
     
+    # Build device mapping from database
+    devices = db.get_devices()
+    device_names = {d['device_name']: d['device_id'] for d in devices}
+    
+    if not device_names:
+        st.error("⚠️ No devices found in database")
+        st.info("Initializing devices from config...")
+        init_devices()
+        devices = db.get_devices()
+        device_names = {d['device_name']: d['device_id'] for d in devices}
+    
     selected_device_name = st.selectbox(
         "Select Device",
         options=sorted(device_names.keys()),
