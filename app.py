@@ -759,8 +759,8 @@ if selected_device_id:
             </h3>
             """, unsafe_allow_html=True)
             
-            if len(df) > 1:
-                # Create tabs for different views
+            if len(df) >= 1:
+                # Create tabs for different views - show even with 1 data point
                 tab1, tab2, tab3, tab4 = st.tabs(["Depth", "Velocity", "Flow", "Summary Statistics"])
                 
                 with tab1:
