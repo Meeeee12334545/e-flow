@@ -397,7 +397,15 @@ def get_collection_stats(device_id):
 
 
 def fetch_latest_reading(device_id: str):
-    """Fetch and display the latest reading from the device (display-only, not stored)."""
+    """
+    Fetch and display the latest reading from the device (display-only, not stored).
+    
+    IMPORTANT: This function ONLY fetches and displays data in the UI.
+    - Data is stored ONLY in session state for temporary display
+    - NO database writes are triggered by this function
+    - Database writes happen ONLY from the background auto-monitor thread
+    - This keeps manual real-time views completely separate from auto-collected data
+    """
     device_config = DEVICES.get(device_id)
     if not device_config:
         return False, "Device is not configured", None
@@ -426,10 +434,12 @@ def fetch_latest_reading(device_id: str):
     if all(v is None for v in (depth_mm, velocity_mps, flow_lps)):
         return False, "No sensor data received", None
 
-    # NOTE: Manual sync does NOT store to database (display-only)
-    # Database writes happen only from automated monitor.py checks for data consistency
+    # NOTE: This function EXPLICITLY DOES NOT call store_measurement()
+    # Manual real-time data stays in session state only (temporary display)
+    # Database writes happen only from the background monitor thread (auto-collect)
+    # This ensures manual and auto-collected data are kept completely separate
     timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
-    message = "Device data retrieved (not stored - auto-sync only)"
+    message = "✓ Real-time data retrieved (display only, not saved to database)"
     return True, message, timestamp
 
 
@@ -805,6 +815,117 @@ if selected_device_id:
                     )
                     fig_flow.update_layout(hovermode="x unified")
                     st.plotly_chart(fig_flow, width="stretch")
+                
+                with tab4:
+                    st.markdown("""
+                    <h4 style="font-weight: 500; letter-spacing: 0.3px; margin-bottom: 1.5rem;">
+                        Aggregate Statistics
+                    </h4>
+                    """, unsafe_allow_html=True)
+                    
+                    # Create 3 columns for the three metrics
+                    col_summary1, col_summary2, col_summary3 = st.columns(3)
+                    
+                    # DEPTH STATISTICS
+                    with col_summary1:
+                        st.markdown("<p style='font-weight: 500; color: #0066cc; margin-bottom: 1rem;'>💧 WATER DEPTH</p>", unsafe_allow_html=True)
+                        
+                        depth_mean = df['depth_mm'].mean()
+                        depth_median = df['depth_mm'].median()
+                        depth_std = df['depth_mm'].std()
+                        depth_min = df['depth_mm'].min()
+                        depth_max = df['depth_mm'].max()
+                        depth_range = depth_max - depth_min
+                        
+                        st.metric("Mean", f"{depth_mean:.1f} mm")
+                        st.metric("Median", f"{depth_median:.1f} mm")
+                        st.metric("Std Dev", f"{depth_std:.1f} mm")
+                        st.metric("Min", f"{depth_min:.1f} mm")
+                        st.metric("Max", f"{depth_max:.1f} mm")
+                        st.metric("Range", f"{depth_range:.1f} mm")
+                    
+                    # VELOCITY STATISTICS
+                    with col_summary2:
+                        st.markdown("<p style='font-weight: 500; color: #0066cc; margin-bottom: 1rem;'>⚡ FLOW VELOCITY</p>", unsafe_allow_html=True)
+                        
+                        vel_mean = df['velocity_mps'].mean()
+                        vel_median = df['velocity_mps'].median()
+                        vel_std = df['velocity_mps'].std()
+                        vel_min = df['velocity_mps'].min()
+                        vel_max = df['velocity_mps'].max()
+                        vel_range = vel_max - vel_min
+                        
+                        st.metric("Mean", f"{vel_mean:.3f} m/s")
+                        st.metric("Median", f"{vel_median:.3f} m/s")
+                        st.metric("Std Dev", f"{vel_std:.3f} m/s")
+                        st.metric("Min", f"{vel_min:.3f} m/s")
+                        st.metric("Max", f"{vel_max:.3f} m/s")
+                        st.metric("Range", f"{vel_range:.3f} m/s")
+                    
+                    # FLOW STATISTICS
+                    with col_summary3:
+                        st.markdown("<p style='font-weight: 500; color: #0066cc; margin-bottom: 1rem;'>🌊 FLOW RATE</p>", unsafe_allow_html=True)
+                        
+                        flow_mean = df['flow_lps'].mean()
+                        flow_median = df['flow_lps'].median()
+                        flow_std = df['flow_lps'].std()
+                        flow_min = df['flow_lps'].min()
+                        flow_max = df['flow_lps'].max()
+                        flow_range = flow_max - flow_min
+                        
+                        st.metric("Mean", f"{flow_mean:.1f} L/s")
+                        st.metric("Median", f"{flow_median:.1f} L/s")
+                        st.metric("Std Dev", f"{flow_std:.1f} L/s")
+                        st.metric("Min", f"{flow_min:.1f} L/s")
+                        st.metric("Max", f"{flow_max:.1f} L/s")
+                        st.metric("Range", f"{flow_range:.1f} L/s")
+                    
+                    # Distribution charts
+                    st.markdown("---")
+                    st.markdown("<h4 style='font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;'>Distribution Analysis</h4>", unsafe_allow_html=True)
+                    
+                    dist_col1, dist_col2 = st.columns(2)
+                    
+                    with dist_col1:
+                        fig_hist_depth = px.histogram(
+                            df, x="depth_mm",
+                            title="Depth Distribution",
+                            nbins=20,
+                            labels={"depth_mm": "Depth (mm)", "count": "Frequency"}
+                        )
+                        fig_hist_depth.update_traces(marker=dict(color="#1f77b4"))
+                        st.plotly_chart(fig_hist_depth, width="stretch", use_container_width=True)
+                    
+                    with dist_col2:
+                        fig_hist_flow = px.histogram(
+                            df, x="flow_lps",
+                            title="Flow Distribution",
+                            nbins=20,
+                            labels={"flow_lps": "Flow (L/s)", "count": "Frequency"}
+                        )
+                        fig_hist_flow.update_traces(marker=dict(color="#ff7f0e"))
+                        st.plotly_chart(fig_hist_flow, width="stretch", use_container_width=True)
+                    
+                    # Data collection info
+                    st.markdown("---")
+                    st.markdown("<h4 style='font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;'>Collection Summary</h4>", unsafe_allow_html=True)
+                    
+                    collection_col1, collection_col2, collection_col3, collection_col4 = st.columns(4)
+                    
+                    with collection_col1:
+                        st.metric("Total Points", len(df))
+                    
+                    with collection_col2:
+                        time_span_hours = (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 3600
+                        st.metric("Time Span", f"{time_span_hours:.1f}h")
+                    
+                    with collection_col3:
+                        collection_rate = len(df) / max(1, time_span_hours)
+                        st.metric("Collection Rate", f"{collection_rate:.1f}/hr")
+                    
+                    with collection_col4:
+                        completeness = (len(df) - df[['depth_mm', 'velocity_mps', 'flow_lps']].isna().sum().max()) / max(1, len(df)) * 100
+                        st.metric("Data Completeness", f"{completeness:.0f}%")
             
             # Data table
             st.markdown("""
