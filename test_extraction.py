@@ -22,7 +22,13 @@ async def test_extraction():
     scraper = DataScraper(db)
     
     print("⏳ Fetching data from website...")
-    data = await scraper.fetch_monitor_data(MONITOR_URL)
+    
+    # Get device config with CSS selectors
+    device_id = "FIT100"
+    device_info = DEVICES.get(device_id, {})
+    device_selectors = device_info.get("selectors", None)
+    
+    data = await scraper.fetch_monitor_data(MONITOR_URL, device_selectors)
     
     if not data:
         print("❌ Failed to fetch data!")
@@ -73,35 +79,10 @@ async def test_extraction():
     flow_lps = None
     
     if isinstance(page_data, dict):
-        if "depth" in page_data:
-            try:
-                val = page_data["depth"]
-                if isinstance(val, (int, float)):
-                    depth_mm = float(val)
-                else:
-                    depth_mm = float(str(val).replace("mm", "").replace("m", "").strip())
-            except (ValueError, AttributeError, TypeError):
-                pass
-        
-        if "velocity" in page_data:
-            try:
-                val = page_data["velocity"]
-                if isinstance(val, (int, float)):
-                    velocity_mps = float(val)
-                else:
-                    velocity_mps = float(str(val).replace("mps", "").replace("m/s", "").replace("m", "").strip())
-            except (ValueError, AttributeError, TypeError):
-                pass
-        
-        if "flow" in page_data:
-            try:
-                val = page_data["flow"]
-                if isinstance(val, (int, float)):
-                    flow_lps = float(val)
-                else:
-                    flow_lps = float(str(val).replace("lps", "").replace("l/s", "").replace("L/s", "").strip())
-            except (ValueError, AttributeError, TypeError):
-                pass
+        # Check for both old and new key formats
+        depth_mm = page_data.get('depth_mm') or page_data.get('depth')
+        velocity_mps = page_data.get('velocity_mps') or page_data.get('velocity')
+        flow_lps = page_data.get('flow_lps') or page_data.get('flow')
     
     stored = scraper.store_measurement(
         device_id=device_id,

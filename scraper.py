@@ -64,8 +64,8 @@ class DataScraper:
         
         return has_changed
 
-    async def fetch_monitor_data(self, url: str = MONITOR_URL, device_xpaths: Dict = None) -> Optional[Dict]:
-        """Fetch data from the monitor website using Selenium and XPath selectors."""
+    async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Dict = None) -> Optional[Dict]:
+        """Fetch data from the monitor website using Selenium and JavaScript selectors."""
         driver = None
         try:
             logger.info(f"Loading page with Selenium: {url[:80]}...")
@@ -96,37 +96,39 @@ class DataScraper:
             
             page_data = {}
             
-            # Extract data using XPath selectors if provided
-            if device_xpaths:
-                for key, xpath in device_xpaths.items():
+            # Extract data using CSS selectors with JavaScript if provided
+            if device_selectors:
+                for key, selector in device_selectors.items():
                     try:
-                        element = driver.find_element(By.XPATH, xpath)
-                        text = element.text.strip()
+                        # Use querySelector to find element
+                        js_code = f"""
+                        var elem = document.querySelector('{selector}');
+                        return elem ? elem.textContent.trim() : null;
+                        """
+                        text = driver.execute_script(js_code)
                         
-                        # Extract numeric value
-                        numbers = re.findall(r'\d+\.?\d*', text)
-                        if numbers:
-                            page_data[key] = float(numbers[0])
-                            logger.info(f"✅ Extracted {key}: {page_data[key]} (from '{text}')")
+                        if text:
+                            # Extract numeric value
+                            numbers = re.findall(r'\d+\.?\d*', text)
+                            if numbers:
+                                page_data[key] = float(numbers[0])
+                                logger.info(f"✅ Extracted {key}: {page_data[key]} (from '{text}')")
+                            else:
+                                logger.warning(f"⚠️  No numbers found in {key}: '{text}'")
                         else:
-                            logger.warning(f"⚠️  No numbers found in {key}: '{text}'")
+                            logger.warning(f"⚠️  Selector not found for {key}: {selector}")
                             
-                    except NoSuchElementException:
-                        logger.warning(f"⚠️  XPath not found for {key}: {xpath}")
                     except Exception as e:
                         logger.warning(f"⚠️  Error extracting {key}: {e}")
             else:
                 # Fallback: try to find elements by common patterns
-                logger.info("No XPath provided, attempting pattern matching...")
+                logger.info("No selectors provided, attempting pattern matching...")
                 try:
                     spans = driver.find_elements(By.TAG_NAME, "span")
                     for span in spans[:100]:  # Check first 100 spans
                         try:
                             text = span.text.strip()
                             if text:
-                                parent_id = span.get_attribute("id")
-                                parent_parent_id = span.find_element(By.XPATH, "..").get_attribute("id") if span.find_elements(By.XPATH, "..") else None
-                                
                                 if "depth" in text.lower():
                                     nums = re.findall(r'\d+\.?\d*', text)
                                     if nums:

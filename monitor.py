@@ -50,14 +50,14 @@ class ContinuousMonitor:
         try:
             logger.info(f"[Check #{self.check_count}] Checking for data updates...")
             
-            # Get device config with XPath selectors
+            # Get device config with CSS selectors
             device_id = "FIT100"
             device_info = DEVICES.get(device_id, {})
             device_name = device_info.get("name", "FIT100 Main Inflow Lismore STP")
-            device_xpaths = device_info.get("xpaths", None)
+            device_selectors = device_info.get("selectors", None)
             
-            # Fetch data from monitor with XPath selectors
-            data = await self.scraper.fetch_monitor_data(MONITOR_URL, device_xpaths)
+            # Fetch data from monitor with CSS selectors
+            data = await self.scraper.fetch_monitor_data(MONITOR_URL, device_selectors)
             
             if not data:
                 logger.warning("Failed to retrieve data from monitor")
