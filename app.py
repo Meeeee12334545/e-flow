@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import subprocess
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
@@ -15,7 +16,7 @@ import plotly.graph_objects as go
 
 from database import FlowDatabase
 from scraper import DataScraper
-from config import DEVICES, MONITOR_URL
+from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
 @st.cache_resource
@@ -39,6 +40,35 @@ def ensure_playwright_installed():
 
 # Install on startup (cached so only runs once)
 ensure_playwright_installed()
+
+@st.cache_resource
+def start_background_monitor():
+    """Start monitor.py as a background daemon thread for auto data collection."""
+    if not MONITOR_ENABLED:
+        return False
+    
+    try:
+        # Check if already running by attempting to import and checking active threads
+        import monitor
+        
+        def run_monitor():
+            try:
+                mon = monitor.ContinuousMonitor()
+                mon.start_monitoring()
+            except Exception as e:
+                logger.error(f"Monitor thread error: {e}")
+        
+        # Start monitor in daemon thread (won't block Streamlit)
+        monitor_thread = threading.Thread(target=run_monitor, daemon=True, name="MonitorDaemon")
+        monitor_thread.start()
+        logger.info("✅ Background monitor started successfully")
+        return True
+    except Exception as e:
+        logger.warning(f"Could not start background monitor: {e}")
+        return False
+
+# Start background monitor (cached so only runs once per Streamlit session)
+monitor_started = start_background_monitor()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -446,28 +476,35 @@ with st.sidebar:
                 flow = rtd.get('flow_lps')
                 ts = rtd.get('timestamp')
                 
+                # Determine if we have valid data (green) or no data (red)
+                has_data = depth is not None or velocity is not None or flow is not None
+                bg_color = "linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%)" if has_data else "linear-gradient(135deg, #ffebee 0%, #ffffff 100%)"
+                border_color = "#4caf50" if has_data else "#f44336"
+                text_color = "#2e7d32" if has_data else "#c62828"
+                status_icon = "🟢" if has_data else "🔴"
+                
                 st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%); 
-                            padding: 15px; border-radius: 10px; border: 2px solid #ff9800;
+                <div style="background: {bg_color}; 
+                            padding: 15px; border-radius: 10px; border: 2px solid {border_color};
                             margin-bottom: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span style="font-size: 0.85rem; color: #e65100; font-weight: 500;">CURRENT VALUES</span>
+                        <span style="font-size: 0.85rem; color: {text_color}; font-weight: 500;">{status_icon} LIVE DATA</span>
                         <span style="font-size: 0.75rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
                         <div style="text-align: center;">
                             <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Depth</div>
-                            <div style="font-size: 1.3rem; font-weight: 500; color: #e65100;">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
+                            <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
                             <div style="font-size: 0.7rem; color: #888;">mm</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Velocity</div>
-                            <div style="font-size: 1.3rem; font-weight: 500; color: #e65100;">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
+                            <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
                             <div style="font-size: 0.7rem; color: #888;">m/s</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Flow</div>
-                            <div style="font-size: 1.3rem; font-weight: 500; color: #e65100;">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
+                            <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
                             <div style="font-size: 0.7rem; color: #888;">L/s</div>
                         </div>
                     </div>
@@ -713,27 +750,40 @@ if selected_device_id:
         else:
             st.info("No data available for the selected time range.")
     else:
-        st.warning("📊 **No measurements found for this device**")
-        st.markdown("""
-        **To populate the database with measurements:**
-        
-        1. **Run the background monitor** (auto-collects data every 60 seconds):
-           ```bash
-           python monitor.py
-           ```
-        
-        2. **Or manually test the scraper**:
-           ```bash
-           python scraper.py
-           ```
-        
-        The background monitor (`monitor.py`) automatically:
-        - Checks for new data every 60 seconds
-        - Stores measurements only when values change
-        - Provides clean, consistent database records
-        
-        Once monitor.py is running, refresh this page to see charts and data.
-        """)
+        if monitor_started:
+            st.info("📊 **Background monitor is running - waiting for data collection...**")
+            st.markdown("""
+            The automatic data collection service is active and checking every 60 seconds.
+            
+            **What's happening:**
+            - Monitor checks device every 60 seconds
+            - Stores measurements only when values change
+            - First reading may take up to 1 minute
+            
+            Refresh this page in a minute to see data populate.
+            """)
+        else:
+            st.warning("📊 **No measurements found - Background monitor not active**")
+            st.markdown("""
+            **To populate the database with measurements:**
+            
+            1. **Manually run the background monitor** (auto-collects data every 60 seconds):
+               ```bash
+               python monitor.py
+               ```
+            
+            2. **Or manually test the scraper**:
+               ```bash
+               python scraper.py
+               ```
+            
+            The background monitor (`monitor.py`) automatically:
+            - Checks for new data every 60 seconds
+            - Stores measurements only when values change
+            - Provides clean, consistent database records
+            
+            Once monitor.py is running, refresh this page to see charts and data.
+            """)
 else:
     st.info("👈 Select a device from the sidebar to view data.")
 
