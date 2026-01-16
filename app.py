@@ -22,8 +22,13 @@ from config import DEVICES, MONITOR_URL
 def ensure_playwright_installed():
     """Install Playwright browsers if not already installed."""
     try:
-        # Try to install Playwright browsers
-        result = subprocess.run(
+        # Ensure system deps (libnspr4, libnss3, etc.) and browser are present
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install-deps", "chromium"],
+            capture_output=True,
+            timeout=120
+        )
+        subprocess.run(
             [sys.executable, "-m", "playwright", "install", "chromium"],
             capture_output=True,
             timeout=120
