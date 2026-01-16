@@ -45,22 +45,46 @@ ensure_playwright_installed()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global flag to ensure only ONE monitor thread ever starts (prevents duplicates)
-_MONITOR_STARTED = False
-_MONITOR_LOCK = threading.Lock()
+# File-based lock to prevent multiple monitors across app restarts
+MONITOR_LOCK_FILE = Path(__file__).parent / ".monitor_lock"
+
+def is_monitor_running():
+    """Check if monitor is already running using file lock."""
+    if not MONITOR_LOCK_FILE.exists():
+        return False
+    
+    try:
+        # Check if lock file is recent (within last 2 minutes)
+        lock_time = datetime.fromtimestamp(MONITOR_LOCK_FILE.stat().st_mtime)
+        age_seconds = (datetime.now() - lock_time).total_seconds()
+        
+        if age_seconds < 120:  # Lock is recent, monitor likely running
+            return True
+        else:
+            # Stale lock, remove it
+            MONITOR_LOCK_FILE.unlink()
+            return False
+    except Exception:
+        return False
+
+def create_monitor_lock():
+    """Create lock file to indicate monitor is running."""
+    MONITOR_LOCK_FILE.touch()
+    
+def update_monitor_lock():
+    """Update lock file timestamp to show monitor is alive."""
+    try:
+        MONITOR_LOCK_FILE.touch()
+    except Exception:
+        pass
 
 @st.cache_resource
 def start_background_monitor():
     """Start a simple background thread for auto data collection."""
-    global _MONITOR_STARTED
-    
-    # Double-check locking pattern to prevent multiple monitor threads
-    if _MONITOR_STARTED:
-        return {"started": True, "thread": None, "reason": "Monitor already running (prevented duplicate)"}
-    
-    with _MONITOR_LOCK:
-        if _MONITOR_STARTED:
-            return {"started": True, "thread": None, "reason": "Monitor already running (prevented duplicate)"}
+    # Check file-based lock first
+    if is_monitor_running():
+        logger.info("⊗ Monitor already running (file lock exists), skipping start")
+        return {"started": False, "thread": None, "reason": "Monitor already running (file lock exists)"}
     
     if not MONITOR_ENABLED:
         return {"started": False, "thread": None, "reason": "Monitor disabled in config"}
@@ -81,10 +105,16 @@ def start_background_monitor():
             db = FlowDatabase()
             scraper = DataScraper(db)
             
+            # Create lock file
+            create_monitor_lock()
+            
             logger.info("🚀 Simple background monitor started")
             
             while True:
                 try:
+                    # Update lock file timestamp to show we're alive
+                    update_monitor_lock()
+                    
                     check_count += 1
                     
                     device_id = "FIT100"
@@ -143,16 +173,19 @@ def start_background_monitor():
                 # Wait 60 seconds before next check
                 time.sleep(60)
             
+            # Clean up lock file on exit
+            try:
+                MONITOR_LOCK_FILE.unlink()
+            except Exception:
+                pass
+            
             logger.error("❌ Background monitor stopped")
         
         # Start monitor in daemon thread
         monitor_thread = threading.Thread(target=run_simple_monitor, daemon=True, name="SimpleMonitor")
         monitor_thread.start()
         
-        # Mark as started AFTER thread starts successfully
-        _MONITOR_STARTED = True
-        
-        logger.info("✅ Background monitor thread started")
+        logger.info("✅ Background monitor thread started with file lock")
         return {"started": True, "thread": monitor_thread, "reason": "Monitor started successfully"}
     except Exception as e:
         error_msg = f"Failed to start: {e}"
