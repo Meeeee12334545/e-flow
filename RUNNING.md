@@ -23,11 +23,16 @@ python monitor.py
 This will:
 - ✅ Connect to the USRIOT dashboard website
 - ✅ Extract depth, velocity, and flow data every 1 minute
-- ✅ Store data in the database only when values change
+- ✅ **Store EVERY reading** (configurable in config.py)
 - ✅ **Automatically retry on failures** (3 attempts with 5s delay)
 - ✅ **Auto-restart on crashes** (up to 5 times)
 - ✅ **Health monitoring** (status checks every 5 minutes)
 - ✅ Run continuously until you press Ctrl+C
+
+**Storage Configuration:**
+By default, `STORE_ALL_READINGS = True` in config.py, which stores every reading.
+- Set to `True`: Stores data every 60 seconds (shows actual check frequency)
+- Set to `False`: Only stores when values change (saves database space)
 
 **Production Features:**
 - Maximum 10 consecutive failures before alert

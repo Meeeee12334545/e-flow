@@ -25,7 +25,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from scraper import DataScraper
 from database import FlowDatabase
-from config import MONITOR_INTERVAL, MONITOR_ENABLED, MONITOR_URL, DEVICES
+from config import MONITOR_INTERVAL, MONITOR_ENABLED, MONITOR_URL, DEVICES, STORE_ALL_READINGS
 
 # Configure logging with rotation
 logging.basicConfig(
@@ -189,9 +189,12 @@ class ContinuousMonitor:
                 
                 if stored:
                     self.update_count += 1
-                    logger.info(f"✅ Data updated! (Update #{self.update_count})")
+                    if STORE_ALL_READINGS:
+                        logger.info(f"✅ Reading stored! (Total: #{self.update_count})")
+                    else:
+                        logger.info(f"✅ Data changed and stored! (Update #{self.update_count})")
                 else:
-                    logger.debug("No changes detected from previous measurement")
+                    logger.info(f"ℹ️  Data unchanged, not stored (Depth={depth_mm}mm, Vel={velocity_mps}m/s, Flow={flow_lps}L/s)")
             else:
                 logger.warning("⚠️  Could not extract any data values from the page")
                 return False
@@ -250,8 +253,9 @@ class ContinuousMonitor:
         logger.info(f"🔄 Auto-retry: {MAX_RETRY_ATTEMPTS} attempts per check")
         logger.info(f"💚 Health checks: Every {HEALTH_CHECK_INTERVAL} seconds")
         logger.info(f"🛡️  Max consecutive errors: {MAX_CONSECUTIVE_ERRORS}")
+        logger.info(f"💾 Storage mode: {'ALL readings (every check)' if STORE_ALL_READINGS else 'CHANGED values only'}")
         logger.info("=" * 60)
-        logger.info("✅ Monitoring will detect changes and store only new data")
+        logger.info("✅ Monitoring will detect changes and store only new data" if not STORE_ALL_READINGS else "✅ Monitoring will store EVERY reading (even if unchanged)")
         logger.info("✅ Automatic retry on failures")
         logger.info("✅ Health monitoring enabled")
         logger.info("Press Ctrl+C to stop")

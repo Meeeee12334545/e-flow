@@ -48,6 +48,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 
 from database import FlowDatabase
+from config import STORE_ALL_READINGS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -252,8 +253,10 @@ class DataScraper:
                          depth_mm: float = None, velocity_mps: float = None, 
                          flow_lps: float = None) -> bool:
         """
-        Store a measurement in the database only if data has changed.
-        Returns True if stored, False if no change detected.
+        Store a measurement in the database.
+        If STORE_ALL_READINGS=True, stores every reading.
+        If STORE_ALL_READINGS=False, only stores when data has changed.
+        Returns True if stored, False if no change detected (when change detection enabled).
         """
         new_data = {
             "depth_mm": depth_mm,
@@ -261,9 +264,11 @@ class DataScraper:
             "flow_lps": flow_lps
         }
         
-        # Check for changes
-        if not self._has_data_changed(device_id, new_data):
-            return False
+        # Check for changes only if STORE_ALL_READINGS is False
+        if not STORE_ALL_READINGS:
+            if not self._has_data_changed(device_id, new_data):
+                logger.debug(f"No change detected for {device_name}, skipping storage")
+                return False
         
         self.db.add_device(device_id, device_name)
         self.db.add_measurement(
@@ -273,7 +278,16 @@ class DataScraper:
             velocity_mps=velocity_mps,
             flow_lps=flow_lps
         )
-        logger.info(f"✅ Stored measurement for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+        
+        if STORE_ALL_READINGS:
+            logger.info(f"✅ Stored reading for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+        else:
+            logger.info(f"✅ Stored changed data for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+        
+        # Update last_data for change tracking
+        if not STORE_ALL_READINGS:
+            self.last_data[device_id] = new_data
+        
         return True
 
     def get_last_values(self, device_id: str) -> Optional[Dict]:
