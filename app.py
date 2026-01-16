@@ -473,118 +473,118 @@ with st.sidebar:
         </p>
     </div>
     """, unsafe_allow_html=True)
-        
-        # Background monitor status
-        thread_alive = monitor_thread and monitor_thread.is_alive() if monitor_thread else False
-        if monitor_started and thread_alive:
-            st.success("🟢 Auto-collect: Active")
-        elif monitor_started and not thread_alive:
-            st.error("🔴 Auto-collect: Thread died - Restart app to fix")
-        else:
-            st.warning(f"⚠️ Auto-collect: {monitor_status.get('reason', 'Inactive')}")
-        """, unsafe_allow_html=True)
-        selected_device_name = st.selectbox(
-            "Select Device",
-            options=sorted(device_names.keys()),
-            key="device_selector",
-            label_visibility="collapsed"
-        )
-        selected_device_id = device_names[selected_device_name]
-        
-        # Get selected device info
-        device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
-        if device_info:
-            with st.expander("📋 Station Details", expanded=False):
-                st.markdown(f"""
-                <div style="font-family: 'Helvetica Neue', sans-serif; font-weight: 300; line-height: 1.8;">
-                    <p><strong style="font-weight: 500;">Station ID</strong><br><code>{device_info['device_id']}</code></p>
-                    <p><strong style="font-weight: 500;">Location</strong><br>{device_info['location'] or 'Not specified'}</p>
-                    <p><strong style="font-weight: 500;">Initialized</strong><br><code>{device_info['created_at']}</code></p>
-                </div>
-                """, unsafe_allow_html=True)
+    
+    # Background monitor status
+    thread_alive = monitor_thread and monitor_thread.is_alive() if monitor_thread else False
+    if monitor_started and thread_alive:
+        st.success("🟢 Auto-collect: Active")
+    elif monitor_started and not thread_alive:
+        st.error("🔴 Auto-collect: Thread died - Restart app to fix")
+    else:
+        st.warning(f"⚠️ Auto-collect: {monitor_status.get('reason', 'Inactive')}")
+    
+    selected_device_name = st.selectbox(
+        "Select Device",
+        options=sorted(device_names.keys()),
+        key="device_selector",
+        label_visibility="collapsed"
+    )
+    selected_device_id = device_names[selected_device_name]
+    
+    # Get selected device info
+    device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
+    if device_info:
+        with st.expander("📋 Station Details", expanded=False):
+            st.markdown(f"""
+            <div style="font-family: 'Helvetica Neue', sans-serif; font-weight: 300; line-height: 1.8;">
+                <p><strong style="font-weight: 500;">Station ID</strong><br><code>{device_info['device_id']}</code></p>
+                <p><strong style="font-weight: 500;">Location</strong><br>{device_info['location'] or 'Not specified'}</p>
+                <p><strong style="font-weight: 500;">Initialized</strong><br><code>{device_info['created_at']}</code></p>
+            </div>
+            """, unsafe_allow_html=True)
 
-            # Manual refresh to pull the newest reading into the app
-            refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
-            
-            if refresh_clicked:
-                with st.spinner("Requesting data from device..."):
-                    success, message, ts = fetch_latest_reading(selected_device_id)
-                    
-                    # Get the actual data values for display
-                    device_config = DEVICES.get(selected_device_id)
-                    scraper = DataScraper(db)
-                    url = device_config.get("url") or MONITOR_URL
-                    selectors = device_config.get("selectors")
-                    
-                    try:
-                        data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
-                    except RuntimeError:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
-                        loop.close()
-                    
-                    if success and data and data.get("data"):
-                        payload = data.get("data", {})
-                        
-                        # Store to session state for display
-                        st.session_state['realtime_data'] = {
-                            'depth_mm': payload.get("depth_mm"),
-                            'velocity_mps': payload.get("velocity_mps"),
-                            'flow_lps': payload.get("flow_lps"),
-                            'timestamp': ts
-                        }
-                        
-                        ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
-                        st.success(f"{message} at {ts_str}")
-                    else:
-                        st.error(message)
-            
-            # Display real-time data if available
-            if 'realtime_data' in st.session_state:
-                rtd = st.session_state['realtime_data']
-                depth = rtd.get('depth_mm')
-                velocity = rtd.get('velocity_mps')
-                flow = rtd.get('flow_lps')
-                ts = rtd.get('timestamp')
+        # Manual refresh to pull the newest reading into the app
+        refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
+        
+        if refresh_clicked:
+            with st.spinner("Requesting data from device..."):
+                success, message, ts = fetch_latest_reading(selected_device_id)
                 
-                # Determine if we have valid data (green) or no data (red)
-                has_data = depth is not None or velocity is not None or flow is not None
-                bg_color = "linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%)" if has_data else "linear-gradient(135deg, #ffebee 0%, #ffffff 100%)"
-                border_color = "#4caf50" if has_data else "#f44336"
-                text_color = "#2e7d32" if has_data else "#c62828"
-                status_icon = "🟢" if has_data else "🔴"
+                # Get the actual data values for display
+                device_config = DEVICES.get(selected_device_id)
+                scraper = DataScraper(db)
+                url = device_config.get("url") or MONITOR_URL
+                selectors = device_config.get("selectors")
                 
-                st.markdown(f"""
-                <div style="background: {bg_color}; 
-                            padding: 15px; border-radius: 10px; border: 2px solid {border_color};
-                            margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span style="font-size: 0.85rem; color: {text_color}; font-weight: 500;">{status_icon} LIVE DATA</span>
-                        <span style="font-size: 0.75rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
+                try:
+                    data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
+                    loop.close()
+                
+                if success and data and data.get("data"):
+                    payload = data.get("data", {})
+                    
+                    # Store to session state for display
+                    st.session_state['realtime_data'] = {
+                        'depth_mm': payload.get("depth_mm"),
+                        'velocity_mps': payload.get("velocity_mps"),
+                        'flow_lps': payload.get("flow_lps"),
+                        'timestamp': ts
+                    }
+                    
+                    ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
+                    st.success(f"{message} at {ts_str}")
+                else:
+                    st.error(message)
+        
+        # Display real-time data if available
+        if 'realtime_data' in st.session_state:
+            rtd = st.session_state['realtime_data']
+            depth = rtd.get('depth_mm')
+            velocity = rtd.get('velocity_mps')
+            flow = rtd.get('flow_lps')
+            ts = rtd.get('timestamp')
+            
+            # Determine if we have valid data (green) or no data (red)
+            has_data = depth is not None or velocity is not None or flow is not None
+            bg_color = "linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%)" if has_data else "linear-gradient(135deg, #ffebee 0%, #ffffff 100%)"
+            border_color = "#4caf50" if has_data else "#f44336"
+            text_color = "#2e7d32" if has_data else "#c62828"
+            status_icon = "🟢" if has_data else "🔴"
+            
+            st.markdown(f"""
+            <div style="background: {bg_color}; 
+                        padding: 15px; border-radius: 10px; border: 2px solid {border_color};
+                        margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 0.85rem; color: {text_color}; font-weight: 500;">{status_icon} LIVE DATA</span>
+                    <span style="font-size: 0.75rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Depth</div>
+                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
+                        <div style="font-size: 0.7rem; color: #888;">mm</div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Depth</div>
-                            <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
-                            <div style="font-size: 0.7rem; color: #888;">mm</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Velocity</div>
-                            <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
-                            <div style="font-size: 0.7rem; color: #888;">m/s</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Flow</div>
-                            <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
-                            <div style="font-size: 0.7rem; color: #888;">L/s</div>
-                        </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Velocity</div>
+                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
+                        <div style="font-size: 0.7rem; color: #888;">m/s</div>
                     </div>
-                    <div style="margin-top: 8px; font-size: 0.7rem; color: #999; text-align: center;">
-                        ⚠️ Display only - Not stored in database
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Flow</div>
+                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
+                        <div style="font-size: 0.7rem; color: #888;">L/s</div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                <div style="margin-top: 8px; font-size: 0.7rem; color: #999; text-align: center;">
+                    ⚠️ Display only - Not stored in database
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
