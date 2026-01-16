@@ -404,11 +404,78 @@ with st.sidebar:
             if refresh_clicked:
                 with st.spinner("Requesting data from device..."):
                     success, message, ts = fetch_latest_reading(selected_device_id)
-                if success:
-                    ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
-                    st.success(f"{message} at {ts_str}")
-                else:
-                    st.error(message)
+                    
+                    # Get the actual data values for display
+                    device_config = DEVICES.get(selected_device_id)
+                    scraper = DataScraper(db)
+                    url = device_config.get("url") or MONITOR_URL
+                    selectors = device_config.get("selectors")
+                    
+                    try:
+                        data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
+                        loop.close()
+                    
+                    if success and data and data.get("data"):
+                        payload = data.get("data", {})
+                        st.session_state['realtime_data'] = {
+                            'depth_mm': payload.get("depth_mm"),
+                            'velocity_mps': payload.get("velocity_mps"),
+                            'flow_lps': payload.get("flow_lps"),
+                            'timestamp': ts
+                        }
+                        ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
+                        st.success(f"{message} at {ts_str}")
+                    else:
+                        st.error(message)
+            
+            # Display real-time data if available
+            if 'realtime_data' in st.session_state:
+                st.markdown("""
+                <p style="font-weight: 500; font-size: 0.95rem; margin-top: 1.5rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
+                    🔴 Live Real-Time Data
+                </p>
+                """, unsafe_allow_html=True)
+                
+                rtd = st.session_state['realtime_data']
+                depth = rtd.get('depth_mm')
+                velocity = rtd.get('velocity_mps')
+                flow = rtd.get('flow_lps')
+                ts = rtd.get('timestamp')
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%); 
+                            padding: 15px; border-radius: 10px; border: 2px solid #ff9800;
+                            margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-size: 0.85rem; color: #e65100; font-weight: 500;">CURRENT VALUES</span>
+                        <span style="font-size: 0.75rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Depth</div>
+                            <div style="font-size: 1.3rem; font-weight: 500; color: #e65100;">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
+                            <div style="font-size: 0.7rem; color: #888;">mm</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Velocity</div>
+                            <div style="font-size: 1.3rem; font-weight: 500; color: #e65100;">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
+                            <div style="font-size: 0.7rem; color: #888;">m/s</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Flow</div>
+                            <div style="font-size: 1.3rem; font-weight: 500; color: #e65100;">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
+                            <div style="font-size: 0.7rem; color: #888;">L/s</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.7rem; color: #999; text-align: center;">
+                        ⚠️ Display only - Not stored in database
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
@@ -646,7 +713,27 @@ if selected_device_id:
         else:
             st.info("No data available for the selected time range.")
     else:
-        st.info("No measurements found for this device. Please refresh data.")
+        st.warning("📊 **No measurements found for this device**")
+        st.markdown("""
+        **To populate the database with measurements:**
+        
+        1. **Run the background monitor** (auto-collects data every 60 seconds):
+           ```bash
+           python monitor.py
+           ```
+        
+        2. **Or manually test the scraper**:
+           ```bash
+           python scraper.py
+           ```
+        
+        The background monitor (`monitor.py`) automatically:
+        - Checks for new data every 60 seconds
+        - Stores measurements only when values change
+        - Provides clean, consistent database records
+        
+        Once monitor.py is running, refresh this page to see charts and data.
+        """)
 else:
     st.info("👈 Select a device from the sidebar to view data.")
 
