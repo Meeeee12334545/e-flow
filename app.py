@@ -293,7 +293,7 @@ def get_collection_stats(device_id):
 
 
 def fetch_latest_reading(device_id: str):
-    """Fetch the latest reading directly from the device and store it."""
+    """Fetch and display the latest reading from the device (display-only, not stored)."""
     device_config = DEVICES.get(device_id)
     if not device_config:
         return False, "Device is not configured", None
@@ -322,16 +322,10 @@ def fetch_latest_reading(device_id: str):
     if all(v is None for v in (depth_mm, velocity_mps, flow_lps)):
         return False, "No sensor data received", None
 
-    stored = scraper.store_measurement(
-        device_id=device_id,
-        device_name=device_config.get("name", device_id),
-        depth_mm=depth_mm,
-        velocity_mps=velocity_mps,
-        flow_lps=flow_lps
-    )
-
+    # NOTE: Manual sync does NOT store to database (display-only)
+    # Database writes happen only from automated monitor.py checks for data consistency
     timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
-    message = "Reading received from device" if stored else "Latest reading from device"
+    message = "Device data retrieved (not stored - auto-sync only)"
     return True, message, timestamp
 
 

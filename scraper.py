@@ -330,32 +330,23 @@ class DataScraper:
         return extracted
 
     async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Dict = None) -> Optional[Dict]:
-        """Fetch data from the monitor website using Playwright with a requests fallback."""
-        # First try direct API calls using the shared token (no browser needed)
-        api_data = self._fetch_via_api(url)
-        if api_data:
-            return {"data": api_data, "title": None, "timestamp": datetime.now(self.tz)}
+        """Fetch data from the monitor website.
+        
+        Strategy:
+        1. If selectors available: use Playwright (live page load)
+        2. Otherwise: try API, then requests fallback
+        """
+        # If we have CSS selectors, use Playwright for live data (most reliable)
+        if device_selectors and not self.force_requests:
+            logger.info("Using Playwright for live page data (selectors available)")
+            try:
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+                    page = await browser.new_page(viewport={"width": 1920, "height": 1080})
+                    await page.goto(url, wait_until="networkidle", timeout=20000)
+                    title = await page.title()
 
-        # Requests-only mode
-        if self.force_requests:
-            logger.info("Force requests mode enabled; skipping browser")
-            if device_selectors:
-                page_data = self._fetch_via_requests(url, device_selectors)
-                if page_data:
-                    return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
-            return None
-
-        page_data = {}
-        title = None
-
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-                page = await browser.new_page(viewport={"width": 1920, "height": 1080})
-                await page.goto(url, wait_until="networkidle", timeout=20000)
-                title = await page.title()
-
-                if device_selectors:
+                    page_data = {}
                     for key, selector in device_selectors.items():
                         try:
                             el = await page.query_selector(selector)
@@ -372,20 +363,28 @@ class DataScraper:
                         except Exception as e:
                             logger.debug(f"Playwright: error extracting {key}: {e}")
 
-                await browser.close()
-        except Exception as e:
-            logger.error(f"Playwright fetch failed: {e}")
+                    await browser.close()
+                    
+                    if page_data:
+                        logger.info(f"✅ Playwright fetch succeeded: {page_data}")
+                        return {"data": page_data, "title": title, "timestamp": datetime.now(self.tz)}
+            except Exception as e:
+                logger.warning(f"Playwright fetch failed: {e}, falling back to API")
 
-        # If Playwright provided data, return it
-        if page_data:
-            return {"data": page_data, "title": title, "timestamp": datetime.now(self.tz)}
+        # First try direct API calls using the shared token (no browser needed)
+        api_data = self._fetch_via_api(url)
+        if api_data:
+            return {"data": api_data, "title": None, "timestamp": datetime.now(self.tz)}
 
-        # Fallback to requests
-        if device_selectors:
-            logger.info("Browser yielded no data; attempting requests fallback")
-            page_data = self._fetch_via_requests(url, device_selectors)
-            if page_data:
-                return {"data": page_data, "title": title, "timestamp": datetime.now(self.tz)}
+        # Requests-only mode
+        if self.force_requests or device_selectors:
+            logger.info("Using requests fallback for data")
+            if device_selectors:
+                page_data = self._fetch_via_requests(url, device_selectors)
+                if page_data:
+                    return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
+            return None
+
         return None
 
     def store_measurement(self, device_id: str, device_name: str, 
