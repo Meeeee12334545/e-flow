@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 def start_background_monitor():
     """Start a simple background thread for auto data collection."""
     if not MONITOR_ENABLED:
-        return False
+        return {"started": False, "thread": None, "reason": "Monitor disabled in config"}
     
     try:
         from scraper import DataScraper
@@ -137,14 +137,17 @@ def start_background_monitor():
         monitor_thread = threading.Thread(target=run_simple_monitor, daemon=True, name="SimpleMonitor")
         monitor_thread.start()
         logger.info("✅ Background monitor thread started")
-        return True
+        return {"started": True, "thread": monitor_thread, "reason": "Monitor started successfully"}
     except Exception as e:
-        logger.error(f"Failed to start background monitor: {e}")
+        error_msg = f"Failed to start: {e}"
+        logger.error(error_msg)
         logger.error(traceback.format_exc())
-        return False
+        return {"started": False, "thread": None, "reason": error_msg}
 
 # Start background monitor (cached so only runs once per Streamlit session)
-monitor_started = start_background_monitor()
+monitor_status = start_background_monitor()
+monitor_started = monitor_status.get("started", False)
+monitor_thread = monitor_status.get("thread")
 
 st.set_page_config(
     page_title="e-flow | Hydrological Analytics",
@@ -470,16 +473,15 @@ with st.sidebar:
         </p>
     </div>
     """, unsafe_allow_html=True)
-    
-    st.divider()
-    
-    # Select device to view
-    devices = db.get_devices()
-    if devices:
-        device_names = {d["device_name"]: d["device_id"] for d in devices}
-        st.markdown("""
-        <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-            📍 Telemetry System
+            
+            # Background monitor status
+            thread_alive = monitor_thread and monitor_thread.is_alive() if monitor_thread else False
+            if monitor_started and thread_alive:
+                st.success("🟢 Auto-collect: Active")
+            elif monitor_started and not thread_alive:
+                st.error("🔴 Auto-collect: Thread died - Restart app to fix")
+            else:
+                st.warning(f"⚠️ Auto-collect: {monitor_status.get('reason', 'Inactive')}")
         </p>
         """, unsafe_allow_html=True)
         selected_device_name = st.selectbox(
