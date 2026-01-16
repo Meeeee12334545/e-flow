@@ -400,7 +400,7 @@ with st.sidebar:
                 """, unsafe_allow_html=True)
 
             # Manual refresh to pull the newest reading into the app
-            refresh_clicked = st.button("Sync device reading", type="primary", key="refresh_button")
+            refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
             if refresh_clicked:
                 with st.spinner("Requesting data from device..."):
                     success, message, ts = fetch_latest_reading(selected_device_id)
