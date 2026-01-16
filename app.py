@@ -363,7 +363,7 @@ with st.sidebar:
         <p style="font-size: 0.9rem; margin: 0; color: #1a1a1a; line-height: 1.6;">
             <strong style="font-weight: 500;">System Status:</strong> Continuous monitoring active<br>
             <span style="color: #666; font-size: 0.85rem;">• Monitor interval: 60 seconds</span><br>
-            <span style="color: #666; font-size: 0.85rem;">• Collection: Selenium WebDriver</span><br>
+            <span style="color: #666; font-size: 0.85rem;">• Collection: Playwright (Chromium)</span><br>
             <span style="color: #666; font-size: 0.85rem;">• Database: SQLite3 change-detection</span>
         </p>
     </div>
