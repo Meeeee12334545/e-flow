@@ -445,7 +445,7 @@ if selected_device_id:
                         WATER DEPTH
                     </p>
                     <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {depth:.1f if depth else 'N/A'} <span style="font-size: 1rem;">mm</span>
+                        {f'{depth:.1f}' if depth is not None else 'N/A'} <span style="font-size: 1rem;">mm</span>
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -460,7 +460,7 @@ if selected_device_id:
                         FLOW VELOCITY
                     </p>
                     <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {velocity:.3f if velocity else 'N/A'} <span style="font-size: 1rem;">m/s</span>
+                        {f'{velocity:.3f}' if velocity is not None else 'N/A'} <span style="font-size: 1rem;">m/s</span>
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -475,7 +475,7 @@ if selected_device_id:
                         FLOW RATE
                     </p>
                     <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {flow:.1f if flow else 'N/A'} <span style="font-size: 1rem;">L/s</span>
+                        {f'{flow:.1f}' if flow is not None else 'N/A'} <span style="font-size: 1rem;">L/s</span>
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
