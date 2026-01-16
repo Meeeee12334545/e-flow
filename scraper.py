@@ -128,8 +128,38 @@ class DataScraper:
         
         return has_changed
 
+    def _fetch_via_requests(self, url: str, selectors: Dict) -> Dict:
+        """Lightweight fallback that pulls values via plain HTTP and CSS selectors."""
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+        except Exception as e:
+            logger.warning(f"Requests fallback failed to fetch page: {e}")
+            return {}
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        extracted = {}
+
+        for key, selector in selectors.items():
+            try:
+                elem = soup.select_one(selector)
+                if not elem:
+                    logger.debug(f"Requests fallback: selector not found for {key}: {selector}")
+                    continue
+                text = elem.get_text(strip=True)
+                numbers = re.findall(r"\d+\.?\d*", text)
+                if numbers:
+                    extracted[key] = float(numbers[0])
+                    logger.info(f"Requests fallback extracted {key}: {extracted[key]}")
+                else:
+                    logger.debug(f"Requests fallback: no numbers in {key} text '{text}'")
+            except Exception as e:
+                logger.debug(f"Requests fallback: error extracting {key}: {e}")
+
+        return extracted
+
     async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Dict = None) -> Optional[Dict]:
-        """Fetch data from the monitor website using Selenium and JavaScript selectors."""
+        """Fetch data from the monitor website using Selenium with a requests fallback."""
         driver = None
         try:
             logger.info(f"Loading page with Selenium: {url[:80]}...")
@@ -182,15 +212,13 @@ class DataScraper:
             if device_selectors:
                 for key, selector in device_selectors.items():
                     try:
-                        # Use querySelector to find element
                         js_code = f"""
                         var elem = document.querySelector('{selector}');
                         return elem ? elem.textContent.trim() : null;
                         """
                         text = driver.execute_script(js_code)
-                        
+
                         if text:
-                            # Extract numeric value
                             numbers = re.findall(r'\d+\.?\d*', text)
                             if numbers:
                                 page_data[key] = float(numbers[0])
@@ -199,7 +227,7 @@ class DataScraper:
                                 logger.warning(f"⚠️  No numbers found in {key}: '{text}'")
                         else:
                             logger.warning(f"⚠️  Selector not found for {key}: {selector}")
-                            
+
                     except Exception as e:
                         logger.warning(f"⚠️  Error extracting {key}: {e}")
             else:
@@ -232,7 +260,13 @@ class DataScraper:
             title = driver.title
             
             logger.info(f"Extracted data: {page_data}")
-            
+
+            # If Selenium didn't yield data but selectors exist, try requests as a fallback
+            if device_selectors and not page_data:
+                logger.info("Selenium produced no values; attempting requests fallback...")
+                page_data = self._fetch_via_requests(url, device_selectors)
+                logger.info(f"Requests fallback extracted: {page_data}")
+
             return {
                 "data": page_data,
                 "title": title,
@@ -241,9 +275,19 @@ class DataScraper:
             
         except TimeoutException:
             logger.error("Timeout waiting for page to load")
+            # Try requests fallback when Selenium times out
+            if device_selectors:
+                page_data = self._fetch_via_requests(url, device_selectors)
+                if page_data:
+                    return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
             return None
         except Exception as e:
             logger.error(f"Error fetching data: {e}", exc_info=True)
+            # Try requests fallback on Selenium errors
+            if device_selectors:
+                page_data = self._fetch_via_requests(url, device_selectors)
+                if page_data:
+                    return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
             return None
         finally:
             if driver:
