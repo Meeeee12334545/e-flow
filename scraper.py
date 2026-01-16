@@ -6,9 +6,17 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from urllib.parse import urljoin
 import logging
-
-from playwright.async_api import async_playwright, Page
+import requests
+from bs4 import BeautifulSoup
 import pytz
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 
 from database import FlowDatabase
 
@@ -56,122 +64,88 @@ class DataScraper:
         
         return has_changed
 
-    async def extract_data_from_page(self, page: Page) -> Optional[Dict]:
-        """
-        Extract depth, velocity, and flow data from the USRIOT dashboard.
-        
-        The dashboard loads data dynamically via JavaScript.
-        We'll look for:
-        1. JSON data in window objects
-        2. Common data attributes
-        3. Text content in specific elements
-        """
+    async def fetch_monitor_data(self, url: str = MONITOR_URL, device_xpaths: Dict = None) -> Optional[Dict]:
+        """Fetch data from the monitor website using Selenium and XPath selectors."""
+        driver = None
         try:
-            await page.wait_for_load_state("networkidle", timeout=10000)
+            logger.info(f"Loading page with Selenium: {url[:80]}...")
             
-            # Wait additional time for charts/data to fully render
-            await page.wait_for_timeout(3000)
+            # Setup Chrome options
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--window-size=1920,1080")
+            
+            # Launch browser with auto-managed chromedriver
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Load the page
+            driver.get(url)
+            
+            # Wait for page to load
+            logger.info("Waiting for page to load...")
+            WebDriverWait(driver, 10).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+            
+            # Give JavaScript time to render data
+            driver.implicitly_wait(3)
             
             page_data = {}
             
-            # Method 1: Try to get data from JavaScript window object
-            try:
-                # Attempt to extract data from various window properties
-                window_data = await page.evaluate("""
-                    () => {
-                        const data = {};
-                        
-                        // Look for common data containers in USRIOT
-                        if (window.chartData) data.chartData = window.chartData;
-                        if (window.deviceData) data.deviceData = window.deviceData;
-                        if (window.sensorData) data.sensorData = window.sensorData;
-                        if (window.__data) data.__data = window.__data;
-                        if (window.config) data.config = window.config;
-                        
-                        return data;
-                    }
-                """)
-                
-                if window_data and any(window_data.values()):
-                    page_data['window'] = window_data
-                    logger.debug(f"Extracted window data: {window_data}")
-            except Exception as e:
-                logger.debug(f"Could not extract window data: {e}")
-            
-            # Method 2: Look for data in all text content on page
-            # Get all visible text and look for patterns with numbers
-            try:
-                body_text = await page.inner_text("body")
-                
-                # Look for common patterns in the text
-                import re
-                
-                # Pattern for depth values (e.g., "Depth: 150.5 mm" or "150.5mm")
-                depth_match = re.search(r'(?:depth|D)[\s:]*(\d+\.?\d*)\s*(?:mm|m)(?:\s|$)', body_text, re.IGNORECASE)
-                if depth_match:
+            # Extract data using XPath selectors if provided
+            if device_xpaths:
+                for key, xpath in device_xpaths.items():
                     try:
-                        page_data['depth'] = float(depth_match.group(1))
-                        logger.debug(f"Found depth: {page_data['depth']} mm")
-                    except ValueError:
-                        pass
-                
-                # Pattern for velocity values (e.g., "Velocity: 0.5 m/s")
-                velocity_match = re.search(r'(?:velocity|V)[\s:]*(\d+\.?\d*)\s*(?:m/s|mps|m)?(?:\s|$)', body_text, re.IGNORECASE)
-                if velocity_match:
-                    try:
-                        page_data['velocity'] = float(velocity_match.group(1))
-                        logger.debug(f"Found velocity: {page_data['velocity']} m/s")
-                    except ValueError:
-                        pass
-                
-                # Pattern for flow values (e.g., "Flow: 25.5 L/s" or "25.5 lps")
-                flow_match = re.search(r'(?:flow|F)[\s:]*(\d+\.?\d*)\s*(?:L/s|lps|l/s)(?:\s|$)', body_text, re.IGNORECASE)
-                if flow_match:
-                    try:
-                        page_data['flow'] = float(flow_match.group(1))
-                        logger.debug(f"Found flow: {page_data['flow']} L/s")
-                    except ValueError:
-                        pass
+                        element = driver.find_element(By.XPATH, xpath)
+                        text = element.text.strip()
                         
-            except Exception as e:
-                logger.debug(f"Error extracting from body text: {e}")
-            
-            # Method 3: Look for elements with specific data attributes or classes
-            try:
-                elements = await page.query_selector_all('[data-value], [data-metric], span, div')
-                
-                for elem in elements[:50]:  # Check first 50 elements to avoid performance issues
-                    try:
-                        text = await elem.inner_text()
-                        text_lower = text.lower()
-                        
-                        # Check for depth indicators
-                        if any(x in text_lower for x in ['depth', 'd:', 'depth:']):
-                            # Extract numbers from the text
-                            nums = re.findall(r'\d+\.?\d*', text)
-                            if nums and 'depth' not in page_data:
-                                page_data['depth'] = float(nums[0])
-                        
-                        # Check for velocity indicators  
-                        if any(x in text_lower for x in ['velocity', 'v:', 'velocity:']):
-                            nums = re.findall(r'\d+\.?\d*', text)
-                            if nums and 'velocity' not in page_data:
-                                page_data['velocity'] = float(nums[0])
-                        
-                        # Check for flow indicators
-                        if any(x in text_lower for x in ['flow', 'f:', 'flow:']):
-                            nums = re.findall(r'\d+\.?\d*', text)
-                            if nums and 'flow' not in page_data:
-                                page_data['flow'] = float(nums[0])
-                                
+                        # Extract numeric value
+                        numbers = re.findall(r'\d+\.?\d*', text)
+                        if numbers:
+                            page_data[key] = float(numbers[0])
+                            logger.info(f"✅ Extracted {key}: {page_data[key]} (from '{text}')")
+                        else:
+                            logger.warning(f"⚠️  No numbers found in {key}: '{text}'")
+                            
+                    except NoSuchElementException:
+                        logger.warning(f"⚠️  XPath not found for {key}: {xpath}")
                     except Exception as e:
-                        continue
-                        
-            except Exception as e:
-                logger.debug(f"Error querying elements: {e}")
+                        logger.warning(f"⚠️  Error extracting {key}: {e}")
+            else:
+                # Fallback: try to find elements by common patterns
+                logger.info("No XPath provided, attempting pattern matching...")
+                try:
+                    spans = driver.find_elements(By.TAG_NAME, "span")
+                    for span in spans[:100]:  # Check first 100 spans
+                        try:
+                            text = span.text.strip()
+                            if text:
+                                parent_id = span.get_attribute("id")
+                                parent_parent_id = span.find_element(By.XPATH, "..").get_attribute("id") if span.find_elements(By.XPATH, "..") else None
+                                
+                                if "depth" in text.lower():
+                                    nums = re.findall(r'\d+\.?\d*', text)
+                                    if nums:
+                                        page_data['depth_mm'] = float(nums[0])
+                                elif "velocity" in text.lower():
+                                    nums = re.findall(r'\d+\.?\d*', text)
+                                    if nums:
+                                        page_data['velocity_mps'] = float(nums[0])
+                                elif "flow" in text.lower():
+                                    nums = re.findall(r'\d+\.?\d*', text)
+                                    if nums:
+                                        page_data['flow_lps'] = float(nums[0])
+                        except:
+                            continue
+                except Exception as e:
+                    logger.warning(f"Error in fallback extraction: {e}")
             
-            # Get the page title (may contain device info)
-            title = await page.title()
+            # Get page title
+            title = driver.title
             
             logger.info(f"Extracted data: {page_data}")
             
@@ -181,33 +155,15 @@ class DataScraper:
                 "timestamp": datetime.now(self.tz)
             }
             
-        except Exception as e:
-            logger.error(f"Error extracting data: {e}")
+        except TimeoutException:
+            logger.error("Timeout waiting for page to load")
             return None
-
-    async def fetch_monitor_data(self, url: str = MONITOR_URL) -> Optional[Dict]:
-        """Fetch data from the monitor website using Playwright."""
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            try:
-                logger.info(f"Loading page: {url}")
-                await page.goto(url, wait_until="load", timeout=15000)
-                
-                # Wait a bit for any dynamic content to load
-                await page.wait_for_timeout(2000)
-                
-                # Extract data
-                data = await self.extract_data_from_page(page)
-                
-                return data
-                
-            except Exception as e:
-                logger.error(f"Error fetching data from monitor: {e}")
-                return None
-            finally:
-                await browser.close()
+        except Exception as e:
+            logger.error(f"Error fetching data: {e}", exc_info=True)
+            return None
+        finally:
+            if driver:
+                driver.quit()
 
     def store_measurement(self, device_id: str, device_name: str, 
                          depth_mm: float = None, velocity_mps: float = None, 

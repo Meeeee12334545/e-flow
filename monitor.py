@@ -16,7 +16,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from scraper import DataScraper
 from database import FlowDatabase
-from config import MONITOR_INTERVAL, MONITOR_ENABLED, MONITOR_URL
+from config import MONITOR_INTERVAL, MONITOR_ENABLED, MONITOR_URL, DEVICES
 
 # Configure logging
 logging.basicConfig(
@@ -50,65 +50,72 @@ class ContinuousMonitor:
         try:
             logger.info(f"[Check #{self.check_count}] Checking for data updates...")
             
-            # Fetch data from monitor
-            data = await self.scraper.fetch_monitor_data(MONITOR_URL)
+            # Get device config with XPath selectors
+            device_id = "FIT100"
+            device_info = DEVICES.get(device_id, {})
+            device_name = device_info.get("name", "FIT100 Main Inflow Lismore STP")
+            device_xpaths = device_info.get("xpaths", None)
+            
+            # Fetch data from monitor with XPath selectors
+            data = await self.scraper.fetch_monitor_data(MONITOR_URL, device_xpaths)
             
             if not data:
                 logger.warning("Failed to retrieve data from monitor")
                 self.error_count += 1
                 return
             
-            # Parse and store data
-            device_id = "FIT100"
-            device_name = "FIT100 Main Inflow Lismore STP"
-            
             # Extract actual values from the page data
             depth_mm = None
             velocity_mps = None
             flow_lps = None
             
-            # Attempt to parse from extracted data
+            # Attempt to parse from extracted data - handle both old and new key formats
             page_data = data.get("data", {})
             if isinstance(page_data, dict):
-                # Extract depth (should be in mm)
-                if "depth" in page_data:
+                # Look for depth
+                if "depth_mm" in page_data:
+                    depth_mm = page_data["depth_mm"]
+                    logger.info(f"  Depth: {depth_mm} mm")
+                elif "depth" in page_data:
                     try:
                         val = page_data["depth"]
-                        # Handle if it's already a float or needs conversion
                         if isinstance(val, (int, float)):
                             depth_mm = float(val)
                         else:
-                            # Remove any unit strings and convert
                             depth_mm = float(str(val).replace("mm", "").replace("m", "").strip())
                         logger.info(f"  Depth: {depth_mm} mm")
                     except (ValueError, AttributeError, TypeError) as e:
-                        logger.warning(f"Could not parse depth value: {page_data['depth']} - {e}")
+                        logger.warning(f"Could not parse depth value: {page_data.get('depth')} - {e}")
                 
-                # Extract velocity (should be in m/s)
-                if "velocity" in page_data:
+                # Look for velocity
+                if "velocity_mps" in page_data:
+                    velocity_mps = page_data["velocity_mps"]
+                    logger.info(f"  Velocity: {velocity_mps} m/s")
+                elif "velocity" in page_data:
                     try:
                         val = page_data["velocity"]
                         if isinstance(val, (int, float)):
                             velocity_mps = float(val)
                         else:
-                            # Remove any unit strings and convert
                             velocity_mps = float(str(val).replace("mps", "").replace("m/s", "").replace("m", "").strip())
                         logger.info(f"  Velocity: {velocity_mps} m/s")
                     except (ValueError, AttributeError, TypeError) as e:
-                        logger.warning(f"Could not parse velocity value: {page_data['velocity']} - {e}")
+                        logger.warning(f"Could not parse velocity value: {page_data.get('velocity')} - {e}")
                 
-                # Extract flow (should be in L/s)
-                if "flow" in page_data:
+                # Look for flow
+                if "flow_lps" in page_data:
+                    flow_lps = page_data["flow_lps"]
+                    logger.info(f"  Flow: {flow_lps} L/s")
+                elif "flow" in page_data:
                     try:
                         val = page_data["flow"]
                         if isinstance(val, (int, float)):
                             flow_lps = float(val)
                         else:
-                            # Remove any unit strings and convert
                             flow_lps = float(str(val).replace("lps", "").replace("l/s", "").replace("L/s", "").strip())
                         logger.info(f"  Flow: {flow_lps} L/s")
                     except (ValueError, AttributeError, TypeError) as e:
-                        logger.warning(f"Could not parse flow value: {page_data['flow']} - {e}")
+                        logger.warning(f"Could not parse flow value: {page_data.get('flow')} - {e}")
             
             # Only store if we have at least one value
             if depth_mm is not None or velocity_mps is not None or flow_lps is not None:
