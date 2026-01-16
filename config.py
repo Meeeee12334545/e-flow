@@ -29,9 +29,10 @@ SCRAPER_TIMEOUT = 15000  # milliseconds
 SCRAPER_HEADLESS = True
 SCRAPER_WAIT_AFTER_LOAD = 3000  # milliseconds - increased for better loading
 
-# Monitor settings
+# Monitor settings - PERMANENTLY DISABLED in Streamlit app
+# Use standalone start_monitor.py script for data collection
 MONITOR_INTERVAL = 60  # seconds (1 minute for continuous monitoring)
-MONITOR_ENABLED = False  # DISABLED - Streamlit Cloud causes duplicate monitors. Use standalone monitor instead.
+MONITOR_ENABLED = False  # PERMANENTLY DISABLED - monitoring removed from Streamlit app entirely
 STORE_ALL_READINGS = False  # If True, stores every reading. If False, only stores when values change
 
 # Streamlit settings

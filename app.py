@@ -45,159 +45,9 @@ ensure_playwright_installed()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# File-based lock to prevent multiple monitors across app restarts
-MONITOR_LOCK_FILE = Path(__file__).parent / ".monitor_lock"
-
-def is_monitor_running():
-    """Check if monitor is already running using file lock."""
-    if not MONITOR_LOCK_FILE.exists():
-        return False
-    
-    try:
-        # Check if lock file is recent (within last 2 minutes)
-        lock_time = datetime.fromtimestamp(MONITOR_LOCK_FILE.stat().st_mtime)
-        age_seconds = (datetime.now() - lock_time).total_seconds()
-        
-        if age_seconds < 120:  # Lock is recent, monitor likely running
-            return True
-        else:
-            # Stale lock, remove it
-            MONITOR_LOCK_FILE.unlink()
-            return False
-    except Exception:
-        return False
-
-def create_monitor_lock():
-    """Create lock file to indicate monitor is running."""
-    MONITOR_LOCK_FILE.touch()
-    
-def update_monitor_lock():
-    """Update lock file timestamp to show monitor is alive."""
-    try:
-        MONITOR_LOCK_FILE.touch()
-    except Exception:
-        pass
-
-@st.cache_resource
-def start_background_monitor():
-    """Start a simple background thread for auto data collection."""
-    # Check file-based lock first
-    if is_monitor_running():
-        logger.info("⊗ Monitor already running (file lock exists), skipping start")
-        return {"started": False, "thread": None, "reason": "Monitor already running (file lock exists)"}
-    
-    if not MONITOR_ENABLED:
-        return {"started": False, "thread": None, "reason": "Monitor disabled in config"}
-    
-    try:
-        from scraper import DataScraper
-        from config import DEVICES, MONITOR_URL
-        import time
-        import traceback
-        
-        def run_simple_monitor():
-            """Simple monitor loop that runs every 60 seconds with robust error handling."""
-            check_count = 0
-            consecutive_errors = 0
-            max_consecutive_errors = 10
-            
-            # Create persistent scraper/db to maintain change detection state
-            db = FlowDatabase()
-            scraper = DataScraper(db)
-            
-            # Create lock file
-            create_monitor_lock()
-            
-            logger.info("🚀 Simple background monitor started")
-            
-            while True:
-                try:
-                    # Update lock file timestamp to show we're alive
-                    update_monitor_lock()
-                    
-                    check_count += 1
-                    
-                    device_id = "FIT100"
-                    device_info = DEVICES.get(device_id, {})
-                    device_name = device_info.get("name", "FIT100 Main Inflow Lismore STP")
-                    device_selectors = device_info.get("selectors")
-                    url = device_info.get("url") or MONITOR_URL
-                    
-                    logger.info(f"[Check #{check_count}] Fetching device data...")
-                    
-                    # Fetch data
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        data = loop.run_until_complete(scraper.fetch_monitor_data(url, device_selectors))
-                    finally:
-                        loop.close()
-                    
-                    if data and data.get("data"):
-                        payload = data.get("data", {})
-                        depth_mm = payload.get("depth_mm")
-                        velocity_mps = payload.get("velocity_mps")
-                        flow_lps = payload.get("flow_lps")
-                        
-                        if depth_mm is not None or velocity_mps is not None or flow_lps is not None:
-                            stored = scraper.store_measurement(
-                                device_id=device_id,
-                                device_name=device_name,
-                                depth_mm=depth_mm,
-                                velocity_mps=velocity_mps,
-                                flow_lps=flow_lps,
-                                allow_storage=False  # NEVER allow storage from built-in monitor (use standalone instead)
-                            )
-                            
-                            if stored:
-                                logger.info(f"✅ Data stored: D={depth_mm}mm, V={velocity_mps}m/s, F={flow_lps}L/s")
-                                consecutive_errors = 0  # Reset error counter on success
-                            else:
-                                logger.info(f"ℹ️  Data unchanged, not stored")
-                                consecutive_errors = 0  # Not an error, just no change
-                        else:
-                            logger.warning("No valid data extracted")
-                            consecutive_errors += 1
-                    else:
-                        logger.warning("Failed to fetch data")
-                        consecutive_errors += 1
-                        
-                except Exception as e:
-                    consecutive_errors += 1
-                    logger.error(f"Monitor error (attempt {consecutive_errors}/{max_consecutive_errors}): {e}")
-                    logger.error(traceback.format_exc())
-                    
-                    if consecutive_errors >= max_consecutive_errors:
-                        logger.critical("Too many consecutive errors, monitor stopping")
-                        break
-                
-                # Wait 60 seconds before next check
-                time.sleep(60)
-            
-            # Clean up lock file on exit
-            try:
-                MONITOR_LOCK_FILE.unlink()
-            except Exception:
-                pass
-            
-            logger.error("❌ Background monitor stopped")
-        
-        # Start monitor in daemon thread
-        monitor_thread = threading.Thread(target=run_simple_monitor, daemon=True, name="SimpleMonitor")
-        monitor_thread.start()
-        
-        logger.info("✅ Background monitor thread started with file lock")
-        return {"started": True, "thread": monitor_thread, "reason": "Monitor started successfully"}
-    except Exception as e:
-        error_msg = f"Failed to start: {e}"
-        logger.error(error_msg)
-        logger.error(traceback.format_exc())
-        return {"started": False, "thread": None, "reason": error_msg}
-
-# Start background monitor (cached so only runs once per Streamlit session)
-monitor_status = start_background_monitor()
-monitor_started = monitor_status.get("started", False)
-monitor_thread = monitor_status.get("thread")
+# MONITORING COMPLETELY REMOVED FROM STREAMLIT APP
+# The app is now READ-ONLY - it displays data but does not collect it
+# Use start_monitor.py script separately for data collection
 
 st.set_page_config(
     page_title="e-flow | Hydrological Analytics",
@@ -534,14 +384,8 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    # Background monitor status
-    thread_alive = monitor_thread and monitor_thread.is_alive() if monitor_thread else False
-    if monitor_started and thread_alive:
-        st.success("🟢 Auto-collect: Active")
-    elif monitor_started and not thread_alive:
-        st.error("🔴 Auto-collect: Thread died - Restart app to fix")
-    else:
-        st.warning(f"⚠️ Auto-collect: {monitor_status.get('reason', 'Inactive')}")
+    # Monitor status - DISABLED (app is read-only)
+    st.info("ℹ️  Auto-collect: Disabled - App is read-only. Use standalone monitor script for data collection.")
     
     # Build device mapping from database
     devices = db.get_devices()
@@ -694,9 +538,8 @@ with st.sidebar:
     
     # Debug info for troubleshooting
     if total_measurements == 0:
-        st.warning(f"⚠️ Database is empty. Monitor status: {'Active' if monitor_started else 'Inactive'}")
-        if monitor_started:
-            st.info("Background monitor is running. First data should appear within 60 seconds. Refresh page to see updates.")
+        st.warning(f"⚠️ Database is empty.")
+        st.info("Run 'python start_monitor.py' locally to collect data, or click 'Show Real-Time Data' for live values.")
     
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
@@ -1018,40 +861,25 @@ if selected_device_id:
         else:
             st.info("No data available for the selected time range.")
     else:
-        if monitor_started:
-            st.info("📊 **Background monitor is running - waiting for data collection...**")
-            st.markdown("""
-            The automatic data collection service is active and checking every 60 seconds.
-            
-            **What's happening:**
-            - Monitor checks device every 60 seconds
-            - Stores measurements only when values change
-            - First reading may take up to 1 minute
-            
-            Refresh this page in a minute to see data populate.
-            """)
-        else:
-            st.warning("📊 **No measurements found - Background monitor not active**")
-            st.markdown("""
-            **To populate the database with measurements:**
-            
-            1. **Manually run the background monitor** (auto-collects data every 60 seconds):
-               ```bash
-               python monitor.py
-               ```
-            
-            2. **Or manually test the scraper**:
-               ```bash
-               python scraper.py
-               ```
-            
-            The background monitor (`monitor.py`) automatically:
-            - Checks for new data every 60 seconds
-            - Stores measurements only when values change
-            - Provides clean, consistent database records
-            
-            Once monitor.py is running, refresh this page to see charts and data.
-            """)
+        st.warning("📊 **No measurements found**")
+        st.markdown("""
+        **The app is now READ-ONLY and does not collect data automatically.**
+        
+        **To populate the database with measurements:**
+        
+        1. **Run the standalone monitor script locally:**
+           ```bash
+           python start_monitor.py
+           ```
+           This will:
+           - Check for new data every 60 seconds
+           - Store measurements only when values change
+           - Provide clean, consistent database records
+        
+        2. **Or click "Show Real-Time Data"** in the sidebar to see current values without storing them.
+        
+        Once data is collected, refresh this page to see charts and analytics.
+        """)
 else:
     st.info("👈 Select a device from the sidebar to view data.")
 
