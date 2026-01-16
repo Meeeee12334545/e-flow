@@ -122,10 +122,12 @@ class DataScraper:
     def _fetch_via_api(self, url: str) -> Dict:
         """Call USRIOT APIs directly using the shared link token to avoid browser dependencies."""
         try:
+            logger.info("Attempting API fetch via token-based method...")
             qs = parse_qs(urlparse(url).query)
             share_param = (qs.get("share") or [None])[0]
             cusdevice_no = (qs.get("cusdeviceNo") or [None])[0]
             if not share_param or not cusdevice_no:
+                logger.warning("API fetch: missing share or cusdeviceNo parameter")
                 return {}
 
             token = self._decrypt_share_token(share_param)
@@ -198,9 +200,10 @@ class DataScraper:
             def fetch_latest_point(data_point_id: int) -> Optional[float]:
                 history_url = "https://sga-history.usriot.com:7002/history/cusdevice/getSampleDataPoint"
                 now_ms = int(datetime.utcnow().timestamp() * 1000)
-                start = now_ms - 24 * 60 * 60 * 1000  # 24h window to satisfy API constraints
+                # Use a 5-minute window to get only recent data, not stale data from 24h ago
+                start = now_ms - 5 * 60 * 1000  # 5-minute window for fresh data
                 body = {
-                    "dataPoints": [{"cusdeviceNo": cusdevice_no, "dataPointId": data_point_id, "sampleFun": "FIRST"}],
+                    "dataPoints": [{"cusdeviceNo": cusdevice_no, "dataPointId": data_point_id, "sampleFun": "LAST"}],
                     "start": start,
                     "end": now_ms,
                     "token": token,
@@ -223,11 +226,16 @@ class DataScraper:
                             payload = r.json()
                 lst = payload.get("data", {}).get("list", []) if isinstance(payload, dict) else []
                 if not lst:
+                    logger.debug(f"fetch_latest_point({data_point_id}): No data in API response")
                     return None
                 samples = lst[0].get("list") or []
                 if not samples:
+                    logger.debug(f"fetch_latest_point({data_point_id}): No samples in response list")
                     return None
-                return float(samples[0].get("value")) if samples[0].get("value") is not None else None
+                value = float(samples[0].get("value")) if samples[0].get("value") is not None else None
+                if value is not None:
+                    logger.debug(f"fetch_latest_point({data_point_id}): Retrieved value {value}")
+                return value
 
             page_data = {}
             if depth_id:
@@ -243,9 +251,10 @@ class DataScraper:
                 if val is not None:
                     page_data["flow_lps"] = val
 
+            logger.info(f"✅ API fetch succeeded: {page_data}")
             return page_data
         except Exception:
-            logger.debug("API fetch failed", exc_info=True)
+            logger.warning("API fetch failed", exc_info=True)
             return {}
 
     def _has_data_changed(self, device_id: str, new_data: Dict) -> bool:
