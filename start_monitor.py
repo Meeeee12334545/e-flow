@@ -99,7 +99,8 @@ def main():
                         device_name=device_name,
                         depth_mm=depth_mm,
                         velocity_mps=velocity_mps,
-                        flow_lps=flow_lps
+                        flow_lps=flow_lps,
+                        allow_storage=True  # Explicitly allow storage from standalone monitor
                     )
                     
                     if stored:

@@ -446,13 +446,22 @@ class DataScraper:
 
     def store_measurement(self, device_id: str, device_name: str, 
                          depth_mm: float = None, velocity_mps: float = None, 
-                         flow_lps: float = None) -> bool:
+                         flow_lps: float = None, allow_storage: bool = False) -> bool:
         """
         Store a measurement in the database.
+        
+        CRITICAL: Requires allow_storage=True to prevent accidental storage from Streamlit app.
+        This flag ensures ONLY the standalone monitor (start_monitor.py) can write to database.
+        
         If STORE_ALL_READINGS=True, stores every reading.
         If STORE_ALL_READINGS=False, only stores when data has changed.
         Returns True if stored, False if no change detected (when change detection enabled).
         """
+        # SAFETY CHECK: Prevent storage unless explicitly allowed
+        if not allow_storage:
+            logger.warning(f"⊗ Storage blocked (allow_storage=False). Only standalone monitor should write to database.")
+            return False
+        
         new_data = {
             "depth_mm": depth_mm,
             "velocity_mps": velocity_mps,

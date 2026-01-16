@@ -145,7 +145,8 @@ def start_background_monitor():
                                 device_name=device_name,
                                 depth_mm=depth_mm,
                                 velocity_mps=velocity_mps,
-                                flow_lps=flow_lps
+                                flow_lps=flow_lps,
+                                allow_storage=False  # NEVER allow storage from built-in monitor (use standalone instead)
                             )
                             
                             if stored:
