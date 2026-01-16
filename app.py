@@ -63,17 +63,15 @@ def start_background_monitor():
             consecutive_errors = 0
             max_consecutive_errors = 10
             
+            # Create persistent scraper/db to maintain change detection state
+            db = FlowDatabase()
+            scraper = DataScraper(db)
+            
             logger.info("🚀 Simple background monitor started")
             
             while True:
-                db = None
-                scraper = None
                 try:
                     check_count += 1
-                    
-                    # Create fresh instances each iteration to avoid stale connections
-                    db = FlowDatabase()
-                    scraper = DataScraper(db)
                     
                     device_id = "FIT100"
                     device_info = DEVICES.get(device_id, {})
