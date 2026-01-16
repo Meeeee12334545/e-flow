@@ -41,6 +41,10 @@ def ensure_playwright_installed():
 # Install on startup (cached so only runs once)
 ensure_playwright_installed()
 
+# Setup logging before anything else
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 @st.cache_resource
 def start_background_monitor():
     """Start monitor.py as a background daemon thread for auto data collection."""
@@ -69,9 +73,6 @@ def start_background_monitor():
 
 # Start background monitor (cached so only runs once per Streamlit session)
 monitor_started = start_background_monitor()
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 st.set_page_config(
     page_title="e-flow | Hydrological Analytics",
