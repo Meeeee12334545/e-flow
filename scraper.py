@@ -91,8 +91,26 @@ class DataScraper:
                 lambda d: d.execute_script("return document.readyState") == "complete"
             )
             
+            # Wait for data elements to appear and contain actual values (the page updates after initial load)
+            def has_data_loaded(driver):
+                divs = driver.execute_script("""
+                    var elements = document.querySelectorAll('[id^="div_varvalue"]');
+                    if (elements.length === 0) return false;
+                    // Check if any element has more than just "Variable Value"
+                    for (var i = 0; i < elements.length; i++) {
+                        var text = elements[i].textContent.trim();
+                        if (text && text !== 'Variable Value' && text.length > 2) {
+                            return true;
+                        }
+                    }
+                    return false;
+                """)
+                return divs
+            
+            WebDriverWait(driver, 10).until(has_data_loaded)
+            
             # Give JavaScript time to render data
-            driver.implicitly_wait(3)
+            driver.implicitly_wait(1)
             
             page_data = {}
             

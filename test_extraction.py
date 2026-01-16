@@ -47,18 +47,18 @@ async def test_extraction():
         return False
     
     # Show what was extracted
-    if "depth" in page_data:
-        print(f"✅ Depth: {page_data['depth']} mm")
+    if "depth_mm" in page_data:
+        print(f"✅ Depth: {page_data['depth_mm']} mm")
     else:
         print("⚠️  Depth: Not found")
     
-    if "velocity" in page_data:
-        print(f"✅ Velocity: {page_data['velocity']} m/s")
+    if "velocity_mps" in page_data:
+        print(f"✅ Velocity: {page_data['velocity_mps']} m/s")
     else:
         print("⚠️  Velocity: Not found")
     
-    if "flow" in page_data:
-        print(f"✅ Flow: {page_data['flow']} L/s")
+    if "flow_lps" in page_data:
+        print(f"✅ Flow: {page_data['flow_lps']} L/s")
     else:
         print("⚠️  Flow: Not found")
     
