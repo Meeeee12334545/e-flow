@@ -28,12 +28,13 @@ Performance Considerations:
 """
 
 import asyncio
+import base64
 import json
 import os
 import re
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, parse_qs
 import logging
 import requests
 from bs4 import BeautifulSoup
@@ -85,6 +86,156 @@ class DataScraper:
         self.last_data = {}  # Track last known values for change detection
         # Allow forcing requests-only mode via environment to avoid browser launches in constrained runtimes
         self.force_requests = os.getenv("SCRAPER_FORCE_REQUESTS", "").lower() in ("1", "true", "yes")
+
+    def _decrypt_share_token(self, share_param: str, pwd: str = "usr.cn") -> Optional[str]:
+        """Replicate the secret_Key decryption used by the USRIOT share link to obtain the API token."""
+        if not share_param:
+            return None
+
+        try:
+            prand = "".join(str(ord(c)) for c in pwd)
+            s_pos = len(prand) // 5
+            mult = int(prand[s_pos] + prand[2 * s_pos] + prand[3 * s_pos] + prand[4 * s_pos] + prand[5 * s_pos])
+            incr = round(len(pwd) / 2)
+            modu = 2 ** 31 - 1
+
+            salt = int(share_param[-8:], 16)
+            share_core = share_param[:-8]
+            prand = prand + str(salt)
+            while len(prand) > 10:
+                prand = str(int(prand[:10]) + int(prand[10:]))
+            prand = (mult * int(prand) + incr) % modu
+
+            enc_str = []
+            for i in range(0, len(share_core), 2):
+                enc_chr = int(share_core[i:i + 2], 16) ^ int((prand / modu) * 255)
+                enc_str.append(chr(enc_chr))
+                prand = (mult * prand + incr) % modu
+
+            decoded = base64.b64decode("".join(enc_str)).decode("utf-8")
+            payload = json.loads(decoded)
+            return payload.get("token")
+        except Exception:
+            logger.debug("Failed to decrypt share token", exc_info=True)
+            return None
+
+    def _fetch_via_api(self, url: str) -> Dict:
+        """Call USRIOT APIs directly using the shared link token to avoid browser dependencies."""
+        try:
+            qs = parse_qs(urlparse(url).query)
+            share_param = (qs.get("share") or [None])[0]
+            cusdevice_no = (qs.get("cusdeviceNo") or [None])[0]
+            if not share_param or not cusdevice_no:
+                return {}
+
+            token = self._decrypt_share_token(share_param)
+            if not token:
+                return {}
+
+            # Refresh the token (the decrypted one is often expired in embeds)
+            refresh_url = f"https://api.mp.usriot.com/usrCloud/user/refreshShareToken?token={token}"
+            refresh_resp = requests.get(refresh_url, timeout=10)
+            if refresh_resp.status_code == 200:
+                try:
+                    refreshed = refresh_resp.json()
+                    if refreshed.get("status") == 0:
+                        token = refreshed.get("data", token)
+                except Exception:
+                    pass
+
+            # Fetch data point IDs (velocity=itemId 1, depth=itemId 2, flow=itemId 15)
+            datapoint_url = "https://api.mp.usriot.com/usrCloud/cusdevice/getBatchDataPointInfo"
+            query_list = [
+                {"cusdeviceNo": cusdevice_no, "slaveIndex": "1", "itemId": str(item_id)}
+                for item_id in (1, 2, 15)
+            ]
+            headers = {
+                "token": token,
+                "u-source": "in-draw",
+                "sdk-version": "2.3.2",
+                "languagetype": "0",
+                "traceid": "ODg4MzE=",
+                "content-type": "application/json",
+            }
+
+            resp = requests.post(datapoint_url, json={"dataPointQueryList": query_list, "token": token}, headers=headers, timeout=10)
+            resp.raise_for_status()
+            payload = resp.json()
+            if payload.get("status") == 4010:  # token expired
+                refresh_resp = requests.get(refresh_url, timeout=10)
+                if refresh_resp.status_code == 200:
+                    refreshed = refresh_resp.json()
+                    if refreshed.get("status") == 0:
+                        token = refreshed.get("data", token)
+                        headers["token"] = token
+                        resp = requests.post(datapoint_url, json={"dataPointQueryList": query_list, "token": token}, headers=headers, timeout=10)
+                        resp.raise_for_status()
+                        payload = resp.json()
+            dp_data = payload.get("data", []) if isinstance(payload, dict) else []
+            rel_map = {}
+            for entry in dp_data:
+                try:
+                    item = int(entry.get("itemId"))
+                    rel_map[item] = entry.get("dataPointRelId")
+                except Exception:
+                    continue
+
+            depth_id = rel_map.get(2)
+            velocity_id = rel_map.get(1)
+            flow_id = rel_map.get(15)
+
+            def fetch_latest_point(data_point_id: int) -> Optional[float]:
+                history_url = "https://sga-history.usriot.com:7002/history/cusdevice/getSampleDataPoint"
+                now_ms = int(datetime.utcnow().timestamp() * 1000)
+                start = now_ms - 24 * 60 * 60 * 1000  # 24h window to satisfy API constraints
+                body = {
+                    "dataPoints": [{"cusdeviceNo": cusdevice_no, "dataPointId": data_point_id, "sampleFun": "FIRST"}],
+                    "start": start,
+                    "end": now_ms,
+                    "token": token,
+                    "timeSort": "desc",
+                    "sampleLimit": 1,
+                }
+                r = requests.post(history_url, json=body, headers=headers, timeout=10)
+                r.raise_for_status()
+                payload = r.json()
+                if isinstance(payload, dict) and payload.get("status") == 4010:
+                    # retry once with refreshed token
+                    ref = requests.get(refresh_url, timeout=10)
+                    if ref.status_code == 200:
+                        new_tok = ref.json().get("data")
+                        if new_tok:
+                            body["token"] = new_tok
+                            headers["token"] = new_tok
+                            r = requests.post(history_url, json=body, headers=headers, timeout=10)
+                            r.raise_for_status()
+                            payload = r.json()
+                lst = payload.get("data", {}).get("list", []) if isinstance(payload, dict) else []
+                if not lst:
+                    return None
+                samples = lst[0].get("list") or []
+                if not samples:
+                    return None
+                return float(samples[0].get("value")) if samples[0].get("value") is not None else None
+
+            page_data = {}
+            if depth_id:
+                val = fetch_latest_point(depth_id)
+                if val is not None:
+                    page_data["depth_mm"] = val
+            if velocity_id:
+                val = fetch_latest_point(velocity_id)
+                if val is not None:
+                    page_data["velocity_mps"] = val
+            if flow_id:
+                val = fetch_latest_point(flow_id)
+                if val is not None:
+                    page_data["flow_lps"] = val
+
+            return page_data
+        except Exception:
+            logger.debug("API fetch failed", exc_info=True)
+            return {}
 
     def _has_data_changed(self, device_id: str, new_data: Dict) -> bool:
         """
@@ -155,6 +306,11 @@ class DataScraper:
 
     async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Dict = None) -> Optional[Dict]:
         """Fetch data from the monitor website using Playwright with a requests fallback."""
+        # First try direct API calls using the shared token (no browser needed)
+        api_data = self._fetch_via_api(url)
+        if api_data:
+            return {"data": api_data, "title": None, "timestamp": datetime.now(self.tz)}
+
         # Requests-only mode
         if self.force_requests:
             logger.info("Force requests mode enabled; skipping browser")
