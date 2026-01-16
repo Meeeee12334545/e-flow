@@ -90,6 +90,8 @@ class DataScraper:
         self.db = db or FlowDatabase()
         self.tz = pytz.timezone(DEFAULT_TZ)
         self.last_data = {}  # Track last known values for change detection
+        # Allow forcing requests-only mode via environment to avoid Selenium crashes in constrained runtimes
+        self.force_requests = os.getenv("SCRAPER_FORCE_REQUESTS", "").lower() in ("1", "true", "yes")
 
     def _has_data_changed(self, device_id: str, new_data: Dict) -> bool:
         """
@@ -158,8 +160,19 @@ class DataScraper:
 
         return extracted
 
+    # Track global Selenium availability to avoid repeated failing launches
+    _selenium_disabled = False
+
     async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Dict = None) -> Optional[Dict]:
         """Fetch data from the monitor website using Selenium with a requests fallback."""
+        # If Selenium is disabled (explicitly or due to previous failure), go straight to requests fallback
+        if self.force_requests or DataScraper._selenium_disabled:
+            logger.info("Selenium disabled; using requests fallback")
+            if device_selectors:
+                page_data = self._fetch_via_requests(url, device_selectors)
+                if page_data:
+                    return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
+            return None
         driver = None
         try:
             logger.info(f"Loading page with Selenium: {url[:80]}...")
@@ -283,6 +296,8 @@ class DataScraper:
             return None
         except Exception as e:
             logger.error(f"Error fetching data: {e}", exc_info=True)
+            # Disable Selenium for future calls to avoid repeated failing launches
+            DataScraper._selenium_disabled = True
             # Try requests fallback on Selenium errors
             if device_selectors:
                 page_data = self._fetch_via_requests(url, device_selectors)
