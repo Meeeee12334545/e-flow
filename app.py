@@ -544,38 +544,38 @@ with st.sidebar:
         refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
         
         if refresh_clicked:
-            with st.spinner("Requesting data from device..."):
-                success, message, ts = fetch_latest_reading(selected_device_id)
+            # Fetch data without spinner (no page greying)
+            success, message, ts = fetch_latest_reading(selected_device_id)
+            
+            # Get the actual data values for display
+            device_config = DEVICES.get(selected_device_id)
+            scraper = DataScraper(db)
+            url = device_config.get("url") or MONITOR_URL
+            selectors = device_config.get("selectors")
+            
+            try:
+                data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
+                loop.close()
+            
+            if success and data and data.get("data"):
+                payload = data.get("data", {})
                 
-                # Get the actual data values for display
-                device_config = DEVICES.get(selected_device_id)
-                scraper = DataScraper(db)
-                url = device_config.get("url") or MONITOR_URL
-                selectors = device_config.get("selectors")
+                # Store to session state for display
+                st.session_state['realtime_data'] = {
+                    'depth_mm': payload.get("depth_mm"),
+                    'velocity_mps': payload.get("velocity_mps"),
+                    'flow_lps': payload.get("flow_lps"),
+                    'timestamp': ts
+                }
                 
-                try:
-                    data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
-                    loop.close()
-                
-                if success and data and data.get("data"):
-                    payload = data.get("data", {})
-                    
-                    # Store to session state for display
-                    st.session_state['realtime_data'] = {
-                        'depth_mm': payload.get("depth_mm"),
-                        'velocity_mps': payload.get("velocity_mps"),
-                        'flow_lps': payload.get("flow_lps"),
-                        'timestamp': ts
-                    }
-                    
-                    ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
-                    st.success(f"{message} at {ts_str}")
-                else:
-                    st.error(message)
+                ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
+                st.success(f"{message} at {ts_str}")
+            else:
+                st.error(message)
         
         # Display real-time data if available
         if 'realtime_data' in st.session_state:
