@@ -481,7 +481,11 @@ with st.sidebar:
 
             # Manual refresh to pull the newest reading into the app
             refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
-            if refresh_clicked:
+            
+            # Add a button to manually store data to database
+            store_clicked = st.button("📥 Store Reading to Database", key="store_button", help="Manually store current reading to database")
+            
+            if refresh_clicked or store_clicked:
                 with st.spinner("Requesting data from device..."):
                     success, message, ts = fetch_latest_reading(selected_device_id)
                     
@@ -501,14 +505,31 @@ with st.sidebar:
                     
                     if success and data and data.get("data"):
                         payload = data.get("data", {})
+                        
+                        # Store to session state for display
                         st.session_state['realtime_data'] = {
                             'depth_mm': payload.get("depth_mm"),
                             'velocity_mps': payload.get("velocity_mps"),
                             'flow_lps': payload.get("flow_lps"),
                             'timestamp': ts
                         }
-                        ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
-                        st.success(f"{message} at {ts_str}")
+                        
+                        # If store button was clicked, actually save to database
+                        if store_clicked:
+                            stored = scraper.store_measurement(
+                                device_id=selected_device_id,
+                                device_name=device_config.get("name", selected_device_id),
+                                depth_mm=payload.get("depth_mm"),
+                                velocity_mps=payload.get("velocity_mps"),
+                                flow_lps=payload.get("flow_lps")
+                            )
+                            if stored:
+                                st.success(f"✅ Data stored to database at {ts.strftime('%Y-%m-%d %H:%M:%S')}")
+                            else:
+                                st.info("ℹ️ Data unchanged from last reading - not stored")
+                        else:
+                            ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
+                            st.success(f"{message} at {ts_str}")
                     else:
                         st.error(message)
             
@@ -590,7 +611,14 @@ with st.sidebar:
     with col1:
         st.metric("Stations", db.get_device_count(), help="Number of connected field devices")
     with col2:
-        st.metric("Data Points", db.get_measurement_count(), help="Total measurements recorded")
+        total_measurements = db.get_measurement_count()
+        st.metric("Data Points", total_measurements, help="Total measurements recorded")
+    
+    # Debug info for troubleshooting
+    if total_measurements == 0:
+        st.warning(f"⚠️ Database is empty. Monitor status: {'Active' if monitor_started else 'Inactive'}")
+        if monitor_started:
+            st.info("Background monitor is running. First data should appear within 60 seconds. Refresh page to see updates.")
     
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
@@ -608,7 +636,14 @@ if selected_device_id:
         
         # Filter by time range
         cutoff_time = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=time_range)
-        df = df[df["timestamp"] >= cutoff_time].sort_values("timestamp")
+        df_filtered = df[df["timestamp"] >= cutoff_time].sort_values("timestamp")
+        
+        # Debug: show total vs filtered
+        if df_filtered.empty and not df.empty:
+            st.warning(f"⚠️ Found {len(df)} measurements, but none in the last {time_range} hours. Try selecting a longer time range.")
+            st.info(f"Oldest data: {df['timestamp'].min()}, Latest data: {df['timestamp'].max()}")
+        
+        df = df_filtered
         
         if not df.empty:
             # Latest values with enhanced metrics
