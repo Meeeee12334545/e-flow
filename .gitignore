@@ -30,6 +30,9 @@ build/
 *.db-backup
 flow_data.db-backup
 
+# Monitor lock file
+.monitor_lock
+
 # Logs
 *.log
 e-flow.log
