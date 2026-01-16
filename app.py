@@ -118,8 +118,8 @@ def start_background_monitor():
                     else:
                         logger.warning("Failed to fetch data")
                         consecutive_errors += 1
-                    
-                    # Note: Database connection closes automatically when scraper goes out of scope
+                        
+                except Exception as e:
                     consecutive_errors += 1
                     logger.error(f"Monitor error (attempt {consecutive_errors}/{max_consecutive_errors}): {e}")
                     logger.error(traceback.format_exc())
