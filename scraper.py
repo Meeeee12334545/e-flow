@@ -426,8 +426,10 @@ class DataScraper:
         # Check for changes only if STORE_ALL_READINGS is False
         if not STORE_ALL_READINGS:
             if not self._has_data_changed(device_id, new_data):
-                logger.debug(f"No change detected for {device_name}, skipping storage")
+                logger.debug(f"⊘ No change detected for {device_name}, skipping storage")
                 return False
+            else:
+                logger.info(f"✓ Change detected for {device_name}, storing to database")
         
         self.db.add_device(device_id, device_name)
         self.db.add_measurement(
@@ -439,9 +441,9 @@ class DataScraper:
         )
         
         if STORE_ALL_READINGS:
-            logger.info(f"✅ Stored reading for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+            logger.info(f"✅ Stored reading (STORE_ALL mode) for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
         else:
-            logger.info(f"✅ Stored changed data for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+            logger.info(f"✅ Stored CHANGED data for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
         
         # Always update last_data for tracking purposes
         self.last_data[device_id] = new_data

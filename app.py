@@ -45,9 +45,23 @@ ensure_playwright_installed()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global flag to ensure only ONE monitor thread ever starts (prevents duplicates)
+_MONITOR_STARTED = False
+_MONITOR_LOCK = threading.Lock()
+
 @st.cache_resource
 def start_background_monitor():
     """Start a simple background thread for auto data collection."""
+    global _MONITOR_STARTED
+    
+    # Double-check locking pattern to prevent multiple monitor threads
+    if _MONITOR_STARTED:
+        return {"started": True, "thread": None, "reason": "Monitor already running (prevented duplicate)"}
+    
+    with _MONITOR_LOCK:
+        if _MONITOR_STARTED:
+            return {"started": True, "thread": None, "reason": "Monitor already running (prevented duplicate)"}
+    
     if not MONITOR_ENABLED:
         return {"started": False, "thread": None, "reason": "Monitor disabled in config"}
     
@@ -134,6 +148,10 @@ def start_background_monitor():
         # Start monitor in daemon thread
         monitor_thread = threading.Thread(target=run_simple_monitor, daemon=True, name="SimpleMonitor")
         monitor_thread.start()
+        
+        # Mark as started AFTER thread starts successfully
+        _MONITOR_STARTED = True
+        
         logger.info("✅ Background monitor thread started")
         return {"started": True, "thread": monitor_thread, "reason": "Monitor started successfully"}
     except Exception as e:
