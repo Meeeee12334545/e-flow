@@ -43,18 +43,201 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Page styling
+# Professional styling with Helvetica Neue
 st.markdown("""
 <style>
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 20px;
-        border-radius: 8px;
-        border-left: 4px solid #0066cc;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    * {
+        font-family: 'Helvetica Neue', 'Helvetica Neue Light', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
-    .status-active { color: #00aa00; font-weight: bold; }
-    .status-idle { color: #cc6600; font-weight: bold; }
-    .status-error { color: #cc0000; font-weight: bold; }
+    
+    /* Main text styling */
+    body, p, span, div {
+        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        font-weight: 300;
+        letter-spacing: 0.3px;
+        line-height: 1.6;
+        color: #333;
+    }
+    
+    /* Headers */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        font-weight: 500;
+        letter-spacing: 0.4px;
+        margin-top: 0.8rem;
+        margin-bottom: 1rem;
+        color: #1a1a1a;
+    }
+    
+    h1 {
+        font-size: 2.8rem;
+        font-weight: 600;
+        color: #000;
+        letter-spacing: 0px;
+        margin-bottom: 1.5rem;
+    }
+    
+    h2 {
+        font-size: 2rem;
+        font-weight: 500;
+        color: #1a1a1a;
+        margin-top: 1.5rem;
+        margin-bottom: 1.2rem;
+        letter-spacing: 0.3px;
+    }
+    
+    h3 {
+        font-size: 1.4rem;
+        font-weight: 500;
+        color: #2a2a2a;
+        letter-spacing: 0.3px;
+        margin-bottom: 0.8rem;
+    }
+    
+    /* Metric cards */
+    .metric-card {
+        background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid #e0e0e0;
+        border-left: 4px solid #0066cc;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        box-shadow: 0 8px 16px rgba(0, 102, 204, 0.12);
+        border-left-color: #0052a3;
+        transform: translateY(-2px);
+    }
+    
+    .metric-card h4 {
+        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        font-weight: 300;
+        font-size: 0.9rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    /* Status indicators */
+    .status-active { 
+        color: #10b981; 
+        font-weight: 500;
+        font-size: 1.1rem;
+        letter-spacing: 0.5px;
+    }
+    .status-idle { 
+        color: #f59e0b; 
+        font-weight: 500;
+        font-size: 1.1rem;
+    }
+    .status-error { 
+        color: #ef4444; 
+        font-weight: 500;
+        font-size: 1.1rem;
+    }
+    
+    /* Dividers */
+    hr {
+        border: none;
+        height: 1px;
+        background: linear-gradient(to right, #e0e0e0 0%, transparent);
+        margin: 2rem 0;
+    }
+    
+    /* Input styling */
+    .stSelectbox, .stSlider, .stNumberInput, .stTextInput {
+        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+    }
+    
+    /* Sidebar styling */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+    }
+    
+    section[data-testid="stSidebar"] h2 {
+        font-weight: 500;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+        color: #1a1a1a;
+        letter-spacing: 0.3px;
+    }
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] button {
+        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        font-weight: 500;
+        font-size: 0.95rem;
+        letter-spacing: 0.3px;
+    }
+    
+    /* Expander styling */
+    details > summary {
+        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    
+    /* Caption styling */
+    .caption {
+        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        font-weight: 300;
+        font-size: 0.9rem;
+        color: #666;
+        letter-spacing: 0.2px;
+    }
+    
+    /* Button styling */
+    button[kind="primary"] {
+        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif !important;
+        font-weight: 500;
+        letter-spacing: 0.4px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%) !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 102, 204, 0.2);
+    }
+    
+    button[kind="primary"]:hover {
+        box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4) !important;
+        transform: translateY(-1px);
+    }
+    
+    /* Secondary buttons */
+    button[kind="secondary"] {
+        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif !important;
+        font-weight: 400;
+        letter-spacing: 0.3px;
+        border-radius: 8px;
+        border: 1px solid #ddd !important;
+    }
+    
+    /* Info/Warning boxes */
+    .stAlert {
+        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        border-radius: 8px;
+        padding: 1rem;
+        font-weight: 300;
+    }
+    
+    /* Code blocks */
+    code {
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 0.9rem;
+        background-color: #f5f5f5;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,22 +289,41 @@ def get_collection_stats(device_id):
 # Page header
 col1, col2 = st.columns([3, 1])
 with col1:
-    st.title("e-flow | Hydrological Analytics Platform")
+    st.markdown("""
+    <h1 style="margin-bottom: 0; font-weight: 600; letter-spacing: -0.5px; font-size: 3rem;">
+        e-flow
+    </h1>
+    <p style="margin-top: 0.2rem; color: #666; font-size: 1.1rem; font-weight: 300; letter-spacing: 0.6px;">
+        Hydrological Analytics Platform
+    </p>
+    """, unsafe_allow_html=True)
 with col2:
-    st.markdown(f"<div class='status-active'>● LIVE</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: right; padding-top: 0.5rem;">
+        <span class="status-active" style="font-size: 1.2rem;">●</span>
+        <span style="color: #10b981; font-weight: 500; margin-left: 0.5rem;">LIVE</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
+
 # Sidebar configuration
 with st.sidebar:
-    st.header("Configuration & Status")
+    st.markdown("""
+    <h2 style="font-weight: 500; letter-spacing: 0.3px;">Configuration & Status</h2>
+    """, unsafe_allow_html=True)
     
     st.markdown("""
-    **System Status**: Continuous monitoring active
-    - Monitor interval: 60 seconds
-    - Collection method: Selenium WebDriver
-    - Database: SQLite3 with change-detection
-    """)
+    <div style="background: #f0f7ff; border-left: 3px solid #0066cc; padding: 12px; border-radius: 6px; margin-bottom: 1.5rem;">
+        <p style="font-size: 0.9rem; margin: 0; color: #1a1a1a; line-height: 1.6;">
+            <strong style="font-weight: 500;">System Status:</strong> Continuous monitoring active<br>
+            <span style="color: #666; font-size: 0.85rem;">• Monitor interval: 60 seconds</span><br>
+            <span style="color: #666; font-size: 0.85rem;">• Collection: Selenium WebDriver</span><br>
+            <span style="color: #666; font-size: 0.85rem;">• Database: SQLite3 change-detection</span>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.divider()
     
@@ -129,21 +331,30 @@ with st.sidebar:
     devices = db.get_devices()
     if devices:
         device_names = {d["device_name"]: d["device_id"] for d in devices}
+        st.markdown("""
+        <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
+            📍 Monitoring Station
+        </p>
+        """, unsafe_allow_html=True)
         selected_device_name = st.selectbox(
-            "📍 Select Monitoring Station",
+            "Select Device",
             options=sorted(device_names.keys()),
-            key="device_selector"
+            key="device_selector",
+            label_visibility="collapsed"
         )
         selected_device_id = device_names[selected_device_name]
         
         # Get selected device info
         device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
         if device_info:
-            with st.expander("Station Details"):
-                st.write(f"**ID**: {device_info['device_id']}")
-                st.write(f"**Name**: {device_info['device_name']}")
-                st.write(f"**Location**: {device_info['location'] or 'N/A'}")
-                st.write(f"**Initialized**: {device_info['created_at']}")
+            with st.expander("📋 Station Details", expanded=False):
+                st.markdown(f"""
+                <div style="font-family: 'Helvetica Neue', sans-serif; font-weight: 300; line-height: 1.8;">
+                    <p><strong style="font-weight: 500;">Station ID</strong><br><code>{device_info['device_id']}</code></p>
+                    <p><strong style="font-weight: 500;">Location</strong><br>{device_info['location'] or 'Not specified'}</p>
+                    <p><strong style="font-weight: 500;">Initialized</strong><br><code>{device_info['created_at']}</code></p>
+                </div>
+                """, unsafe_allow_html=True)
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
@@ -152,26 +363,37 @@ with st.sidebar:
     st.divider()
     
     # Time range selection
-    st.subheader("Query Parameters")
+    st.markdown("""
+    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
+        Query Parameters
+    </p>
+    """, unsafe_allow_html=True)
     time_range = st.selectbox(
         "Time Window",
         options=[(1, "1 hour"), (6, "6 hours"), (24, "24 hours"), (168, "7 days"), (720, "30 days")],
         format_func=lambda x: x[1],
-        key="time_range"
+        key="time_range",
+        label_visibility="collapsed"
     )[0]
     
+    st.divider()
+    
     # Database stats
-    st.subheader("System Metrics")
+    st.markdown("""
+    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 1rem; letter-spacing: 0.2px;">
+        System Metrics
+    </p>
+    """, unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Monitored Stations", db.get_device_count())
+        st.metric("Stations", db.get_device_count(), help="Number of monitored stations")
     with col2:
-        st.metric("Total Data Points", db.get_measurement_count())
+        st.metric("Data Points", db.get_measurement_count(), help="Total measurements recorded")
     
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
         if stats:
-            st.metric("24h Collection Rate", f"{stats.get('collection_rate', 0):.1f} pts/min")
+            st.metric("Collection Rate", f"{stats.get('collection_rate', 0):.1f}/min", help="Average points per minute")
 
 # Main content area
 if selected_device_id:
@@ -201,52 +423,101 @@ if selected_device_id:
         
         if not df.empty:
             # Latest values with enhanced metrics
-            st.subheader(f"Current Status: {selected_device_name}")
+            st.markdown(f"""
+            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-bottom: 1.5rem;">
+                Current Status: {selected_device_name}
+            </h2>
+            """, unsafe_allow_html=True)
+            
             latest = df.iloc[-1]
             last_update = latest["timestamp"]
             
-            metric_cols = st.columns(3)
+            # KPI Metrics
+            metric_cols = st.columns(3, gap="medium")
             
             with metric_cols[0]:
                 depth = latest["depth_mm"]
-                st.metric(
-                    "Water Depth",
-                    f"{depth:.1f} mm" if depth else "N/A",
-                    delta=None,
-                    help="Water level measurement in millimeters"
-                )
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
+                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
+                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
+                        WATER DEPTH
+                    </p>
+                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
+                        {depth:.1f if depth else 'N/A'} <span style="font-size: 1rem;">mm</span>
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
             
             with metric_cols[1]:
                 velocity = latest["velocity_mps"]
-                st.metric(
-                    "Flow Velocity",
-                    f"{velocity:.3f} m/s" if velocity else "N/A",
-                    delta=None,
-                    help="Water velocity in meters per second"
-                )
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
+                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
+                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
+                        FLOW VELOCITY
+                    </p>
+                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
+                        {velocity:.3f if velocity else 'N/A'} <span style="font-size: 1rem;">m/s</span>
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
             
             with metric_cols[2]:
                 flow = latest["flow_lps"]
-                st.metric(
-                    "Flow Rate",
-                    f"{flow:.1f} L/s" if flow else "N/A",
-                    delta=None,
-                    help="Volumetric flow rate in liters per second"
-                )
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
+                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
+                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
+                        FLOW RATE
+                    </p>
+                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
+                        {flow:.1f if flow else 'N/A'} <span style="font-size: 1rem;">L/s</span>
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Data quality indicators
+            # Data quality indicators with enhanced styling
+            st.markdown("""
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+            """, unsafe_allow_html=True)
+            
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
-                st.caption(f"🕒 Last Update: {last_update.strftime('%Y-%m-%d %H:%M:%S')}")
+                st.markdown(f"""
+                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
+                    <strong style="color: #333;">🕒 Last Update</strong><br>
+                    {last_update.strftime('%Y-%m-%d %H:%M:%S')}
+                </p>
+                """, unsafe_allow_html=True)
             with col_info2:
-                st.caption(f"📊 Data Points (window): {len(df)}")
+                st.markdown(f"""
+                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
+                    <strong style="color: #333;">📊 Data Points</strong><br>
+                    {len(df)} in {time_range}h window
+                </p>
+                """, unsafe_allow_html=True)
             with col_info3:
-                st.caption(f"⏱️ Collection Rate: {len(df)/(time_range if time_range > 0 else 1):.1f} pts/hr")
+                st.markdown(f"""
+                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
+                    <strong style="color: #333;">⏱️ Collection Rate</strong><br>
+                    {len(df)/(time_range if time_range > 0 else 1):.1f} pts/hr
+                </p>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
             
             st.markdown("---")
             
             # Advanced analytics
-            st.subheader("Time Series Analysis")
+            st.markdown("""
+            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
+                Time Series Analysis
+            </h3>
+            """, unsafe_allow_html=True)
             
             if len(df) > 1:
                 # Create tabs for different views
@@ -296,14 +567,22 @@ if selected_device_id:
                     st.plotly_chart(fig_flow, use_container_width=True)
             
             # Data table
-            st.subheader("📋 Data Table")
+            st.markdown("""
+            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
+                📋 Data Table
+            </h3>
+            """, unsafe_allow_html=True)
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             
             # Export functionality
-            st.subheader("📥 Export Data")
+            st.markdown("""
+            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
+                📥 Export Data
+            </h3>
+            """, unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             
             with col1:
