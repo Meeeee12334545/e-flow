@@ -1,11 +1,11 @@
 """
 Data Scraper Module - Autonomous Web Automation & DOM Extraction
 
-This module implements browser automation using Selenium WebDriver to extract
+This module implements browser automation using Playwright to extract
 hydrological measurements from JavaScript-rendered USRIOT dashboards.
 
 Key Features:
-  - Headless Chrome orchestration with intelligent page-load detection
+    - Headless Chromium orchestration with intelligent page-load detection
   - CSS selector-based DOM traversal with JavaScript execution
   - Regex-based numeric value extraction with unit parsing
   - Change-detection to minimize database writes
@@ -13,12 +13,12 @@ Key Features:
   - Timezone-aware timestamp management
 
 Architecture:
-  1. Browser initialization with headless Chrome + webdriver-manager
-  2. Page load with document.readyState polling + element wait
-  3. JavaScript execution for CSS selector queries
-  4. Regex parsing of measurement strings (e.g., "133mm" -> 133.0)
-  5. Change detection via FlowDatabase.has_changed()
-  6. Async persistence with pytz timezone handling
+    1. Browser initialization with headless Chromium via Playwright
+    2. Page load waiting for network idle
+    3. DOM querying with CSS selector queries
+    4. Regex parsing of measurement strings (e.g., "133mm" -> 133.0)
+    5. Change detection via FlowDatabase.has_changed()
+    6. Async persistence with pytz timezone handling
 
 Performance Considerations:
   - Page load time: ~1-2 seconds due to USRIOT dashboard rendering
@@ -38,14 +38,7 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 import pytz
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
+from playwright.async_api import async_playwright
 
 from database import FlowDatabase
 from config import STORE_ALL_READINGS
@@ -63,12 +56,12 @@ class DataScraper:
     """
     Production-grade web scraper for USRIOT hydrological dashboards.
     
-    Responsibilities:
-      - Selenium WebDriver lifecycle management
-      - DOM querying with CSS selectors
-      - Value extraction via regex parsing
-      - Change detection for delta compression
-      - Timezone-aware timestamp generation
+        Responsibilities:
+            - Playwright browser lifecycle management
+            - DOM querying with CSS selectors
+            - Value extraction via regex parsing
+            - Change detection for delta compression
+            - Timezone-aware timestamp generation
     
     Design Patterns:
       - Singleton: One scraper instance per monitor session
@@ -90,7 +83,7 @@ class DataScraper:
         self.db = db or FlowDatabase()
         self.tz = pytz.timezone(DEFAULT_TZ)
         self.last_data = {}  # Track last known values for change detection
-        # Allow forcing requests-only mode via environment to avoid Selenium crashes in constrained runtimes
+        # Allow forcing requests-only mode via environment to avoid browser launches in constrained runtimes
         self.force_requests = os.getenv("SCRAPER_FORCE_REQUESTS", "").lower() in ("1", "true", "yes")
 
     def _has_data_changed(self, device_id: str, new_data: Dict) -> bool:
@@ -160,153 +153,59 @@ class DataScraper:
 
         return extracted
 
-    # Track global Selenium availability to avoid repeated failing launches
-    _selenium_disabled = False
-
     async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Dict = None) -> Optional[Dict]:
-        """Fetch data from the monitor website using Selenium with a requests fallback."""
-        # If Selenium is disabled (explicitly or due to previous failure), go straight to requests fallback
-        if self.force_requests or DataScraper._selenium_disabled:
-            logger.info("Selenium disabled; using requests fallback")
+        """Fetch data from the monitor website using Playwright with a requests fallback."""
+        # Requests-only mode
+        if self.force_requests:
+            logger.info("Force requests mode enabled; skipping browser")
             if device_selectors:
                 page_data = self._fetch_via_requests(url, device_selectors)
                 if page_data:
                     return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
             return None
-        driver = None
-        try:
-            logger.info(f"Loading page with Selenium: {url[:80]}...")
-            
-            # Setup Chrome options
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
-            
-            # Launch browser with auto-managed chromedriver
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            # Load the page
-            driver.get(url)
-            
-            # Wait for page to load
-            logger.info("Waiting for page to load...")
-            WebDriverWait(driver, 10).until(
-                lambda d: d.execute_script("return document.readyState") == "complete"
-            )
-            
-            # Wait for data elements to appear and contain actual values (the page updates after initial load)
-            def has_data_loaded(driver):
-                divs = driver.execute_script("""
-                    var elements = document.querySelectorAll('[id^="div_varvalue"]');
-                    if (elements.length === 0) return false;
-                    // Check if any element has more than just "Variable Value"
-                    for (var i = 0; i < elements.length; i++) {
-                        var text = elements[i].textContent.trim();
-                        if (text && text !== 'Variable Value' && text.length > 2) {
-                            return true;
-                        }
-                    }
-                    return false;
-                """)
-                return divs
-            
-            WebDriverWait(driver, 10).until(has_data_loaded)
-            
-            # Give JavaScript time to render data
-            driver.implicitly_wait(1)
-            
-            page_data = {}
-            
-            # Extract data using CSS selectors with JavaScript if provided
-            if device_selectors:
-                for key, selector in device_selectors.items():
-                    try:
-                        js_code = f"""
-                        var elem = document.querySelector('{selector}');
-                        return elem ? elem.textContent.trim() : null;
-                        """
-                        text = driver.execute_script(js_code)
 
-                        if text:
-                            numbers = re.findall(r'\d+\.?\d*', text)
+        page_data = {}
+        title = None
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+                page = await browser.new_page(viewport={"width": 1920, "height": 1080})
+                await page.goto(url, wait_until="networkidle", timeout=20000)
+                title = await page.title()
+
+                if device_selectors:
+                    for key, selector in device_selectors.items():
+                        try:
+                            el = await page.query_selector(selector)
+                            if not el:
+                                logger.debug(f"Playwright: selector not found for {key}: {selector}")
+                                continue
+                            text = (await el.text_content() or "").strip()
+                            numbers = re.findall(r"\d+\.?\d*", text)
                             if numbers:
                                 page_data[key] = float(numbers[0])
-                                logger.info(f"✅ Extracted {key}: {page_data[key]} (from '{text}')")
+                                logger.info(f"Playwright extracted {key}: {page_data[key]} (from '{text}')")
                             else:
-                                logger.warning(f"⚠️  No numbers found in {key}: '{text}'")
-                        else:
-                            logger.warning(f"⚠️  Selector not found for {key}: {selector}")
+                                logger.debug(f"Playwright: no numbers in {key} text '{text}'")
+                        except Exception as e:
+                            logger.debug(f"Playwright: error extracting {key}: {e}")
 
-                    except Exception as e:
-                        logger.warning(f"⚠️  Error extracting {key}: {e}")
-            else:
-                # Fallback: try to find elements by common patterns
-                logger.info("No selectors provided, attempting pattern matching...")
-                try:
-                    spans = driver.find_elements(By.TAG_NAME, "span")
-                    for span in spans[:100]:  # Check first 100 spans
-                        try:
-                            text = span.text.strip()
-                            if text:
-                                if "depth" in text.lower():
-                                    nums = re.findall(r'\d+\.?\d*', text)
-                                    if nums:
-                                        page_data['depth_mm'] = float(nums[0])
-                                elif "velocity" in text.lower():
-                                    nums = re.findall(r'\d+\.?\d*', text)
-                                    if nums:
-                                        page_data['velocity_mps'] = float(nums[0])
-                                elif "flow" in text.lower():
-                                    nums = re.findall(r'\d+\.?\d*', text)
-                                    if nums:
-                                        page_data['flow_lps'] = float(nums[0])
-                        except:
-                            continue
-                except Exception as e:
-                    logger.warning(f"Error in fallback extraction: {e}")
-            
-            # Get page title
-            title = driver.title
-            
-            logger.info(f"Extracted data: {page_data}")
-
-            # If Selenium didn't yield data but selectors exist, try requests as a fallback
-            if device_selectors and not page_data:
-                logger.info("Selenium produced no values; attempting requests fallback...")
-                page_data = self._fetch_via_requests(url, device_selectors)
-                logger.info(f"Requests fallback extracted: {page_data}")
-
-            return {
-                "data": page_data,
-                "title": title,
-                "timestamp": datetime.now(self.tz)
-            }
-            
-        except TimeoutException:
-            logger.error("Timeout waiting for page to load")
-            # Try requests fallback when Selenium times out
-            if device_selectors:
-                page_data = self._fetch_via_requests(url, device_selectors)
-                if page_data:
-                    return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
-            return None
+                await browser.close()
         except Exception as e:
-            logger.error(f"Error fetching data: {e}", exc_info=True)
-            # Disable Selenium for future calls to avoid repeated failing launches
-            DataScraper._selenium_disabled = True
-            # Try requests fallback on Selenium errors
-            if device_selectors:
-                page_data = self._fetch_via_requests(url, device_selectors)
-                if page_data:
-                    return {"data": page_data, "title": None, "timestamp": datetime.now(self.tz)}
-            return None
-        finally:
-            if driver:
-                driver.quit()
+            logger.error(f"Playwright fetch failed: {e}")
+
+        # If Playwright provided data, return it
+        if page_data:
+            return {"data": page_data, "title": title, "timestamp": datetime.now(self.tz)}
+
+        # Fallback to requests
+        if device_selectors:
+            logger.info("Browser yielded no data; attempting requests fallback")
+            page_data = self._fetch_via_requests(url, device_selectors)
+            if page_data:
+                return {"data": page_data, "title": title, "timestamp": datetime.now(self.tz)}
+        return None
 
     def store_measurement(self, device_id: str, device_name: str, 
                          depth_mm: float = None, velocity_mps: float = None, 
