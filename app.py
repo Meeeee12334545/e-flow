@@ -47,23 +47,72 @@ logger = logging.getLogger(__name__)
 
 @st.cache_resource
 def start_background_monitor():
-    """Start monitor.py as a background daemon thread for auto data collection."""
+    """Start a simple background thread for auto data collection."""
     if not MONITOR_ENABLED:
         return False
     
     try:
-        # Check if already running by attempting to import and checking active threads
-        import monitor
+        from scraper import DataScraper
+        from config import DEVICES, MONITOR_URL
+        import time
         
-        def run_monitor():
-            try:
-                mon = monitor.ContinuousMonitor()
-                mon.start_monitoring()
-            except Exception as e:
-                logger.error(f"Monitor thread error: {e}")
+        def run_simple_monitor():
+            """Simple monitor loop that runs every 60 seconds."""
+            db = FlowDatabase()
+            scraper = DataScraper(db)
+            
+            device_id = "FIT100"
+            device_info = DEVICES.get(device_id, {})
+            device_name = device_info.get("name", "FIT100 Main Inflow Lismore STP")
+            device_selectors = device_info.get("selectors")
+            url = device_info.get("url") or MONITOR_URL
+            
+            check_count = 0
+            logger.info("🚀 Simple background monitor started")
+            
+            while True:
+                try:
+                    check_count += 1
+                    logger.info(f"[Check #{check_count}] Fetching device data...")
+                    
+                    # Fetch data
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    data = loop.run_until_complete(scraper.fetch_monitor_data(url, device_selectors))
+                    loop.close()
+                    
+                    if data and data.get("data"):
+                        payload = data.get("data", {})
+                        depth_mm = payload.get("depth_mm")
+                        velocity_mps = payload.get("velocity_mps")
+                        flow_lps = payload.get("flow_lps")
+                        
+                        if depth_mm is not None or velocity_mps is not None or flow_lps is not None:
+                            stored = scraper.store_measurement(
+                                device_id=device_id,
+                                device_name=device_name,
+                                depth_mm=depth_mm,
+                                velocity_mps=velocity_mps,
+                                flow_lps=flow_lps
+                            )
+                            
+                            if stored:
+                                logger.info(f"✅ Data stored: D={depth_mm}mm, V={velocity_mps}m/s, F={flow_lps}L/s")
+                            else:
+                                logger.info(f"ℹ️  Data unchanged, not stored")
+                        else:
+                            logger.warning("No valid data extracted")
+                    else:
+                        logger.warning("Failed to fetch data")
+                        
+                except Exception as e:
+                    logger.error(f"Monitor error: {e}")
+                
+                # Wait 60 seconds before next check
+                time.sleep(60)
         
-        # Start monitor in daemon thread (won't block Streamlit)
-        monitor_thread = threading.Thread(target=run_monitor, daemon=True, name="MonitorDaemon")
+        # Start monitor in daemon thread
+        monitor_thread = threading.Thread(target=run_simple_monitor, daemon=True, name="SimpleMonitor")
         monitor_thread.start()
         logger.info("✅ Background monitor started successfully")
         return True
