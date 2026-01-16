@@ -88,7 +88,8 @@ def format_measurement(value, unit):
 
 def get_collection_stats(device_id):
     """Calculate data collection statistics."""
-    measurements = db.get_measurements(device_id, hours=24)
+    # Get all measurements for the device
+    measurements = db.get_measurements(device_id, limit=2000)
     if not measurements:
         return {}
     
