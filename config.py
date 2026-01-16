@@ -31,7 +31,7 @@ SCRAPER_WAIT_AFTER_LOAD = 3000  # milliseconds - increased for better loading
 
 # Monitor settings
 MONITOR_INTERVAL = 60  # seconds (1 minute for continuous monitoring)
-MONITOR_ENABLED = True  # Enable continuous monitoring
+MONITOR_ENABLED = False  # DISABLED - Streamlit Cloud causes duplicate monitors. Use standalone monitor instead.
 STORE_ALL_READINGS = False  # If True, stores every reading. If False, only stores when values change
 
 # Streamlit settings
