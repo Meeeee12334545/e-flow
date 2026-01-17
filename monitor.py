@@ -13,6 +13,7 @@ Production features:
 """
 
 import asyncio
+import os
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
@@ -20,6 +21,12 @@ import time
 import signal
 from datetime import datetime, timedelta
 from pathlib import Path
+import atexit
+
+try:
+    import fcntl  # Unix-only; used for advisory file locking
+except ImportError:  # pragma: no cover - non-Unix
+    fcntl = None
 
 import pytz
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -54,6 +61,76 @@ RETRY_DELAY = 5  # Seconds between retries
 HEALTH_CHECK_INTERVAL = 300  # Health check every 5 minutes
 
 DEFAULT_TZ = "Australia/Brisbane"
+LOCK_FILE_PATH = Path(os.getenv("E_FLOW_MONITOR_LOCK", "/tmp/e-flow-monitor.lock"))
+
+
+class SingletonProcessLock:
+    """Advisory file lock to prevent multiple monitor instances.
+
+    Uses fcntl.flock on Unix. If fcntl is unavailable, falls back to
+    exclusive file creation semantics.
+    """
+
+    def __init__(self, lock_path: Path = LOCK_FILE_PATH):
+        self.lock_path = Path(lock_path)
+        self.fp = None
+        self.locked = False
+
+    def acquire(self) -> bool:
+        try:
+            # Ensure parent directory exists
+            self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+            # Open file for read/write, create if missing
+            self.fp = open(self.lock_path, "a+")
+            try:
+                self.fp.seek(0)
+                self.fp.truncate(0)
+                self.fp.write(str(os.getpid()))
+                self.fp.flush()
+            except Exception:
+                pass
+
+            if fcntl is not None:
+                try:
+                    fcntl.flock(self.fp.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    self.locked = True
+                    return True
+                except BlockingIOError:
+                    return False
+            else:
+                # Fallback: try to create a separate pid file exclusively
+                # Note: not race-proof on non-Unix, but best-effort
+                if self.lock_path.exists():
+                    return False
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                self.locked = True
+                return True
+        except Exception:
+            return False
+
+    def release(self):
+        try:
+            if self.fp and fcntl is not None and self.locked:
+                try:
+                    fcntl.flock(self.fp.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
+            if self.fp:
+                try:
+                    self.fp.close()
+                except Exception:
+                    pass
+            # Best-effort cleanup of lock file
+            try:
+                if self.lock_path.exists():
+                    self.lock_path.unlink()
+            except Exception:
+                pass
+        finally:
+            self.fp = None
+            self.locked = False
 
 
 class ContinuousMonitor:
@@ -307,6 +384,28 @@ class ContinuousMonitor:
 
 def main():
     """Main entry point with automatic restart capability."""
+    # Acquire singleton lock to prevent multiple instances
+    instance_lock = SingletonProcessLock()
+    if not instance_lock.acquire():
+        try:
+            # Try to read existing PID for nicer log
+            existing_pid = None
+            if LOCK_FILE_PATH.exists():
+                try:
+                    existing_pid = LOCK_FILE_PATH.read_text().strip()
+                except Exception:
+                    pass
+            logger.error(
+                f"Another monitor instance is already running"
+                + (f" (PID {existing_pid})" if existing_pid else "")
+                + f". Lock file: {LOCK_FILE_PATH}"
+            )
+        finally:
+            return
+
+    # Ensure lock is released on any exit path
+    atexit.register(instance_lock.release)
+
     restart_count = 0
     max_restarts = 5
     restart_delay = 60  # seconds
@@ -335,6 +434,12 @@ def main():
             else:
                 logger.critical(f"❌ MAX RESTARTS REACHED ({max_restarts}). Monitor requires manual intervention.")
                 sys.exit(1)
+
+    # Explicitly release the lock when leaving main
+    try:
+        instance_lock.release()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
