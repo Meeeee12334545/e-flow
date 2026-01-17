@@ -35,6 +35,7 @@ SCRAPER_WAIT_AFTER_LOAD = int(os.getenv("SCRAPER_WAIT_AFTER_LOAD", "3000"))  # m
 MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", "60"))  # seconds
 MONITOR_ENABLED = os.getenv("MONITOR_ENABLED", "true").lower() in ("1", "true", "yes")
 STORE_ALL_READINGS = os.getenv("STORE_ALL_READINGS", "false").lower() in ("1", "true", "yes")
+EXIT_ON_UNHEALTHY = os.getenv("EXIT_ON_UNHEALTHY", "true").lower() in ("1", "true", "yes")
 
 # Streamlit settings
 STREAMLIT_DEFAULT_TIME_RANGE = 24  # hours

@@ -27,7 +27,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from scraper import DataScraper
 from database import FlowDatabase
-from config import MONITOR_INTERVAL, MONITOR_ENABLED, MONITOR_URL, DEVICES, STORE_ALL_READINGS
+from config import MONITOR_INTERVAL, MONITOR_ENABLED, MONITOR_URL, DEVICES, STORE_ALL_READINGS, EXIT_ON_UNHEALTHY
 
 # Configure logging with rotation
 logger = logging.getLogger(__name__)
@@ -239,6 +239,10 @@ class ContinuousMonitor:
         # Alert if no success for too long
         if time_since_last_success > 600:  # 10 minutes
             logger.warning(f"⚠️  WARNING: No successful data collection in {int(time_since_last_success)}s")
+            # If we've exceeded max consecutive errors and exit-on-unhealthy is enabled, terminate to trigger container restart
+            if not self.is_healthy and EXIT_ON_UNHEALTHY:
+                logger.critical("Container exiting due to prolonged unhealthy state (triggering restart policy)")
+                sys.exit(1)
 
     def run_check(self):
         """Wrapper to run async check from synchronous scheduler."""

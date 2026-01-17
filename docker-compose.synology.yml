@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  monitor:
+    build: .
+    container_name: e-flow-monitor
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Brisbane
+      - TIMEZONE=Australia/Brisbane
+      - MONITOR_ENABLED=true
+      - MONITOR_INTERVAL=60
+      - STORE_ALL_READINGS=false
+      - EXIT_ON_UNHEALTHY=true
+      - HEALTH_MAX_AGE=900
+    volumes:
+      - /volume1/docker/e-flow/data/flow_data.db:/app/flow_data.db
+      - /volume1/docker/e-flow/logs/monitor.log:/app/monitor.log
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    healthcheck:
+      test: ["CMD", "python", "health.py"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+
+  dashboard:
+    build: .
+    container_name: e-flow-dashboard
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - TZ=Australia/Brisbane
+      - TIMEZONE=Australia/Brisbane
+    volumes:
+      - /volume1/docker/e-flow/data/flow_data.db:/app/flow_data.db:ro
+    depends_on:
+      - monitor
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
