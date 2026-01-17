@@ -451,7 +451,7 @@ class DataScraper:
         Store a measurement in the database.
         
         CRITICAL: Requires allow_storage=True to prevent accidental storage from Streamlit app.
-        This flag ensures ONLY the standalone monitor (start_monitor.py) can write to database.
+        This flag ensures ONLY the monitor service can write to the database.
         
         If STORE_ALL_READINGS=True, stores every reading.
         If STORE_ALL_READINGS=False, only stores when data has changed.
@@ -470,6 +470,7 @@ class DataScraper:
         
         # Check for changes only if STORE_ALL_READINGS is False
         if not STORE_ALL_READINGS:
+            # _has_data_changed will also update self.last_data with the computed hash and persist state
             if not self._has_data_changed(device_id, new_data):
                 logger.debug(f"⊘ No change detected for {device_name}, skipping storage")
                 return False
@@ -487,11 +488,17 @@ class DataScraper:
         
         if STORE_ALL_READINGS:
             logger.info(f"✅ Stored reading (STORE_ALL mode) for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+            # In STORE_ALL mode, ensure last_data includes hash for proper future change detection
+            canonical_json = json.dumps(new_data, sort_keys=True, separators=(',', ':'), default=str)
+            new_hash = zlib.crc32(canonical_json.encode('utf-8')) & 0xffffffff
+            self.last_data[device_id] = {
+                **new_data,
+                '_hash': new_hash,
+                '_timestamp': datetime.now(self.tz)
+            }
+            self._save_state()
         else:
             logger.info(f"✅ Stored CHANGED data for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
-        
-        # Always update last_data for tracking purposes
-        self.last_data[device_id] = new_data
         
         return True
 
