@@ -396,7 +396,7 @@ with st.sidebar:
         devices = db.get_devices()
         device_names = {d['device_name']: d['device_id'] for d in devices}
     
-    selected_device_name = st.selectbox(
+    selected_device_name: str = st.selectbox(
         "Select Device",
         options=sorted(device_names.keys()),
         key="device_selector",

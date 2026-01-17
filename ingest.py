@@ -51,7 +51,8 @@ async def ingest_data():
                 device_name=device_name,
                 depth_mm=0.0,
                 velocity_mps=0.0,
-                flow_lps=0.0
+                flow_lps=0.0,
+                allow_storage=True
             )
             
             logger.info("✅ Data ingestion completed successfully")
