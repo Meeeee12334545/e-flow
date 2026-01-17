@@ -300,19 +300,17 @@ def get_collection_stats(device_id):
 
 def fetch_latest_reading(device_id: str):
     """
-    Fetch and display the latest reading from the device (display-only, not stored).
+    Fetch and return the latest reading (display-only, not stored) as fast as possible.
     
-    IMPORTANT: This function ONLY fetches and displays data in the UI.
-    - Data is stored ONLY in session state for temporary display
-    - NO database writes are triggered by this function
-    - Database writes happen ONLY from the background auto-monitor thread
-    - This keeps manual real-time views completely separate from auto-collected data
+    Returns: (success: bool, message: str, timestamp: datetime, payload: dict)
     """
     device_config = DEVICES.get(device_id)
     if not device_config:
-        return False, "Device is not configured", None
+        return False, "Device is not configured", None, None
 
     scraper = DataScraper(db)
+    # Force requests/API path to avoid Playwright overhead for speed
+    scraper.force_requests = True
     url = device_config.get("url") or MONITOR_URL
     selectors = device_config.get("selectors")
 
@@ -326,7 +324,7 @@ def fetch_latest_reading(device_id: str):
         loop.close()
 
     if not data or not data.get("data"):
-        return False, "Device communication error", None
+        return False, "Device communication error", None, None
 
     payload = data.get("data", {})
     depth_mm = payload.get("depth_mm")
@@ -334,15 +332,12 @@ def fetch_latest_reading(device_id: str):
     flow_lps = payload.get("flow_lps")
 
     if all(v is None for v in (depth_mm, velocity_mps, flow_lps)):
-        return False, "No sensor data received", None
+        return False, "No sensor data received", None, None
 
-    # NOTE: This function EXPLICITLY DOES NOT call store_measurement()
-    # Manual real-time data stays in session state only (temporary display)
-    # Database writes happen only from the background monitor thread (auto-collect)
-    # This ensures manual and auto-collected data are kept completely separate
+    # Display-only; never stored
     timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
     message = "✓ Real-time data retrieved (display only, not saved to database)"
-    return True, message, timestamp
+    return True, message, timestamp, payload
 
 
 # Page header
@@ -418,38 +413,18 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
 
-        # Manual refresh to pull the newest reading into the app
+        # Manual refresh to pull the newest reading into the app (fast API path)
         refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
         
         if refresh_clicked:
-            # Fetch data without spinner (no page greying)
-            success, message, ts = fetch_latest_reading(selected_device_id)
-            
-            # Get the actual data values for display
-            device_config = DEVICES.get(selected_device_id)
-            scraper = DataScraper(db)
-            url = device_config.get("url") or MONITOR_URL
-            selectors = device_config.get("selectors")
-            
-            try:
-                data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
-                loop.close()
-            
-            if success and data and data.get("data"):
-                payload = data.get("data", {})
-                
-                # Store to session state for display
+            success, message, ts, payload = fetch_latest_reading(selected_device_id)
+            if success and payload:
                 st.session_state['realtime_data'] = {
                     'depth_mm': payload.get("depth_mm"),
                     'velocity_mps': payload.get("velocity_mps"),
                     'flow_lps': payload.get("flow_lps"),
                     'timestamp': ts
                 }
-                
                 ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
                 st.success(f"{message} at {ts_str}")
             else:
@@ -513,10 +488,23 @@ with st.sidebar:
         Query Parameters
     </p>
     """, unsafe_allow_html=True)
+    # Enhanced time window selection with 24h default and days/months options
+    time_options = [
+        (24, "24 hours"),
+        (48, "2 days"),
+        (72, "3 days"),
+        (168, "7 days"),
+        (720, "30 days"),
+        (2160, "3 months"),
+        (4320, "6 months"),
+        (8760, "12 months"),
+    ]
+    default_index = 0  # 24 hours
     time_range = st.selectbox(
         "Time Window",
-        options=[(1, "1 hour"), (6, "6 hours"), (24, "24 hours"), (168, "7 days"), (720, "30 days")],
+        options=time_options,
         format_func=lambda x: x[1],
+        index=default_index,
         key="time_range",
         label_visibility="collapsed"
     )[0]

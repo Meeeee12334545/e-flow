@@ -1,29 +1,21 @@
 #!/usr/bin/env python
 """
 Continuous monitoring service for the USRIOT monitor.
-Runs every 1 minute and only stores data when changes are detected.
+Runs every MONITOR_INTERVAL seconds and stores data only when changes are detected
+unless configured to store all readings.
 
-⚠️  DISABLED - Use Streamlit built-in monitor instead!
-The Streamlit app (app.py) has a persistent background thread with proper change detection.
-Running both this AND the app would create duplicate entries.
-
-PRODUCTION-READY FEATURES:
+Production features:
 - Automatic retry on failures
 - Graceful error recovery
 - Health checks and monitoring
 - Automatic restart on critical errors
-- Comprehensive logging
+- Rotating log files + stdout logging
 """
-
-if __name__ == "__main__":
-    print("⚠️  Standalone monitor.py is DISABLED.")
-    print("The Streamlit app has a built-in background monitor.")
-    print("Do NOT run both simultaneously to avoid duplicate data.")
-    exit(1)
 
 import asyncio
 import sys
 import logging
+from logging.handlers import RotatingFileHandler
 import time
 import signal
 from datetime import datetime, timedelta
@@ -38,14 +30,21 @@ from database import FlowDatabase
 from config import MONITOR_INTERVAL, MONITOR_ENABLED, MONITOR_URL, DEVICES, STORE_ALL_READINGS
 
 # Configure logging with rotation
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('monitor.log')
-    ]
-)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+
+file_handler = RotatingFileHandler('monitor.log', maxBytes=10 * 1024 * 1024, backupCount=3)
+file_handler.setFormatter(log_formatter)
+
+# Avoid duplicate handlers if reinitialized
+if not logger.handlers:
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
 logger = logging.getLogger(__name__)
 
 # Constants for reliability
@@ -194,7 +193,8 @@ class ContinuousMonitor:
                     device_name=device_name,
                     depth_mm=depth_mm,
                     velocity_mps=velocity_mps,
-                    flow_lps=flow_lps
+                    flow_lps=flow_lps,
+                    allow_storage=True
                 )
                 
                 if stored:

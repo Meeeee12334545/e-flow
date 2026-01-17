@@ -27,9 +27,9 @@ RUN mkdir -p /app/data
 ENV PYTHONUNBUFFERED=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-# Health check
-HEALTHCHECK --interval=5m --timeout=30s --start-period=30s --retries=3 \
-    CMD python -c "import sqlite3; conn = sqlite3.connect('flow_data.db'); conn.execute('SELECT 1'); conn.close()" || exit 1
+# Health check (uses health.py to ensure recent data)
+HEALTHCHECK --interval=5m --timeout=30s --start-period=60s --retries=3 \
+    CMD python health.py || exit 1
 
 # Run the monitor
 CMD ["python", "monitor.py"]
