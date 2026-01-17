@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 from database import FlowDatabase
 from scraper import DataScraper
 from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
+from reporting import ReportSelections, compute_calculations, create_charts, build_html_report
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
 @st.cache_resource
@@ -506,6 +507,31 @@ with st.sidebar:
         selected_device_id = None
     
     st.divider()
+
+    # Report Builder
+    st.markdown("""
+    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
+        Report Builder
+    </p>
+    """, unsafe_allow_html=True)
+
+    report_vars = st.multiselect(
+        "Variables",
+        options=["depth_mm", "velocity_mps", "flow_lps"],
+        default=["depth_mm", "velocity_mps", "flow_lps"],
+        help="Select which measurements to include."
+    )
+    report_calcs = st.multiselect(
+        "Calculations",
+        options=["mean", "max", "min", "std", "p50", "p95", "range", "count", "volume"],
+        default=["mean", "max", "min", "std", "p50", "p95"],
+        help="Choose metrics; 'volume' integrates flow over time (requires flow)."
+    )
+    gen_col1, gen_col2 = st.columns([1,1])
+    with gen_col1:
+        generate_report = st.button("Generate Report", type="primary")
+    with gen_col2:
+        export_csv = st.button("Download CSV", type="secondary")
     
     # Time range selection
     st.markdown("""
@@ -656,6 +682,33 @@ if selected_device_id:
             st.markdown("""
             <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
             """, unsafe_allow_html=True)
+
+            # Reporting actions
+            if generate_report:
+                sels = ReportSelections(
+                    variables=report_vars,
+                    calculations=report_calcs,
+                    device_name=selected_device_name,
+                    time_window_hours=time_range,
+                )
+                calcs = compute_calculations(df, sels)
+                charts = create_charts(df, sels)
+                html = build_html_report(selected_device_name, df, sels, calcs, charts)
+                st.success("✅ Report generated")
+                st.download_button(
+                    label="Download HTML Report",
+                    data=html,
+                    file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                    mime="text/html",
+                )
+
+            if export_csv:
+                st.download_button(
+                    label="Download CSV (filtered)",
+                    data=df.to_csv(index=False),
+                    file_name=f"data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                )
             
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
