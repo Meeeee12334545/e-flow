@@ -45,9 +45,8 @@ ensure_playwright_installed()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# MONITORING COMPLETELY REMOVED FROM STREAMLIT APP
-# The app is now READ-ONLY - it displays data but does not collect it
-# Use start_monitor.py script separately for data collection
+# Data collection runs in a separate monitor service/container.
+# This Streamlit app is read-only and visualizes stored data.
 
 st.set_page_config(
     page_title="e-flow | Hydrological Analytics",
@@ -379,8 +378,11 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    # Monitor status - DISABLED (app is read-only)
-    st.info("ℹ️  Auto-collect: Disabled - App is read-only. Use standalone monitor script for data collection.")
+    # Monitor status (app is read-only; collection handled by monitor service)
+    if MONITOR_ENABLED:
+        st.success("✔ Auto-collect: Enabled (monitor service). Dashboard is read-only.")
+    else:
+        st.info("ℹ️ Auto-collect: Disabled here. Start the monitor service to collect data.")
     
     # Build device mapping from database
     devices = db.get_devices()
@@ -526,8 +528,8 @@ with st.sidebar:
     
     # Debug info for troubleshooting
     if total_measurements == 0:
-        st.warning(f"⚠️ Database is empty.")
-        st.info("Run 'python start_monitor.py' locally to collect data, or click 'Show Real-Time Data' for live values.")
+        st.warning("⚠️ No measurements found yet.")
+        st.info("If this is a fresh deploy, the monitor service will populate data shortly. You can also click 'Show Real-Time Data' for a live view without storing.")
     
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
