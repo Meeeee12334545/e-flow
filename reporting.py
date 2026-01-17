@@ -153,6 +153,24 @@ def build_html_report(device_name: str,
           <p><strong>Variables:</strong> {', '.join(selections.variables)}</p>
           <p><strong>Calculations:</strong> {', '.join(selections.calculations)}</p>
         </div>
+
+        <div class='section card'>
+          <h2>Metrics Glossary</h2>
+          <table>
+            <thead><tr><th>Metric</th><th>Definition</th></tr></thead>
+            <tbody>
+              <tr><td><strong>mean</strong></td><td>Average value across all measurements in the time window</td></tr>
+              <tr><td><strong>max</strong></td><td>Highest value recorded</td></tr>
+              <tr><td><strong>min</strong></td><td>Lowest value recorded</td></tr>
+              <tr><td><strong>std</strong></td><td>Standard deviation — how spread out values are from the mean (variability indicator)</td></tr>
+              <tr><td><strong>p50</strong></td><td>Median (50th percentile) — middle value where 50% of data falls below and 50% above</td></tr>
+              <tr><td><strong>p95</strong></td><td>95th percentile — value below which 95% of measurements fall; useful for high-flow/capacity analysis</td></tr>
+              <tr><td><strong>range</strong></td><td>Difference between maximum and minimum values</td></tr>
+              <tr><td><strong>count</strong></td><td>Total number of measurements in the time window</td></tr>
+              <tr><td><strong>volume</strong></td><td>Total flow volume integrated over time (flow_lps only) — reported in liters and cubic meters</td></tr>
+            </tbody>
+          </table>
+        </div>
     """
 
     # Metrics table
