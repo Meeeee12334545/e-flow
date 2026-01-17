@@ -477,6 +477,29 @@ with st.sidebar:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+            # Optional: allow one-click store from Streamlit (for Cloud testing)
+            allow_streamlit_writes = os.getenv("ALLOW_STREAMLIT_WRITES", "").lower() in ("1", "true", "yes")
+            if allow_streamlit_writes and has_data:
+                col_store, _ = st.columns([1,3])
+                with col_store:
+                    if st.button("Store This Reading (admin)", key="store_now_button"):
+                        try:
+                            writer = DataScraper(db)
+                            stored = writer.store_measurement(
+                                device_id=selected_device_id,
+                                device_name=selected_device_name,
+                                depth_mm=depth,
+                                velocity_mps=velocity,
+                                flow_lps=flow,
+                                allow_storage=True
+                            )
+                            if stored:
+                                st.success("✅ Reading stored to database")
+                            else:
+                                st.info("ℹ️ No change detected — not stored")
+                        except Exception as e:
+                            st.error(f"❌ Failed to store reading: {e}")
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
