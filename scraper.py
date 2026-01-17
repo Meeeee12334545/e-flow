@@ -386,7 +386,7 @@ class DataScraper:
 
         return extracted
 
-    async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Dict = None) -> Optional[Dict]:
+    async def fetch_monitor_data(self, url: str = MONITOR_URL, device_selectors: Optional[Dict] = None) -> Optional[Dict]:
         """Fetch data from the monitor website.
         
         Strategy:

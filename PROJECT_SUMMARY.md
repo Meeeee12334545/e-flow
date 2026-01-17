@@ -6,6 +6,7 @@
 ## What Was Done
 
 ### 1. ✅ Cleaned Repository
+
 - Deleted old m2m-downloader directory
 - Deleted m2m_outputs directory
 - Fresh start with modern architecture
@@ -20,6 +21,7 @@
 - Indexed queries for performance
 
 #### Data Scraper (`scraper.py`)
+
 - Playwright-based web automation
 - Headless browser support
 - Flexible data extraction (JSON/HTML)
@@ -27,12 +29,14 @@
 - Error logging and debugging
 
 #### Data Ingestion (`ingest.py`)
+
 - Standalone data collection script
 - Suitable for manual runs or cron scheduling
 - Comprehensive logging
 - Error handling
 
 #### Web Dashboard (`app.py`)
+
 - Streamlit interface
 - Real-time data visualization
 - Interactive Plotly charts
@@ -41,24 +45,27 @@
 - Responsive design
 
 ### 3. ✅ Configuration & Setup
+
 - `config.py` - Centralized settings
 - `setup.py` - Automated environment setup
 - `requirements.txt` - All dependencies
 
 ### 4. ✅ Documentation
+
 - `README.md` - Full project documentation
 - `QUICKSTART.md` - Quick reference guide
 - `ARCHITECTURE.md` - System design & data flow
 - `DEVELOPMENT.md` - Development guide & troubleshooting
 
 ### 5. ✅ Project Management
+
 - `.gitignore` - Git configuration
 - Organized file structure
 - Clear separation of concerns
 
 ## Current Project Structure
 
-```
+```text
 e-flow/
 ├── Core Scripts
 │   ├── database.py      (Database management)
@@ -84,42 +91,47 @@ e-flow/
 ## Key Features
 
 ✅ **Data Collection**
+
 - Automated scraping from web monitor
 - Support for multiple devices
 - Scheduled collection via cron/GitHub Actions
 
 ✅ **Data Storage**
+
 - Lightweight SQLite database
 - Efficient indexing
 - Automatic deduplication
 
 ✅ **Data Visualization**
+
 - Interactive web dashboard
 - Real-time charts
 - Historical analysis
 - Responsive design
 
 ✅ **Data Export**
+
 - CSV export
 - JSON export
 - Flexible time range selection
 
 ✅ **Configuration**
+
 - Centralized settings
 - Easy customization
 - Multiple deployment options
 
 ## Technology Stack
 
-| Component | Technology |
-|-----------|------------|
-| Backend | Python 3.10+ |
-| Database | SQLite3 |
-| Web Scraping | Playwright |
-| Dashboard | Streamlit |
-| Visualization | Plotly |
-| Data Processing | Pandas |
-| Timezone Handling | pytz |
+|Component|Technology|
+|---|---|
+|Backend|Python 3.10+|
+|Database|SQLite3|
+|Web Scraping|Playwright|
+|Dashboard|Streamlit|
+|Visualization|Plotly|
+|Data Processing|Pandas|
+|Timezone Handling|pytz|
 
 ## Quick Start
 
@@ -144,7 +156,8 @@ streamlit run app.py
 ## Data Models
 
 ### Devices Table
-```
+
+```text
 device_id (PK)    : String (e.g., "FIT100")
 device_name       : String
 location          : String (optional)
@@ -152,7 +165,8 @@ created_at        : Timestamp
 ```
 
 ### Measurements Table
-```
+
+```text
 id (PK)           : Integer (auto-increment)
 device_id (FK)    : String
 timestamp         : Timestamp
@@ -166,6 +180,7 @@ UNIQUE(device_id, timestamp)
 ## Configuration Reference
 
 All settings in `config.py`:
+
 - `TIMEZONE` - Default timezone for timestamps
 - `MONITOR_URL` - Target website URL
 - `DEVICES` - Device registry
@@ -176,18 +191,21 @@ All settings in `config.py`:
 ## Deployment Options
 
 ### 1. Local Development
+
 ```bash
 python ingest.py          # Manual data collection
 streamlit run app.py      # View dashboard
 ```
 
 ### 2. Scheduled Collection (Cron)
+
 ```bash
 # Every 15 minutes
 */15 * * * * cd /e-flow && python ingest.py >> /var/log/e-flow.log
 ```
 
 ### 3. Cloud Deployment
+
 - Push to GitHub
 - Deploy Streamlit app on Streamlit Cloud
 - Configure GitHub Actions for scheduled scraping
@@ -220,6 +238,7 @@ streamlit run app.py      # View dashboard
 ## Database Status
 
 ✅ **Initialized**
+
 - Location: `/workspaces/e-flow/flow_data.db`
 - Size: 28 KB
 - Tables: 2 (devices, measurements)

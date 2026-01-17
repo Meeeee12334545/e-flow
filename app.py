@@ -311,7 +311,7 @@ def fetch_latest_reading(device_id: str):
     # Force requests/API path to avoid Playwright overhead for speed
     scraper.force_requests = True
     url = device_config.get("url") or MONITOR_URL
-    selectors = device_config.get("selectors")
+    selectors = device_config.get("selectors") or {}
 
     try:
         data = asyncio.run(scraper.fetch_monitor_data(url, selectors))
@@ -319,7 +319,7 @@ def fetch_latest_reading(device_id: str):
         # Fallback if an event loop is already running
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors))
+        data = loop.run_until_complete(scraper.fetch_monitor_data(url, selectors or {}))
         loop.close()
 
     if not data or not data.get("data"):
@@ -525,6 +525,20 @@ with st.sidebar:
     with col2:
         total_measurements = db.get_measurement_count()
         st.metric("Data Points", total_measurements, help="Total measurements recorded")
+    # Last ingest indicator
+    latest_rows = db.get_measurements(limit=1)
+    if latest_rows:
+        try:
+            ts_raw = latest_rows[0]["timestamp"]
+            latest_ts = pd.to_datetime(ts_raw)
+            if latest_ts.tzinfo is None:
+                latest_ts = latest_ts.tz_localize(pytz.utc)
+            else:
+                latest_ts = pd.Timestamp(latest_ts)
+            local_ts = latest_ts.astimezone(pytz.timezone(DEFAULT_TZ))
+            st.caption(f"Last ingest: {local_ts.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        except Exception:
+            st.caption(f"Last ingest: {latest_rows[0]['timestamp']}")
     
     # Debug info for troubleshooting
     if total_measurements == 0:
@@ -820,7 +834,7 @@ if selected_device_id:
             """, unsafe_allow_html=True)
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
-            display_df["Timestamp"] = display_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+            display_df["Timestamp"] = display_df["Timestamp"].astype(str)
             st.dataframe(display_df, width="stretch", hide_index=True)
             
             # Export functionality
@@ -853,22 +867,16 @@ if selected_device_id:
     else:
         st.warning("📊 **No measurements found**")
         st.markdown("""
-        **The app is now READ-ONLY and does not collect data automatically.**
+        The dashboard is waiting for the monitor service to collect data.
         
-        **To populate the database with measurements:**
+        **Data collection status:**
+        - Monitor Service: Running (check logs for details)
+        - Collection Interval: Every 60 seconds
+        - Storage Mode: Only stores when values change
         
-        1. **Run the standalone monitor script locally:**
-           ```bash
-           python start_monitor.py
-           ```
-           This will:
-           - Check for new data every 60 seconds
-           - Store measurements only when values change
-           - Provide clean, consistent database records
+        If you just started the service, data will appear here shortly once the first measurement is recorded.
         
-        2. **Or click "Show Real-Time Data"** in the sidebar to see current values without storing them.
-        
-        Once data is collected, refresh this page to see charts and analytics.
+        You can also click "Show Real-Time Data" in the sidebar to verify the device is reachable without storing to the database.
         """)
 else:
     st.info("👈 Select a device from the sidebar to view data.")
