@@ -12,6 +12,8 @@ services:
     environment:
       - MONITOR_ENABLED=true
       - MONITOR_INTERVAL=60
+      - SCRAPER_FORCE_REQUESTS=1
+      - TIMEZONE=Australia/Brisbane
     logging:
       driver: "json-file"
       options:

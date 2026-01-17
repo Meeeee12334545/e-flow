@@ -13,6 +13,7 @@ services:
       - STORE_ALL_READINGS=false
       - EXIT_ON_UNHEALTHY=true
       - HEALTH_MAX_AGE=900
+      - SCRAPER_FORCE_REQUESTS=1
     volumes:
       - /volume1/docker/e-flow/data/flow_data.db:/app/flow_data.db
       - /volume1/docker/e-flow/logs/monitor.log:/app/monitor.log
