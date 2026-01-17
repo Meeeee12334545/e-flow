@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 from database import FlowDatabase
 from scraper import DataScraper
 from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
-from reporting import ReportSelections, compute_calculations, create_charts, build_html_report
+from reporting import ReportSelections, compute_calculations, create_charts, build_html_report, build_pdf_report
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
 @st.cache_resource
@@ -693,14 +693,38 @@ if selected_device_id:
                 )
                 calcs = compute_calculations(df, sels)
                 charts = create_charts(df, sels)
-                html = build_html_report(selected_device_name, df, sels, calcs, charts)
+                
+                # Find logo if available
+                logo_path = Path(__file__).parent / "logos" / "EDS-logo.png"
+                if not logo_path.exists():
+                    # Try alternative naming conventions
+                    for logo_file in Path(__file__).parent.glob("logos/*logo*.png"):
+                        logo_path = logo_file
+                        break
+                
+                html = build_html_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
+                pdf = build_pdf_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
+                
                 st.success("✅ Report generated")
-                st.download_button(
-                    label="Download HTML Report",
-                    data=html,
-                    file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
-                    mime="text/html",
-                )
+                
+                col_html, col_pdf = st.columns(2)
+                with col_html:
+                    st.download_button(
+                        label="📄 Download HTML Report",
+                        data=html,
+                        file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                        mime="text/html",
+                    )
+                with col_pdf:
+                    if pdf:
+                        st.download_button(
+                            label="📕 Download PDF Report",
+                            data=pdf,
+                            file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                            mime="application/pdf",
+                        )
+                    else:
+                        st.info("💡 PDF generation unavailable (install weasyprint)")
 
             if export_csv:
                 st.download_button(

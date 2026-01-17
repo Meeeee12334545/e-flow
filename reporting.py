@@ -5,6 +5,7 @@ import base64
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
@@ -18,6 +19,13 @@ try:
     _KALEIDO_AVAILABLE = True
 except Exception:
     _KALEIDO_AVAILABLE = False
+
+# For PDF generation
+try:
+    from weasyprint import HTML, CSS
+    _WEASYPRINT_AVAILABLE = True
+except Exception:
+    _WEASYPRINT_AVAILABLE = False
 
 
 @dataclass
@@ -123,35 +131,64 @@ def build_html_report(device_name: str,
                       df: pd.DataFrame,
                       selections: ReportSelections,
                       calculations: Dict[str, Dict[str, float]],
-                      charts: Dict[str, go.Figure]) -> str:
-    """Generate an HTML report string with embedded charts and metrics."""
+                      charts: Dict[str, go.Figure],
+                      logo_path: Optional[str] = None) -> str:
+    """Generate an HTML report string with embedded charts, metrics, and optional logo."""
     # Header and metadata
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Logo HTML (if provided)
+    logo_html = ""
+    if logo_path and Path(logo_path).exists():
+        # Convert logo to base64 for embedding
+        try:
+            with open(logo_path, "rb") as f:
+                logo_b64 = base64.b64encode(f.read()).decode()
+                logo_html = f"<img src='data:image/png;base64,{logo_b64}' style='height:60px;margin-bottom:20px;'/>"
+        except Exception:
+            pass
+    
     intro = f"""
     <html>
       <head>
         <meta charset='utf-8'/>
         <title>e-flow Technical Report — {device_name}</title>
         <style>
-          body {{ font-family: -apple-system, Segoe UI, Roboto, Inter, sans-serif; color: #222; }}
+          body {{ font-family: -apple-system, Segoe UI, Roboto, Inter, sans-serif; color: #222; margin: 40px; }}
           h1, h2 {{ font-weight: 600; }}
-          .section {{ margin: 18px 0; }}
-          .card {{ border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-bottom: 12px; }}
-          table {{ border-collapse: collapse; width: 100%; }}
-          th, td {{ border: 1px solid #eee; padding: 8px; text-align: right; }}
-          th {{ background: #f8fafc; text-align: left; }}
-          .small {{ color: #666; font-size: 12px; }}
+          h1 {{ margin-top: 0; }}
+          .header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; }}
+          .header-left {{ display: flex; align-items: center; gap: 20px; }}
+          .section {{ margin: 24px 0; }}
+          .card {{ border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px; background: #f9fafb; }}
+          table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
+          th, td {{ border: 1px solid #e5e7eb; padding: 10px; text-align: right; }}
+          th {{ background: #f0f4f8; text-align: left; font-weight: 600; }}
+          .small {{ color: #666; font-size: 12px; margin-top: 8px; }}
+          .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }}
+          .metric-box {{ border: 1px solid #e5e7eb; padding: 12px; border-radius: 8px; background: white; }}
+          .metric-label {{ color: #666; font-size: 12px; font-weight: 500; text-transform: uppercase; }}
+          .metric-value {{ font-size: 18px; font-weight: 600; color: #0066cc; margin-top: 4px; }}
         </style>
       </head>
       <body>
-        <h1>e-flow Technical Report</h1>
-        <div class='small'>Generated: {generated_at}</div>
+        <div class='header'>
+          <div class='header-left'>
+            {logo_html}
+            <div>
+              <h1>e-flow Technical Report</h1>
+              <div class='small'>Generated: {generated_at}</div>
+            </div>
+          </div>
+        </div>
+
         <div class='section card'>
           <h2>Overview</h2>
           <p><strong>Station:</strong> {device_name}</p>
           <p><strong>Time Window:</strong> Last {selections.time_window_hours} hours</p>
           <p><strong>Variables:</strong> {', '.join(selections.variables)}</p>
           <p><strong>Calculations:</strong> {', '.join(selections.calculations)}</p>
+          <p><strong>Data Points:</strong> {len(df)}</p>
         </div>
 
         <div class='section card'>
@@ -197,3 +234,28 @@ def build_html_report(device_name: str,
     outro = "</body></html>"
 
     return intro + metrics_html + charts_html + outro
+
+
+def build_pdf_report(device_name: str,
+                     df: pd.DataFrame,
+                     selections: ReportSelections,
+                     calculations: Dict[str, Dict[str, float]],
+                     charts: Dict[str, go.Figure],
+                     logo_path: Optional[str] = None) -> bytes:
+    """Generate a PDF report from HTML with logo support.
+    
+    Returns: PDF bytes, or empty bytes if weasyprint is unavailable.
+    """
+    if not _WEASYPRINT_AVAILABLE:
+        return b""
+    
+    try:
+        # Generate HTML report
+        html_content = build_html_report(device_name, df, selections, calculations, charts, logo_path)
+        
+        # Convert HTML to PDF using weasyprint
+        pdf_bytes = HTML(string=html_content).write_pdf()
+        return pdf_bytes
+    except Exception as e:
+        print(f"Error generating PDF report: {e}")
+        return b""
