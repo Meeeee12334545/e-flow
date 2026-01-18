@@ -117,6 +117,21 @@ def render_auth_header():
             with col2:
                 if st.button("🚪"):
                     logout()
+            
+            # Admin quick links
+            if is_admin():
+                st.markdown("---")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("👨‍💼 Admin Panel", use_container_width=True):
+                        st.switch_page("pages/admin.py")
+                with col2:
+                    if st.button("👤 Profile", use_container_width=True):
+                        st.switch_page("pages/profile.py")
+            else:
+                st.markdown("---")
+                if st.button("👤 My Profile", use_container_width=True):
+                    st.switch_page("pages/profile.py")
         else:
             st.markdown("*Not logged in*")
 
