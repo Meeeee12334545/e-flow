@@ -18,6 +18,15 @@ from database import FlowDatabase
 from scraper import DataScraper
 from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
 from reporting import ReportSelections, compute_calculations, create_charts, build_html_report, build_pdf_report
+from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user
+
+# Initialize authentication state
+init_auth_state()
+
+# Check if user is authenticated - if not, show login page
+if not is_authenticated():
+    login_page()
+    st.stop()
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
 @st.cache_resource
@@ -364,6 +373,9 @@ st.markdown("---")
 
 # Sidebar configuration
 with st.sidebar:
+    # Add authentication header
+    render_auth_header()
+    
     st.markdown("""
     <h2 style="font-weight: 500; letter-spacing: 0.3px;">Configuration & Status</h2>
     """, unsafe_allow_html=True)
@@ -387,14 +399,17 @@ with st.sidebar:
     
     # Build device mapping from database
     devices = db.get_devices()
+    
+    # Filter devices based on user's access rights
+    devices = filter_devices_for_user(devices)
+    
     device_names = {d['device_name']: d['device_id'] for d in devices}
     
     if not device_names:
-        st.error("⚠️ No devices found in database")
-        st.info("Initializing devices from config...")
-        init_devices()
-        devices = db.get_devices()
-        device_names = {d['device_name']: d['device_id'] for d in devices}
+        st.warning("⚠️ No devices assigned to your account")
+        if is_admin():
+            st.info("As an admin, go to the Admin Panel to manage device assignments")
+        st.stop()
     
     selected_device_name: str = st.selectbox(
         "Select Device",

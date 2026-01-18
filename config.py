@@ -13,6 +13,17 @@ DEVICES = {
     "FIT100": {
         "name": "FIT100 Main Inflow Lismore STP",
         "location": "Lismore",
+        "url": "https://mp.usriot.com/draw/show.html?lang=en&lightbox=1&highlight=0000ff&layers=1&nav=1&title=FIT100%20Main%20Inflow%20Lismore%20STP&id=97811&link=Lpu7Q2CM3osZ&model=1&cusdeviceNo=0000088831000010&share=48731ec89bf8108b2a451fbffa590da4f0cf419a5623beb7d48c1060e3f0dbe177e28054c26be49bbabca1da5b977e7c16a47891d94f70a08a876d24c55416854700de7cc51a06f8e102798d6ecc39478ef1394a246efa109e6c6358e30a259010a5c403c71756173c90cf1e10ced6fdf54d90881c05559f2c8c5717ee8109210672fa3574a9c04a465bc0df8b9c354da487a7bcb6679a7ec32276ba3610301be80d8c7588ef1797ca01fb6b87e74a8b6e5cd0ac668918d02ae99a7966f57ecf603b63a12d4b0a160d3ac0920254d6836f1e26d244412f82859f7f7b0df7b8406e95ef97a7cb2302a07826d3b8cba81721c5bce1d7e9bf0b01f32d1d0330a44301a1ab0f",
+        "selectors": {
+            "depth_mm": "#div_varvalue_10",
+            "velocity_mps": "#div_varvalue_6",
+            "flow_lps": "#div_varvalue_42"
+        }
+    },
+    "BYPASS_INFLOW": {
+        "name": "Bypass Inflow Lismore STP",
+        "location": "Lismore",
+        "url": "https://mp.usriot.com/draw/show.html?lang=en&lightbox=1&highlight=0000ff&layers=1&nav=1&title=Bypass%20InflowLismore%20STP&id=97811&link=Lpu7Q2CM3osZ&model=1&cusdeviceNo=0000088831000011&share=48731ec89bf8108b2a451fbffa590da4f0cf419a5623beb7d48c1060e3f0dbe177e28054c26be49bbabca1da5b977e7c16a47891d94f70a08a876d24c55416854700de7cc51a06f8e102798d6ecc39478ef1394a246efa109e6c6358e30a259010a5c403c71756173c90cf1e10ced6fdf54d90881c05559f2c8c5717ee8109210672fa3574a9c04a465bc0df8b9c354da487a7bcb6679a76c3227a9e361c1e04ec0d8c7588ef1797ca01fb6b87e74a8b6e5cd0ac66873ae001e99a7960f56acf603b63a72b3f061e055caf980840ddb86f0000ae432b7be69ca4415d3df4db5b7098f3a0aacb270da01f258d83dbb02039d4db97d6d6af0e33ef36530330a44301a1ab0f",
         "selectors": {
             "depth_mm": "#div_varvalue_10",
             "velocity_mps": "#div_varvalue_6",
