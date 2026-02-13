@@ -776,6 +776,141 @@ if selected_device_id:
             
             st.markdown("---")
             
+            # Flow Graph Section - Prominent display with date range selection
+            st.markdown("""
+            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;">
+                📊 Flow Rate Analysis
+            </h2>
+            """, unsafe_allow_html=True)
+            
+            # Date range selector
+            col_range1, col_range2 = st.columns([1, 2])
+            
+            with col_range1:
+                range_mode = st.radio(
+                    "Date Range Mode",
+                    options=["Quick Select", "Custom Range"],
+                    index=0,
+                    horizontal=True
+                )
+            
+            # Initialize default date range (24 hours)
+            default_start = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=24)
+            default_end = datetime.now(pytz.timezone(DEFAULT_TZ))
+            
+            if range_mode == "Quick Select":
+                with col_range2:
+                    # Quick select options
+                    quick_options = [
+                        (24, "24 hours"),
+                        (48, "2 days"),
+                        (72, "3 days"),
+                        (168, "7 days"),
+                        (720, "30 days"),
+                    ]
+                    selected_hours = st.selectbox(
+                        "Select Time Window",
+                        options=quick_options,
+                        format_func=lambda x: x[1],
+                        index=0,  # Default to 24 hours
+                        key="quick_select_graph"
+                    )[0]
+                    
+                    graph_start = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=selected_hours)
+                    graph_end = datetime.now(pytz.timezone(DEFAULT_TZ))
+            else:
+                # Custom range with date/time pickers
+                col_custom1, col_custom2 = st.columns(2)
+                with col_custom1:
+                    start_date = st.date_input(
+                        "Start Date",
+                        value=default_start.date(),
+                        key="custom_start_date"
+                    )
+                    start_time = st.time_input(
+                        "Start Time",
+                        value=default_start.time(),
+                        key="custom_start_time"
+                    )
+                    graph_start = datetime.combine(start_date, start_time)
+                    graph_start = pytz.timezone(DEFAULT_TZ).localize(graph_start)
+                
+                with col_custom2:
+                    end_date = st.date_input(
+                        "End Date",
+                        value=default_end.date(),
+                        key="custom_end_date"
+                    )
+                    end_time = st.time_input(
+                        "End Time",
+                        value=default_end.time(),
+                        key="custom_end_time"
+                    )
+                    graph_end = datetime.combine(end_date, end_time)
+                    graph_end = pytz.timezone(DEFAULT_TZ).localize(graph_end)
+            
+            # Filter data for the graph
+            df_graph = df[(df["timestamp"] >= graph_start) & (df["timestamp"] <= graph_end)].sort_values("timestamp")
+            
+            if not df_graph.empty:
+                # Create prominent flow chart
+                fig_main_flow = go.Figure()
+                
+                fig_main_flow.add_trace(go.Scatter(
+                    x=df_graph["timestamp"],
+                    y=df_graph["flow_lps"],
+                    mode='lines+markers',
+                    name='Flow Rate',
+                    line=dict(color='#0066cc', width=3),
+                    marker=dict(size=6, color='#0066cc'),
+                    fill='tozeroy',
+                    fillcolor='rgba(0, 102, 204, 0.1)',
+                    hovertemplate='<b>%{x|%Y-%m-%d %H:%M}</b><br>Flow: %{y:.2f} L/s<extra></extra>'
+                ))
+                
+                fig_main_flow.update_layout(
+                    title=dict(
+                        text=f"Flow Rate Over Time - {selected_device_name}",
+                        font=dict(size=20, family="Helvetica Neue, sans-serif", weight=500)
+                    ),
+                    xaxis_title="Time",
+                    yaxis_title="Flow Rate (L/s)",
+                    hovermode="x unified",
+                    height=500,
+                    template="plotly_white",
+                    font=dict(family="Helvetica Neue, sans-serif"),
+                    xaxis=dict(
+                        showgrid=True,
+                        gridcolor='rgba(0,0,0,0.05)',
+                        showline=True,
+                        linecolor='rgba(0,0,0,0.2)'
+                    ),
+                    yaxis=dict(
+                        showgrid=True,
+                        gridcolor='rgba(0,0,0,0.05)',
+                        showline=True,
+                        linecolor='rgba(0,0,0,0.2)'
+                    )
+                )
+                
+                st.plotly_chart(fig_main_flow, use_container_width=True)
+                
+                # Show statistics for the selected range
+                col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                with col_stat1:
+                    st.metric("Average Flow", f"{df_graph['flow_lps'].mean():.2f} L/s")
+                with col_stat2:
+                    st.metric("Peak Flow", f"{df_graph['flow_lps'].max():.2f} L/s")
+                with col_stat3:
+                    st.metric("Minimum Flow", f"{df_graph['flow_lps'].min():.2f} L/s")
+                with col_stat4:
+                    total_volume = df_graph['flow_lps'].sum() * 60 / 1000  # Approximate total volume in m³
+                    st.metric("Est. Total Volume", f"{total_volume:.2f} m³")
+            else:
+                st.info(f"No data available for the selected date range ({graph_start.strftime('%Y-%m-%d %H:%M')} to {graph_end.strftime('%Y-%m-%d %H:%M')})")
+            
+            st.markdown("---")
+            
             # Advanced analytics
             st.markdown("""
             <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
