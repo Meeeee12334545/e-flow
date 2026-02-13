@@ -693,88 +693,7 @@ if selected_device_id:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Data quality indicators with enhanced styling
-            st.markdown("""
-            <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
-            """, unsafe_allow_html=True)
-
-            # Reporting actions
-            if generate_report:
-                sels = ReportSelections(
-                    variables=report_vars,
-                    calculations=report_calcs,
-                    device_name=selected_device_name,
-                    time_window_hours=time_range,
-                )
-                calcs = compute_calculations(df, sels)
-                charts = create_charts(df, sels)
-                
-                # Find logo if available
-                logo_path = Path(__file__).parent / "logos" / "EDS-logo.png"
-                if not logo_path.exists():
-                    # Try alternative naming conventions
-                    for logo_file in Path(__file__).parent.glob("logos/*logo*.png"):
-                        logo_path = logo_file
-                        break
-                
-                html = build_html_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
-                pdf = build_pdf_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
-                
-                st.success("✅ Report generated")
-                
-                col_html, col_pdf = st.columns(2)
-                with col_html:
-                    st.download_button(
-                        label="📄 Download HTML Report",
-                        data=html,
-                        file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
-                        mime="text/html",
-                    )
-                with col_pdf:
-                    if pdf:
-                        st.download_button(
-                            label="📕 Download PDF Report",
-                            data=pdf,
-                            file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                            mime="application/pdf",
-                        )
-                    else:
-                        st.info("💡 PDF generation unavailable (install weasyprint)")
-
-            if export_csv:
-                st.download_button(
-                    label="Download CSV (filtered)",
-                    data=df.to_csv(index=False),
-                    file_name=f"data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv",
-                )
-            
-            col_info1, col_info2, col_info3 = st.columns(3)
-            with col_info1:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">🕒 Last Update</strong><br>
-                    {last_update.strftime('%Y-%m-%d %H:%M:%S')}
-                </p>
-                """, unsafe_allow_html=True)
-            with col_info2:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">📊 Data Points</strong><br>
-                    {len(df)} in {time_range}h window
-                </p>
-                """, unsafe_allow_html=True)
-            with col_info3:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">⏱️ Collection Rate</strong><br>
-                    {len(df)/(time_range if time_range > 0 else 1):.1f} pts/hr
-                </p>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-            st.markdown("---")
+            st.markdown("<br>", unsafe_allow_html=True)
             
             # Flow Graph Section - Prominent display with date range selection
             st.markdown("""
@@ -907,7 +826,90 @@ if selected_device_id:
                     total_volume = df_graph['flow_lps'].sum() * 60 / 1000  # Approximate total volume in m³
                     st.metric("Est. Total Volume", f"{total_volume:.2f} m³")
             else:
-                st.info(f"No data available for the selected date range ({graph_start.strftime('%Y-%m-%d %H:%M')} to {graph_end.strftime('%Y-%m-%d %H:%M')})")
+                st.info(f"📊 No data available for the selected date range ({graph_start.strftime('%Y-%m-%d %H:%M')} to {graph_end.strftime('%Y-%m-%d %H:%M')})")
+            
+            st.markdown("---")
+            
+            # Data quality indicators with enhanced styling
+            st.markdown("""
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+            """, unsafe_allow_html=True)
+
+            # Reporting actions
+            if generate_report:
+                sels = ReportSelections(
+                    variables=report_vars,
+                    calculations=report_calcs,
+                    device_name=selected_device_name,
+                    time_window_hours=time_range,
+                )
+                calcs = compute_calculations(df, sels)
+                charts = create_charts(df, sels)
+                
+                # Find logo if available
+                logo_path = Path(__file__).parent / "logos" / "EDS-logo.png"
+                if not logo_path.exists():
+                    # Try alternative naming conventions
+                    for logo_file in Path(__file__).parent.glob("logos/*logo*.png"):
+                        logo_path = logo_file
+                        break
+                
+                html = build_html_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
+                pdf = build_pdf_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
+                
+                st.success("✅ Report generated")
+                
+                col_html, col_pdf = st.columns(2)
+                with col_html:
+                    st.download_button(
+                        label="📄 Download HTML Report",
+                        data=html,
+                        file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                        mime="text/html",
+                    )
+                with col_pdf:
+                    if pdf:
+                        st.download_button(
+                            label="📕 Download PDF Report",
+                            data=pdf,
+                            file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                            mime="application/pdf",
+                        )
+                    else:
+                        st.info("💡 PDF generation unavailable (install weasyprint)")
+
+            if export_csv:
+                st.download_button(
+                    label="Download CSV (filtered)",
+                    data=df.to_csv(index=False),
+                    file_name=f"data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                )
+            
+            col_info1, col_info2, col_info3 = st.columns(3)
+            with col_info1:
+                st.markdown(f"""
+                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
+                    <strong style="color: #333;">🕒 Last Update</strong><br>
+                    {last_update.strftime('%Y-%m-%d %H:%M:%S')}
+                </p>
+                """, unsafe_allow_html=True)
+            with col_info2:
+                st.markdown(f"""
+                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
+                    <strong style="color: #333;">📊 Data Points</strong><br>
+                    {len(df)} in {time_range}h window
+                </p>
+                """, unsafe_allow_html=True)
+            with col_info3:
+                st.markdown(f"""
+                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
+                    <strong style="color: #333;">⏱️ Collection Rate</strong><br>
+                    {len(df)/(time_range if time_range > 0 else 1):.1f} pts/hr
+                </p>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
             
             st.markdown("---")
             
@@ -1114,20 +1116,56 @@ if selected_device_id:
                 )
         else:
             st.info("No data available for the selected time range.")
+            
+            # Show Flow Graph section even without data
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("""
+            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;">
+                📊 Flow Rate Analysis
+            </h2>
+            """, unsafe_allow_html=True)
+            
+            st.warning("""
+            ⚠️ **No data available to display graph**
+            
+            The flow graph will appear here once data is being collected. Current status:
+            - ✅ Device is reachable (see "Show Real-Time Data" in sidebar)
+            - ❌ No data points stored in database yet
+            
+            **To start seeing data:**
+            1. Ensure the monitor service is running (separate container/process)
+            2. OR enable `ALLOW_STREAMLIT_WRITES=true` in environment variables, then use "Store This Reading" button in sidebar
+            3. Wait for automatic collection (every 60 seconds when values change)
+            """)
     else:
-        st.warning("📊 **No measurements found**")
+        st.warning("📊 **No measurements found in database**")
+        
         st.markdown("""
-        The dashboard is waiting for the monitor service to collect data.
+        <div style="background: #fff3cd; padding: 20px; border-radius: 10px; border-left: 4px solid #ffc107; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #856404;">🔧 Quick Start Guide</h3>
         
-        **Data collection status:**
-        - Monitor Service: Running (check logs for details)
-        - Collection Interval: Every 60 seconds
-        - Storage Mode: Only stores when values change
+        <p><strong>Your device is online!</strong> Click "Show Real-Time Data" in the sidebar to verify connectivity.</p>
         
-        If you just started the service, data will appear here shortly once the first measurement is recorded.
+        <p><strong>To start seeing historical data and graphs:</strong></p>
         
-        You can also click "Show Real-Time Data" in the sidebar to verify the device is reachable without storing to the database.
-        """)
+        <p><strong>Option 1: Run the Monitor Service</strong> (Recommended for production)</p>
+        <ul>
+            <li>Start the monitor service: <code>python monitor.py</code></li>
+            <li>Or use Docker: <code>docker-compose up -d</code></li>
+            <li>Data will be collected automatically every 60 seconds</li>
+        </ul>
+        
+        <p><strong>Option 2: Manual Data Storage</strong> (Quick testing)</p>
+        <ul>
+            <li>Set environment variable: <code>ALLOW_STREAMLIT_WRITES=true</code></li>
+            <li>Restart the app</li>
+            <li>Click "Show Real-Time Data" then "Store This Reading" in the sidebar</li>
+            <li>Repeat a few times to build up data points</li>
+        </ul>
+        
+        <p style="margin-bottom: 0;"><strong>Once data is stored:</strong> The flow graph and analytics will appear automatically!</p>
+        </div>
+        """, unsafe_allow_html=True)
 else:
     st.info("👈 Select a device from the sidebar to view data.")
 
