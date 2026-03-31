@@ -477,28 +477,38 @@ class DataScraper:
             else:
                 logger.info(f"✓ Change detected for {device_name}, storing to database")
         
-        self.db.add_device(device_id, device_name)
-        self.db.add_measurement(
-            device_id=device_id,
-            timestamp=datetime.now(self.tz),
-            depth_mm=depth_mm,
-            velocity_mps=velocity_mps,
-            flow_lps=flow_lps
-        )
+        try:
+            self.db.add_device(device_id, device_name)
+            inserted = self.db.add_measurement(
+                device_id=device_id,
+                timestamp=datetime.now(self.tz),
+                depth_mm=depth_mm,
+                velocity_mps=velocity_mps,
+                flow_lps=flow_lps
+            )
+        except Exception as e:
+            logger.error(f"❌ Database write failed for {device_name}: {e}", exc_info=True)
+            return False
         
-        if STORE_ALL_READINGS:
-            logger.info(f"✅ Stored reading (STORE_ALL mode) for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
-            # In STORE_ALL mode, ensure last_data includes hash for proper future change detection
-            canonical_json = json.dumps(new_data, sort_keys=True, separators=(',', ':'), default=str)
-            new_hash = zlib.crc32(canonical_json.encode('utf-8')) & 0xffffffff
-            self.last_data[device_id] = {
-                **new_data,
-                '_hash': new_hash,
-                '_timestamp': datetime.now(self.tz)
-            }
-            self._save_state()
+        # Always update change-detection state once we've attempted the write, so that a
+        # duplicate-timestamp conflict doesn't cause repeated insert attempts on the next poll.
+        canonical_json = json.dumps(new_data, sort_keys=True, separators=(',', ':'), default=str)
+        new_hash = zlib.crc32(canonical_json.encode('utf-8')) & 0xffffffff
+        self.last_data[device_id] = {
+            **new_data,
+            '_hash': new_hash,
+            '_timestamp': datetime.now(self.tz)
+        }
+        self._save_state()
+
+        if inserted:
+            if STORE_ALL_READINGS:
+                logger.info(f"✅ Stored reading (STORE_ALL mode) for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+            else:
+                logger.info(f"✅ Stored CHANGED data for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
         else:
-            logger.info(f"✅ Stored CHANGED data for {device_name}: D={depth_mm}mm, V={velocity_mps}mps, F={flow_lps}lps")
+            logger.warning(f"⚠️ Measurement for {device_name} was not inserted (duplicate timestamp or constraint violation)")
+            return False
         
         return True
 

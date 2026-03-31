@@ -278,9 +278,9 @@ class ContinuousMonitor:
                     if stored:
                         self.update_count += 1
                         if STORE_ALL_READINGS:
-                            logger.info(f"✅ Reading stored for {device_id}! (Total: #{self.update_count})")
+                            logger.info(f"✅ Reading stored and committed to database for {device_id}! (Total: #{self.update_count})")
                         else:
-                            logger.info(f"✅ Data changed and stored for {device_id}! (Update #{self.update_count})")
+                            logger.info(f"✅ Data changed, stored and committed to database for {device_id}! (Update #{self.update_count})")
                     else:
                         logger.info(f"ℹ️  Data unchanged for {device_id}, not stored (Depth={depth_mm}mm, Vel={velocity_mps}m/s, Flow={flow_lps}L/s)")
                 else:
@@ -291,6 +291,12 @@ class ContinuousMonitor:
             self.error_count += 1
             return False
         
+        # Flush WAL to ensure all writes are durable before the next cycle
+        try:
+            self.db.flush_db()
+        except Exception as e:
+            logger.warning(f"WAL checkpoint failed (non-fatal): {e}")
+
         return True
 
     def perform_health_check(self):
