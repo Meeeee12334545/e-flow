@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 from database import FlowDatabase
 from scraper import DataScraper
 from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
-from reporting import ReportSelections, compute_calculations, create_charts, build_html_report, build_pdf_report
+
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user
 
 # Initialize authentication state
@@ -86,8 +86,8 @@ st.markdown("""
     
     /* Headers */
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Inter', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        font-weight: 600;
+        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        font-weight: 300;
         letter-spacing: 0.3px;
         margin-top: 0.8rem;
         margin-bottom: 1rem;
@@ -96,7 +96,7 @@ st.markdown("""
     
     h1 {
         font-size: 2.8rem;
-        font-weight: 700;
+        font-weight: 300;
         color: #002f6c;
         letter-spacing: 0px;
         margin-bottom: 1.2rem;
@@ -104,7 +104,7 @@ st.markdown("""
     
     h2 {
         font-size: 2rem;
-        font-weight: 500;
+        font-weight: 300;
         color: #1a1a1a;
         margin-top: 1.5rem;
         margin-bottom: 1.2rem;
@@ -113,7 +113,7 @@ st.markdown("""
     
     h3 {
         font-size: 1.4rem;
-        font-weight: 500;
+        font-weight: 300;
         color: #2a2a2a;
         letter-spacing: 0.3px;
         margin-bottom: 0.8rem;
@@ -536,32 +536,8 @@ with st.sidebar:
     
     st.divider()
 
-    # Report Builder
-    st.markdown("""
-    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-        Report Builder
-    </p>
-    """, unsafe_allow_html=True)
-
-    report_vars = st.multiselect(
-        "Variables",
-        options=["depth_mm", "velocity_mps", "flow_lps"],
-        default=["depth_mm", "velocity_mps", "flow_lps"],
-        help="Select which measurements to include."
-    )
-    report_calcs = st.multiselect(
-        "Calculations",
-        options=["mean", "max", "min", "std", "p50", "p95", "range", "count", "volume"],
-        default=["mean", "max", "min", "std", "p50", "p95"],
-        help="Choose metrics; 'volume' integrates flow over time (requires flow)."
-    )
-    gen_col1, gen_col2 = st.columns([1,1])
-    with gen_col1:
-        generate_report = st.button("Generate Report", type="primary")
-    with gen_col2:
-        export_csv = st.button("Download CSV", type="secondary")
-    
     # Time range selection
+
     st.markdown("""
     <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
         Query Parameters
@@ -899,57 +875,22 @@ if selected_device_id:
             <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
             """, unsafe_allow_html=True)
 
-            # Reporting actions
-            if generate_report:
-                sels = ReportSelections(
-                    variables=report_vars,
-                    calculations=report_calcs,
-                    device_name=selected_device_name,
-                    time_window_hours=time_range,
-                )
-                calcs = compute_calculations(df, sels)
-                charts = create_charts(df, sels)
-                
-                # Find logo if available
-                logo_path = Path(__file__).parent / "logos" / "EDS-logo.png"
-                if not logo_path.exists():
-                    # Try alternative naming conventions
-                    for logo_file in Path(__file__).parent.glob("logos/*logo*.png"):
-                        logo_path = logo_file
-                        break
-                
-                html = build_html_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
-                pdf = build_pdf_report(selected_device_name, df, sels, calcs, charts, str(logo_path) if logo_path.exists() else None)
-                
-                st.success("✅ Report generated")
-                
-                col_html, col_pdf = st.columns(2)
-                with col_html:
-                    st.download_button(
-                        label="📄 Download HTML Report",
-                        data=html,
-                        file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
-                        mime="text/html",
-                    )
-                with col_pdf:
-                    if pdf:
-                        st.download_button(
-                            label="📕 Download PDF Report",
-                            data=pdf,
-                            file_name=f"report_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                            mime="application/pdf",
-                        )
-                    else:
-                        st.info("💡 PDF generation unavailable (install weasyprint)")
-
+            # CSV Export
+            st.markdown("""
+            <p style="font-weight: 300; font-size: 0.9rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
+                Export Data
+            </p>
+            """, unsafe_allow_html=True)
+            export_csv = st.button("📥 Download CSV", type="secondary", use_container_width=True)
+            
             if export_csv:
                 st.download_button(
-                    label="Download CSV (filtered)",
+                    label="💾 Click to download CSV",
                     data=df.to_csv(index=False),
                     file_name=f"data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     mime="text/csv",
                 )
-            
+
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
                 st.markdown(f"""
@@ -991,13 +932,40 @@ if selected_device_id:
                 with tab1:
                     fig_depth = px.line(
                         df, x="timestamp", y="depth_mm",
-                        title="Water Depth Time Series",
+                        title="Water Depth Over Time",
                         labels={"depth_mm": "Depth (mm)", "timestamp": "Time"},
                         markers=True
                     )
-                    fig_depth.update_traces(line=dict(color="#1f77b4", width=2), marker=dict(size=4))
-                    fig_depth.update_layout(hovermode="x unified", height=400)
-                    st.plotly_chart(fig_depth, width="stretch")
+                    fig_depth.update_traces(
+                        line=dict(color="#0066cc", width=2.5),
+                        marker=dict(size=5, color="#0066cc")
+                    )
+                    fig_depth.update_layout(
+                        hovermode="x unified",
+                        height=500,
+                        font=dict(family="Helvetica Neue Light, sans-serif", size=12, color="#333"),
+                        plot_bgcolor="#f8f9fa",
+                        paper_bgcolor="#ffffff",
+                        margin=dict(l=60, r=40, t=60, b=60),
+                        title_font=dict(size=18, family="Helvetica Neue Light, sans-serif", color="#002f6c"),
+                    )
+                    fig_depth.update_xaxes(
+                        showgrid=True,
+                        gridwidth=1,
+                        gridcolor="#e8eaed",
+                        showline=True,
+                        linewidth=1,
+                        linecolor="#333",
+                    )
+                    fig_depth.update_yaxes(
+                        showgrid=True,
+                        gridwidth=1,
+                        gridcolor="#e8eaed",
+                        showline=True,
+                        linewidth=1,
+                        linecolor="#333",
+                    )
+                    st.plotly_chart(fig_depth, use_container_width=True)
                     
                     if len(df) > 0:
                         col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
@@ -1014,22 +982,90 @@ if selected_device_id:
                 with tab2:
                     fig_velocity = px.line(
                         df, x="timestamp", y="velocity_mps",
-                        title="Velocity over Time",
+                        title="Flow Velocity Over Time",
                         labels={"velocity_mps": "Velocity (m/s)", "timestamp": "Time"},
                         markers=True
                     )
-                    fig_velocity.update_layout(hovermode="x unified")
-                    st.plotly_chart(fig_velocity, width="stretch")
+                    fig_velocity.update_traces(
+                        line=dict(color="#10b981", width=2.5),
+                        marker=dict(size=5, color="#10b981")
+                    )
+                    fig_velocity.update_layout(
+                        hovermode="x unified",
+                        height=500,
+                        font=dict(family="Helvetica Neue Light, sans-serif", size=12, color="#333"),
+                        plot_bgcolor="#f8f9fa",
+                        paper_bgcolor="#ffffff",
+                        margin=dict(l=60, r=40, t=60, b=60),
+                        title_font=dict(size=18, family="Helvetica Neue Light, sans-serif", color="#002f6c"),
+                    )
+                    fig_velocity.update_xaxes(
+                        showgrid=True,
+                        gridwidth=1,
+                        gridcolor="#e8eaed",
+                        showline=True,
+                        linewidth=1,
+                        linecolor="#333",
+                    )
+                    fig_velocity.update_yaxes(
+                        showgrid=True,
+                        gridwidth=1,
+                        gridcolor="#e8eaed",
+                        showline=True,
+                        linewidth=1,
+                        linecolor="#333",
+                    )
+                    st.plotly_chart(fig_velocity, use_container_width=True)
+                    
+                    if len(df) > 0:
+                        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+                        with col_stats1:
+                            st.metric("Mean", f"{df['velocity_mps'].mean():.2f} m/s")
+                        with col_stats2:
+                            st.metric("Max", f"{df['velocity_mps'].max():.2f} m/s")
+                        with col_stats3:
+                            st.metric("Min", f"{df['velocity_mps'].min():.2f} m/s")
+                        with col_stats4:
+                            st.metric("Std Dev", f"{df['velocity_mps'].std():.2f} m/s")
+                
                 
                 with tab3:
                     fig_flow = px.line(
                         df, x="timestamp", y="flow_lps",
-                        title="Flow over Time",
+                        title="Flow Rate Over Time",
                         labels={"flow_lps": "Flow (L/s)", "timestamp": "Time"},
                         markers=True
                     )
-                    fig_flow.update_layout(hovermode="x unified")
-                    st.plotly_chart(fig_flow, width="stretch")
+                    fig_flow.update_traces(
+                        line=dict(color="#f59e0b", width=2.5),
+                        marker=dict(size=5, color="#f59e0b")
+                    )
+                    fig_flow.update_layout(
+                        hovermode="x unified",
+                        height=500,
+                        font=dict(family="Helvetica Neue Light, sans-serif", size=12, color="#333"),
+                        plot_bgcolor="#f8f9fa",
+                        paper_bgcolor="#ffffff",
+                        margin=dict(l=60, r=40, t=60, b=60),
+                        title_font=dict(size=18, family="Helvetica Neue Light, sans-serif", color="#002f6c"),
+                    )
+                    fig_flow.update_xaxes(
+                        showgrid=True,
+                        gridwidth=1,
+                        gridcolor="#e8eaed",
+                        showline=True,
+                        linewidth=1,
+                        linecolor="#333",
+                    )
+                    fig_flow.update_yaxes(
+                        showgrid=True,
+                        gridwidth=1,
+                        gridcolor="#e8eaed",
+                        showline=True,
+                        linewidth=1,
+                        linecolor="#333",
+                    )
+                    st.plotly_chart(fig_flow, use_container_width=True)
                 
                 with tab4:
                     st.markdown("""
