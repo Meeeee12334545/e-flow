@@ -1,12 +1,12 @@
 [client]
-showErrorDetails = true
+showErrorDetails = false
 
 [logger]
-level = "info"
+level = "warning"
 
 [theme]
-primaryColor = "#1f77b4"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
+primaryColor = "#0f4c81"
+backgroundColor = "#f4f7fb"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#233047"
 font = "sans serif"

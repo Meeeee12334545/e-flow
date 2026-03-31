@@ -65,7 +65,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Professional styling with Inter and polished components
+# Professional design system — Inter font, professional blue palette
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -78,192 +78,367 @@ st.markdown("""
         --text: #233047;
         --muted: #6b7280;
         --primary: #0f4c81;
+        --primary-light: #1a6bb5;
         --primary-soft: #e7f0ff;
         --accent: #0b76ca;
         --accent-soft: #dbe9ff;
+        --success: #047c3d;
+        --success-soft: #daf9e6;
+        --warning: #b45309;
+        --warning-soft: #fef3c7;
+        --radius-sm: 12px;
+        --radius-md: 18px;
+        --radius-lg: 22px;
+        --shadow-sm: 0 4px 12px rgba(15, 76, 129, 0.06);
+        --shadow-md: 0 14px 32px rgba(15, 76, 129, 0.08);
+        --shadow-lg: 0 24px 60px rgba(15, 76, 129, 0.10);
     }
 
     html, body, [data-testid="stAppViewContainer"] {
-        background: linear-gradient(180deg, #eef4fb 0%, #f9fbff 100%) !important;
+        background: #f4f7fb !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+
+    [data-testid="stAppViewContainer"] > .main {
+        background: #f4f7fb !important;
     }
 
     * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif !important;
-        color: var(--text) !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
         box-sizing: border-box;
     }
 
     .block-container {
-        padding: 2rem 2rem 2.5rem !important;
+        padding: 1.5rem 2rem 3rem !important;
+        max-width: 1400px !important;
     }
 
-    .css-1lcbmhc.e1fqkh3o1 {
-        padding-top: 0 !important;
-    }
-
+    /* ── Typography ── */
     h1, h2, h3, h4, h5, h6 {
         color: var(--text) !important;
-        letter-spacing: 0.05em;
-    }
-
-    h1 {
-        font-size: 3.2rem !important;
         font-weight: 700 !important;
-        margin-bottom: 0.5rem !important;
     }
 
-    h2 {
-        font-size: 2rem !important;
-        font-weight: 600 !important;
-        margin-bottom: 1rem !important;
-    }
+    h1 { font-size: 2.6rem !important; line-height: 1.15 !important; }
+    h2 { font-size: 1.7rem !important; line-height: 1.25 !important; }
+    h3 { font-size: 1.25rem !important; }
 
-    p, span, li, label {
-        font-weight: 400 !important;
-        line-height: 1.7 !important;
-    }
+    p, span, li { line-height: 1.7 !important; }
 
+    /* ── Hero Card ── */
     .hero-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f3f8ff 100%);
-        border: 1px solid rgba(15, 76, 129, 0.12);
-        border-radius: 24px;
-        padding: 32px;
-        box-shadow: 0 24px 60px rgba(15, 76, 129, 0.08);
+        background: linear-gradient(135deg, #0f4c81 0%, #1a6bb5 60%, #0b76ca 100%);
+        border-radius: var(--radius-lg);
+        padding: 36px 40px;
+        box-shadow: var(--shadow-lg);
+        color: #ffffff;
     }
 
     .hero-title {
-        font-size: 3.6rem;
-        font-weight: 700;
-        margin: 0;
-        color: var(--primary);
-        line-height: 1.05;
+        font-size: 2.8rem !important;
+        font-weight: 700 !important;
+        margin: 0.5rem 0 !important;
+        color: #ffffff !important;
+        line-height: 1.1 !important;
+        letter-spacing: -0.02em;
     }
 
     .hero-subtitle {
-        margin: 1rem 0 1.5rem 0;
-        font-size: 1.05rem;
-        color: #475569;
-        max-width: 760px;
+        margin: 0.75rem 0 1.5rem 0 !important;
+        font-size: 1.05rem !important;
+        color: rgba(255,255,255,0.85) !important;
+        max-width: 560px;
+        line-height: 1.6 !important;
     }
 
     .hero-pill {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1rem;
+        gap: 0.4rem;
+        padding: 0.45rem 1rem;
         border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
-        font-weight: 600;
-        font-size: 0.95rem;
+        background: rgba(255,255,255,0.18);
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        border: 1px solid rgba(255,255,255,0.3);
     }
 
-    .hero-grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: 1fr;
+    .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.55rem 1.1rem;
+        border-radius: 999px;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
     }
 
+    /* ── Status / Live Card ── */
     .status-card {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 22px;
-        box-shadow: 0 16px 35px rgba(31, 64, 110, 0.08);
+        border-radius: var(--radius-md);
+        padding: 28px 20px;
+        box-shadow: var(--shadow-md);
         text-align: center;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .status-live-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--success);
+        display: inline-block;
+        margin-right: 6px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(0.9); }
     }
 
     .status-pill {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.85rem 1rem;
+        padding: 0.6rem 1.4rem;
         border-radius: 999px;
-        background: #daf9e6;
-        color: #047c3d;
-        font-weight: 700;
-        letter-spacing: 0.04em;
+        background: var(--success-soft);
+        color: var(--success) !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        letter-spacing: 0.06em;
         margin-bottom: 0.75rem;
+        border: 1px solid rgba(4, 124, 61, 0.2);
     }
 
     .status-note {
-        font-size: 0.95rem;
-        color: #475569;
+        font-size: 0.88rem !important;
+        color: var(--muted) !important;
+        line-height: 1.5 !important;
     }
 
+    /* ── Metric Cards ── */
+    .metric-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        box-shadow: var(--shadow-md);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .metric-card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
+    }
+
+    .metric-label {
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        color: var(--muted) !important;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 0.6rem 0 !important;
+    }
+
+    .metric-value {
+        font-size: 2.4rem !important;
+        font-weight: 700 !important;
+        color: var(--primary) !important;
+        margin: 0 !important;
+        line-height: 1.1 !important;
+        letter-spacing: -0.02em;
+    }
+
+    .metric-value.green { color: var(--success) !important; }
+    .metric-value.amber { color: var(--warning) !important; }
+
+    .metric-unit {
+        font-size: 1rem !important;
+        font-weight: 400 !important;
+        color: var(--muted) !important;
+        margin-left: 4px;
+    }
+
+    /* ── Section Card ── */
     .section-card {
         background: var(--surface);
-        border: 1px solid rgba(15, 76, 129, 0.08);
-        border-radius: 22px;
-        padding: 24px;
-        box-shadow: 0 20px 40px rgba(15, 76, 129, 0.05);
-    }
-
-    .section-title {
-        font-size: 1.6rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        color: var(--primary);
-    }
-
-    .stMetric, div[data-testid="metric-container"] {
-        background: var(--surface) !important;
-        border: 1px solid var(--border) !important;
-        border-radius: 18px !important;
-        padding: 1rem 1.2rem !important;
-        box-shadow: 0 14px 32px rgba(15, 76, 129, 0.06) !important;
-    }
-
-    .css-1avcm0n.e1fqkh3o4 {
-        background: var(--surface) !important;
-    }
-
-    button, .stButton button {
-        border-radius: 12px !important;
-        background: linear-gradient(135deg, #0f4c81 0%, #0a3c67 100%) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 10px 24px rgba(15, 76, 129, 0.18) !important;
-        padding: 0.85rem 1.35rem !important;
-    }
-
-    button:hover, .stButton button:hover {
-        transform: translateY(-1px);
-    }
-
-    section[data-testid="stSidebar"] {
-        background: #ffffff !important;
-        border-right: 1px solid rgba(15, 76, 129, 0.12);
-        box-shadow: inset -1px 0 0 rgba(15, 76, 129, 0.04);
-    }
-
-    section[data-testid="stSidebar"] h2 {
-        font-size: 1.1rem !important;
-        letter-spacing: 0.04em;
-        color: #102a43 !important;
-    }
-
-    .sidebar-card {
-        background: var(--surface-soft);
-        border: 1px solid rgba(15, 76, 129, 0.1);
-        border-radius: 18px;
-        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 28px 30px;
+        box-shadow: var(--shadow-sm);
         margin-bottom: 1.5rem;
     }
 
-    .sidebar-card p {
-        margin: 0.35rem 0;
-        color: #475569;
+    .section-title {
+        font-size: 1.35rem !important;
+        font-weight: 700 !important;
+        color: var(--primary) !important;
+        margin: 0 0 0.75rem 0 !important;
+        letter-spacing: -0.01em;
     }
 
-    .caption {
-        color: #546e7a !important;
+    .section-subtitle {
+        font-size: 0.9rem !important;
+        color: var(--muted) !important;
+        margin: 0 0 1.5rem 0 !important;
     }
 
+    /* ── Streamlit native metric override ── */
+    div[data-testid="metric-container"] {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-md) !important;
+        padding: 1rem 1.25rem !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+
+    div[data-testid="metric-container"] label {
+        color: var(--muted) !important;
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+    }
+
+    div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+        color: var(--primary) !important;
+        font-weight: 700 !important;
+    }
+
+    /* ── Buttons ── */
+    .stButton > button {
+        border-radius: var(--radius-sm) !important;
+        background: linear-gradient(135deg, #0f4c81 0%, #0a3c67 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        box-shadow: 0 6px 18px rgba(15, 76, 129, 0.22) !important;
+        padding: 0.6rem 1.4rem !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 10px 24px rgba(15, 76, 129, 0.3) !important;
+    }
+
+    .stButton > button[kind="secondary"] {
+        background: var(--surface) !important;
+        color: var(--primary) !important;
+        border: 1.5px solid var(--primary) !important;
+        box-shadow: none !important;
+    }
+
+    /* Download buttons */
+    .stDownloadButton > button {
+        border-radius: var(--radius-sm) !important;
+        border: 1.5px solid var(--border) !important;
+        background: var(--surface) !important;
+        color: var(--primary) !important;
+        font-weight: 600 !important;
+        padding: 0.55rem 1.2rem !important;
+    }
+
+    /* ── Sidebar ── */
+    section[data-testid="stSidebar"] {
+        background: #ffffff !important;
+        border-right: 1px solid var(--border) !important;
+    }
+
+    section[data-testid="stSidebar"] > div {
+        padding-top: 1.5rem !important;
+    }
+
+    section[data-testid="stSidebar"] h2 {
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        color: var(--primary) !important;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    /* ── Tabs ── */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px !important;
+        background: var(--primary-soft) !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 5px !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 9px !important;
+        padding: 0.5rem 1.2rem !important;
+        font-weight: 500 !important;
+        color: var(--muted) !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: var(--surface) !important;
+        color: var(--primary) !important;
+        font-weight: 700 !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+
+    /* ── Selectbox & inputs ── */
+    .stSelectbox > div > div {
+        border-radius: var(--radius-sm) !important;
+        border-color: var(--border) !important;
+        background: var(--surface) !important;
+    }
+
+    /* ── Code ── */
     code {
         background: #f1f5f9 !important;
         padding: 0.2rem 0.45rem !important;
         border-radius: 6px !important;
+        font-size: 0.85em !important;
+        color: var(--primary) !important;
+    }
+
+    /* ── Footer ── */
+    .app-footer {
+        border-top: 1px solid var(--border);
+        padding: 1.25rem 0 0.5rem 0;
+        margin-top: 3rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .app-footer-brand {
+        font-weight: 700 !important;
+        color: var(--primary) !important;
+        font-size: 0.95rem !important;
+    }
+
+    .app-footer-meta {
+        font-size: 0.82rem !important;
+        color: var(--muted) !important;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+        .block-container { padding: 1rem 1rem 2rem !important; }
+        .hero-card { padding: 24px 20px !important; }
+        .hero-title { font-size: 2rem !important; }
+        .metric-value { font-size: 1.9rem !important; }
+        .section-card { padding: 20px !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -315,8 +490,9 @@ def get_collection_stats(device_id):
 
 def fetch_latest_reading(device_id: str):
     """
-    Fetch and return the latest reading (display-only, not stored) as fast as possible.
-    
+    Fetch and return the latest real-time reading as fast as possible.
+    The reading is returned for display; persistence is handled by the monitor service.
+
     Returns: (success: bool, message: str, timestamp: datetime, payload: dict)
     """
     device_config = DEVICES.get(device_id)
@@ -349,9 +525,9 @@ def fetch_latest_reading(device_id: str):
     if all(v is None for v in (depth_mm, velocity_mps, flow_lps)):
         return False, "No sensor data received", None, None
 
-    # Display-only; never stored
+    # Return for display; persistence is handled by the monitor service
     timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
-    message = "✓ Real-time data retrieved (monitor service saves data automatically to database)"
+    message = "✓ Live reading retrieved — monitor service stores data automatically"
     return True, message, timestamp, payload
 
 
@@ -360,25 +536,25 @@ col1, col2 = st.columns([3, 1])
 with col1:
     st.markdown("""
     <div class="hero-card">
-        <p class="hero-pill">Hydrological Intelligence</p>
+        <span class="hero-pill">🌊 Hydrological Intelligence</span>
         <h1 class="hero-title">e-flow™ by EDS</h1>
         <p class="hero-subtitle">Professional sewer flow monitoring, analytics and reporting for depth, velocity and flow performance.</p>
-        <div style="display:flex; flex-wrap: wrap; gap: 10px;">
-            <span style="background: rgba(15, 76, 129, 0.08); color: #0f4c81; padding: 0.65rem 1rem; border-radius: 999px; font-weight: 600;">Live data overview</span>
-            <span style="background: rgba(2, 120, 212, 0.12); color: #075985; padding: 0.65rem 1rem; border-radius: 999px; font-weight: 600;">Historical analytics</span>
-            <span style="background: rgba(16, 185, 129, 0.12); color: #047c3d; padding: 0.65rem 1rem; border-radius: 999px; font-weight: 600;">Operational insights</span>
+        <div style="display:flex; flex-wrap: wrap; gap: 8px;">
+            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">📡 Live data overview</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">📈 Historical analytics</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">⚙️ Operational insights</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 with col2:
     st.markdown("""
     <div class="status-card">
-        <div class="status-pill">LIVE</div>
-        <div class="status-note">Auto-sync enabled • Data saved automatically</div>
+        <div class="status-pill"><span class="status-live-dot"></span>LIVE</div>
+        <div class="status-note">Auto-sync enabled<br>Data saved automatically<br>by monitor service</div>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("---")
+st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
 
 # Sidebar configuration
@@ -386,39 +562,33 @@ with st.sidebar:
     # Add authentication header
     render_auth_header()
 
-    st.markdown("""
-    <h2 style="font-weight: 500; letter-spacing: 0.3px;">EDS Experience Mode</h2>
-    """, unsafe_allow_html=True)
+    st.markdown("## Interface")
 
     page_mode = st.selectbox(
-        "Interface Mode",
+        "View mode",
         options=["Simplified View", "Full Dashboard", "EDS Product Overview"],
         index=0,
         help="Simplified View for standard users, Full Dashboard for power users, EDS Product Overview for sales demos."
     )
     st.session_state['page_mode'] = page_mode
 
+    st.markdown("## Device")
+
     st.markdown("""
-    <h2 style="font-weight: 500; letter-spacing: 0.3px;">Configuration & Status</h2>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div style="background: #f0f7ff; border-left: 3px solid #002f6c; padding: 12px; border-radius: 6px; margin-bottom: 1.5rem;">
-        <p style="font-size: 0.9rem; margin: 0; color: #1a1a1a; line-height: 1.6;">
-            <strong style="font-weight: 500;">Device Status:</strong> Connected & streaming<br>
-            <span style="color: #666; font-size: 0.85rem;">• Update interval: 60 seconds</span><br>
-            <span style="color: #666; font-size: 0.85rem;">• Protocol: Direct device telemetry</span><br>
-            <span style="color: #666; font-size: 0.85rem;">• Storage: Local data repository</span>
+    <div style="background: #f0f7ff; border-left: 3px solid #0f4c81; padding: 10px 12px; border-radius: 6px; margin-bottom: 1rem;">
+        <p style="font-size: 0.82rem; margin: 0; color: #233047; line-height: 1.6;">
+            <strong>Status:</strong> Connected &amp; streaming<br>
+            <span style="color: #6b7280;">• Interval: 60 s &nbsp;• WAL persistence: on</span>
         </p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Monitor status (app is read-only; collection handled by monitor service)
+
+    # Monitor status
     if MONITOR_ENABLED:
-        st.success("✔ Auto-collect: Enabled (monitor service). Dashboard is read-only.")
+        st.success("✔ Monitor service: active")
     else:
-        st.info("ℹ️ Auto-collect: Disabled here. Start the monitor service to collect data.")
-    
+        st.info("ℹ️ Monitor service: not running locally. Start monitor.py to collect data.")
+
     # Build device mapping from database
     devices = db.get_devices()
     
@@ -547,51 +717,17 @@ with st.sidebar:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
         selected_device_id = None
-    
+
     st.divider()
 
-    # Time range selection
-
-    st.markdown("""
-    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-        Query Parameters
-    </p>
-    """, unsafe_allow_html=True)
-    # Enhanced time window selection with 24h default and days/months options
-    time_options = [
-        (24, "24 hours"),
-        (48, "2 days"),
-        (72, "3 days"),
-        (168, "7 days"),
-        (720, "30 days"),
-        (2160, "3 months"),
-        (4320, "6 months"),
-        (8760, "12 months"),
-    ]
-    default_index = 0  # 24 hours
-    time_range = st.selectbox(
-        "Time Window",
-        options=time_options,
-        format_func=lambda x: x[1],
-        index=default_index,
-        key="time_range",
-        label_visibility="collapsed"
-    )[0]
-    
-    st.divider()
-    
-    # Database stats
-    st.markdown("""
-    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 1rem; letter-spacing: 0.2px;">
-        System Metrics
-    </p>
-    """, unsafe_allow_html=True)
+    # System stats
+    st.markdown("## System")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Stations", db.get_device_count(), help="Number of connected field devices")
+        st.metric("Stations", db.get_device_count(), help="Connected field devices")
     with col2:
         total_measurements = db.get_measurement_count()
-        st.metric("Data Points", total_measurements, help="Total measurements recorded")
+        st.metric("Records", total_measurements, help="Total stored measurements")
     # Last ingest indicator
     latest_rows = db.get_measurements(limit=1)
     if latest_rows:
@@ -603,15 +739,14 @@ with st.sidebar:
             else:
                 latest_ts = pd.Timestamp(latest_ts)
             local_ts = latest_ts.astimezone(pytz.timezone(DEFAULT_TZ))
-            st.caption(f"Last ingest: {local_ts.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            st.caption(f"Last record: {local_ts.strftime('%Y-%m-%d %H:%M %Z')}")
         except Exception:
-            st.caption(f"Last ingest: {latest_rows[0]['timestamp']}")
-    
-    # Debug info for troubleshooting
+            st.caption(f"Last record: {latest_rows[0]['timestamp']}")
+
     if total_measurements == 0:
-        st.warning("⚠️ No measurements found yet.")
-        st.info("If this is a fresh deploy, the monitor service will populate data shortly. You can also click 'Show Real-Time Data' for a live view without storing.")
-    
+        st.warning("⚠️ No measurements yet.")
+        st.info("Start the monitor service to collect data automatically.")
+
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
         if stats:
@@ -643,39 +778,41 @@ if page_mode == 'Simplified View':
         if measurements:
             df = pd.DataFrame(measurements)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df.sort_values('timestamp', inplace=True)
             latest = df.iloc[-1]
             now_local = datetime.now(pytz.timezone(DEFAULT_TZ))
             latest_depth = f"{latest['depth_mm']:.1f}" if pd.notna(latest['depth_mm']) else 'N/A'
             latest_velocity = f"{latest['velocity_mps']:.3f}" if pd.notna(latest['velocity_mps']) else 'N/A'
             latest_flow = f"{latest['flow_lps']:.1f}" if pd.notna(latest['flow_lps']) else 'N/A'
 
-            st.markdown(f"""
-            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 1.5rem;">
-                <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
-                    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Depth</p>
-                    <p style="font-size: 2.6rem; color: #0f4c81; margin: 0; font-weight: 700;">{latest_depth}</p>
-                    <span style="color: #475569; font-size: 0.95rem;">mm</span>
-                </div>
-                <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
-                    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Velocity</p>
-                    <p style="font-size: 2.6rem; color: #047c3d; margin: 0; font-weight: 700;">{latest_velocity}</p>
-                    <span style="color: #475569; font-size: 0.95rem;">m/s</span>
-                </div>
-                <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
-                    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Flow</p>
-                    <p style="font-size: 2.6rem; color: #b45309; margin: 0; font-weight: 700;">{latest_flow}</p>
-                    <span style="color: #475569; font-size: 0.95rem;">L/s</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Latest reading timestamp
+            try:
+                last_ts = pd.to_datetime(latest['timestamp'])
+                if last_ts.tzinfo is None:
+                    last_ts = last_ts.tz_localize(pytz.utc)
+                last_ts_local = last_ts.astimezone(pytz.timezone(DEFAULT_TZ))
+                last_ts_str = last_ts_local.strftime('%d %b %Y, %H:%M %Z')
+            except Exception:
+                last_ts_str = str(latest['timestamp'])
 
-            st.markdown("""
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <div>
-                    <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.03em;">24-hour performance</h2>
-                    <p style="margin: 0.35rem 0 0 0; color: #475569;">Adjust the time window to compare recent flow, depth and velocity trends.</p>
+            st.markdown(f"""
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 1.75rem;">
+                <div class="metric-card">
+                    <p class="metric-label">💧 Water Depth</p>
+                    <p class="metric-value">{latest_depth}<span class="metric-unit">mm</span></p>
+                </div>
+                <div class="metric-card">
+                    <p class="metric-label">⚡ Flow Velocity</p>
+                    <p class="metric-value green">{latest_velocity}<span class="metric-unit">m/s</span></p>
+                </div>
+                <div class="metric-card">
+                    <p class="metric-label">🌊 Flow Rate</p>
+                    <p class="metric-value amber">{latest_flow}<span class="metric-unit">L/s</span></p>
                 </div>
             </div>
+            <p style="font-size: 0.82rem; color: #6b7280; margin: -0.75rem 0 1.5rem 4px;">
+                ✓ Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
+            </p>
             """, unsafe_allow_html=True)
 
             time_window_options = [
@@ -685,13 +822,20 @@ if page_mode == 'Simplified View':
                 (168, '7 days'),
                 (720, '30 days')
             ]
-            selected_window = st.selectbox(
-                'View period',
-                options=time_window_options,
-                format_func=lambda x: x[1],
-                index=0,
-                key='simplified_view_window'
-            )[0]
+            col_title, col_picker = st.columns([2, 1])
+            with col_title:
+                st.markdown("""
+                <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #233047;">Performance trend</h2>
+                <p style="margin: 0.25rem 0 0 0; color: #6b7280; font-size: 0.92rem;">Flow rate, depth and velocity over the selected window.</p>
+                """, unsafe_allow_html=True)
+            with col_picker:
+                selected_window, selected_window_label = st.selectbox(
+                    'Time window',
+                    options=time_window_options,
+                    format_func=lambda x: x[1],
+                    index=0,
+                    key='simplified_view_window'
+                )
 
             cutoff = now_local - timedelta(hours=selected_window)
             df_window = df[df['timestamp'] >= cutoff].sort_values('timestamp')
@@ -707,8 +851,10 @@ if page_mode == 'Simplified View':
                     y=df_window['flow_lps'],
                     mode='lines+markers',
                     name='Flow (L/s)',
-                    line=dict(color='#0f4c81', width=3),
-                    marker=dict(size=6)
+                    line=dict(color='#0f4c81', width=2.5),
+                    marker=dict(size=5),
+                    fill='tozeroy',
+                    fillcolor='rgba(15, 76, 129, 0.07)',
                 ),
                 secondary_y=False
             )
@@ -718,8 +864,8 @@ if page_mode == 'Simplified View':
                     y=df_window['depth_mm'],
                     mode='lines+markers',
                     name='Depth (mm)',
-                    line=dict(color='#047c3d', width=3, dash='dash'),
-                    marker=dict(size=6)
+                    line=dict(color='#047c3d', width=2, dash='dash'),
+                    marker=dict(size=5)
                 ),
                 secondary_y=False
             )
@@ -729,133 +875,162 @@ if page_mode == 'Simplified View':
                     y=df_window['velocity_mps'],
                     mode='lines+markers',
                     name='Velocity (m/s)',
-                    line=dict(color='#b45309', width=3, dash='dot'),
-                    marker=dict(size=6)
+                    line=dict(color='#b45309', width=2, dash='dot'),
+                    marker=dict(size=5)
                 ),
                 secondary_y=True
             )
             fig.update_layout(
-                title=dict(text=f'Flow, Depth & Velocity - {selected_device_name}', x=0.01, xanchor='left'),
-                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                title=None,
+                legend=dict(
+                    orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
+                    font=dict(size=12)
+                ),
                 hovermode='x unified',
-                margin=dict(l=40, r=40, t=80, b=40),
+                margin=dict(l=0, r=0, t=40, b=0),
                 template='plotly_white',
-                height=520,
-                font=dict(family='Inter, sans-serif', color='#1f2937')
+                height=440,
+                paper_bgcolor='#ffffff',
+                plot_bgcolor='#ffffff',
+                font=dict(family='Inter, -apple-system, sans-serif', color='#233047', size=12),
+                xaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
+                yaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
             )
             fig.update_xaxes(title_text='Time')
-            fig.update_yaxes(title_text='Flow / Depth', secondary_y=False)
+            fig.update_yaxes(title_text='Flow (L/s) / Depth (mm)', secondary_y=False)
             fig.update_yaxes(title_text='Velocity (m/s)', secondary_y=True)
             st.plotly_chart(fig, use_container_width=True)
 
             if show_note:
                 st.info(
-                    f'No data was captured in the last {selected_window} hours. Showing the latest available history instead.'
+                    f'ℹ️ No data in the last {selected_window_label}. Showing all available history instead.'
                 )
 
+            st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
+            col_download1, col_download2, _ = st.columns([1, 1, 2])
             csv_data = df.to_csv(index=False)
             json_data = df.to_json(orient='records', date_format='iso')
-            col_download1, col_download2 = st.columns(2)
             with col_download1:
-                st.download_button('Download CSV', data=csv_data, file_name=f'{selected_device_id}_data.csv', mime='text/csv')
+                st.download_button('⬇ Download CSV', data=csv_data,
+                                   file_name=f'{selected_device_id}_data.csv', mime='text/csv',
+                                   use_container_width=True)
             with col_download2:
-                st.download_button('Download JSON', data=json_data, file_name=f'{selected_device_id}_data.json', mime='application/json')
+                st.download_button('⬇ Download JSON', data=json_data,
+                                   file_name=f'{selected_device_id}_data.json',
+                                   mime='application/json', use_container_width=True)
         else:
-            st.warning('No measurements available yet. Run the monitor service or store readings from real-time view.')
+            st.markdown("""
+            <div style="background: #ffffff; border: 1px solid #dfe7ef; border-radius: 18px; padding: 40px; text-align: center; margin: 2rem 0;">
+                <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
+                <h3 style="color: #233047; margin: 0 0 0.5rem;">Awaiting first reading</h3>
+                <p style="color: #6b7280; margin: 0 0 1.5rem;">No measurements have been stored yet for this device.</p>
+                <p style="color: #6b7280; font-size: 0.9rem;">Start the <code>monitor.py</code> service to begin collecting data automatically.</p>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         st.warning('No device selected. Choose a device in the sidebar.')
     st.stop()
 
 if selected_device_id:
+    # ── Full Dashboard ──────────────────────────────────────────────────────
+    # Time range selector for the full dashboard
+    _fd_time_opts = [
+        (24, "24 hours"),
+        (48, "2 days"),
+        (72, "3 days"),
+        (168, "7 days"),
+        (720, "30 days"),
+        (2160, "3 months"),
+        (4320, "6 months"),
+        (8760, "12 months"),
+    ]
+    col_fd_title, col_fd_range = st.columns([2, 1])
+    with col_fd_title:
+        st.markdown(f"""
+        <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #233047;">
+            Full Dashboard — {selected_device_name}
+        </h2>
+        <p style="margin: 0.25rem 0 1rem; color: #6b7280; font-size: 0.92rem;">
+            Detailed time-series analytics and statistics
+        </p>
+        """, unsafe_allow_html=True)
+    with col_fd_range:
+        time_range, _time_label = st.selectbox(
+            "Time window",
+            options=_fd_time_opts,
+            format_func=lambda x: x[1],
+            index=3,  # Default: 7 days
+            key="fd_time_range"
+        )
+
     # Get measurements for selected device
     measurements = db.get_measurements(device_id=selected_device_id)
-    
+
     if measurements:
         df = pd.DataFrame(measurements)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        
+
         # Filter by time range
         cutoff_time = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=time_range)
         df_filtered = df[df["timestamp"] >= cutoff_time].sort_values("timestamp")
-        
-        # Debug: show total vs filtered
+
         if df_filtered.empty and not df.empty:
-            st.warning(f"⚠️ Found {len(df)} measurements, but none in the last {time_range} hours. Try selecting a longer time range.")
-            st.info(f"Oldest data: {df['timestamp'].min()}, Latest data: {df['timestamp'].max()}")
-        
+            st.warning(
+                f"⚠️ No data in the last {_time_label}. "
+                f"Oldest record: {df['timestamp'].min().strftime('%Y-%m-%d %H:%M')}, "
+                f"Latest: {df['timestamp'].max().strftime('%Y-%m-%d %H:%M')}. "
+                "Try a wider time window."
+            )
+
         df = df_filtered
-        
+
         if not df.empty:
-            # Latest values with enhanced metrics
-            st.markdown(f"""
-            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-bottom: 1.5rem;">
-                Current Status: {selected_device_name}
-            </h2>
-            """, unsafe_allow_html=True)
-            
             latest = df.iloc[-1]
             last_update = latest["timestamp"]
-            
-            # KPI Metrics
-            metric_cols = st.columns(3, gap="medium")
-            
-            with metric_cols[0]:
-                depth = latest["depth_mm"]
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
-                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
-                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
-                        WATER DEPTH
-                    </p>
-                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {f'{depth:.1f}' if depth is not None else 'N/A'} <span style="font-size: 1rem;">mm</span>
-                    </p>
+
+            # ── KPI metric cards ────────────────────────────────────────────
+            depth = latest["depth_mm"]
+            velocity = latest["velocity_mps"]
+            flow = latest["flow_lps"]
+            depth_str = f"{depth:.1f}" if depth is not None else "N/A"
+            velocity_str = f"{velocity:.3f}" if velocity is not None else "N/A"
+            flow_str = f"{flow:.1f}" if flow is not None else "N/A"
+
+            try:
+                lu_ts = pd.to_datetime(last_update)
+                if lu_ts.tzinfo is None:
+                    lu_ts = lu_ts.tz_localize(pytz.utc)
+                lu_local = lu_ts.astimezone(pytz.timezone(DEFAULT_TZ))
+                lu_str = lu_local.strftime('%d %b %Y, %H:%M %Z')
+            except Exception:
+                lu_str = str(last_update)
+
+            st.markdown(f"""
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 0.5rem;">
+                <div class="metric-card">
+                    <p class="metric-label">💧 Water Depth</p>
+                    <p class="metric-value">{depth_str}<span class="metric-unit">mm</span></p>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            with metric_cols[1]:
-                velocity = latest["velocity_mps"]
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
-                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
-                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
-                        FLOW VELOCITY
-                    </p>
-                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {f'{velocity:.3f}' if velocity is not None else 'N/A'} <span style="font-size: 1rem;">m/s</span>
-                    </p>
+                <div class="metric-card">
+                    <p class="metric-label">⚡ Flow Velocity</p>
+                    <p class="metric-value green">{velocity_str}<span class="metric-unit">m/s</span></p>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            with metric_cols[2]:
-                flow = latest["flow_lps"]
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
-                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
-                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
-                        FLOW RATE
-                    </p>
-                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {f'{flow:.1f}' if flow is not None else 'N/A'} <span style="font-size: 1rem;">L/s</span>
-                    </p>
+                <div class="metric-card">
+                    <p class="metric-label">🌊 Flow Rate</p>
+                    <p class="metric-value amber">{flow_str}<span class="metric-unit">L/s</span></p>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Flow Graph Section - Prominent display with date range selection
-            st.markdown("""
-            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;">
-                📊 Flow Rate Analysis
-            </h2>
+            </div>
+            <p style="font-size: 0.82rem; color: #6b7280; margin: 0 0 1.5rem 4px;">
+                ✓ Last reading: {lu_str} &nbsp;·&nbsp; {len(df)} records in selected window
+            </p>
             """, unsafe_allow_html=True)
-            
-            # Date range selector
+
+            # ── Main flow chart ─────────────────────────────────────────────
+            st.markdown("""
+            <p class="section-title" style="margin-top: 0.5rem;">📊 Flow Rate Analysis</p>
+            """, unsafe_allow_html=True)
+
             col_range1, col_range2 = st.columns([1, 2])
-            
             with col_range1:
                 range_mode = st.radio(
                     "Date Range Mode",
@@ -863,14 +1038,12 @@ if selected_device_id:
                     index=0,
                     horizontal=True
                 )
-            
-            # Initialize default date range (24 hours)
+
             default_start = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=24)
             default_end = datetime.now(pytz.timezone(DEFAULT_TZ))
-            
+
             if range_mode == "Quick Select":
                 with col_range2:
-                    # Quick select options
                     quick_options = [
                         (24, "24 hours"),
                         (48, "2 days"),
@@ -878,512 +1051,243 @@ if selected_device_id:
                         (168, "7 days"),
                         (720, "30 days"),
                     ]
-                    selected_hours = st.selectbox(
-                        "Select Time Window",
+                    selected_hours, _ = st.selectbox(
+                        "Chart window",
                         options=quick_options,
                         format_func=lambda x: x[1],
-                        index=0,  # Default to 24 hours
+                        index=0,
                         key="quick_select_graph"
-                    )[0]
-                    
+                    )
                     graph_start = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=selected_hours)
                     graph_end = datetime.now(pytz.timezone(DEFAULT_TZ))
             else:
-                # Custom range with date/time pickers
                 col_custom1, col_custom2 = st.columns(2)
                 with col_custom1:
-                    start_date = st.date_input(
-                        "Start Date",
-                        value=default_start.date(),
-                        key="custom_start_date"
-                    )
-                    start_time = st.time_input(
-                        "Start Time",
-                        value=default_start.time(),
-                        key="custom_start_time"
-                    )
-                    graph_start = datetime.combine(start_date, start_time)
-                    graph_start = pytz.timezone(DEFAULT_TZ).localize(graph_start)
-                
+                    start_date = st.date_input("Start Date", value=default_start.date(), key="custom_start_date")
+                    start_time = st.time_input("Start Time", value=default_start.time(), key="custom_start_time")
+                    graph_start = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(start_date, start_time))
                 with col_custom2:
-                    end_date = st.date_input(
-                        "End Date",
-                        value=default_end.date(),
-                        key="custom_end_date"
-                    )
-                    end_time = st.time_input(
-                        "End Time",
-                        value=default_end.time(),
-                        key="custom_end_time"
-                    )
-                    graph_end = datetime.combine(end_date, end_time)
-                    graph_end = pytz.timezone(DEFAULT_TZ).localize(graph_end)
-            
-            # Filter data for the graph
+                    end_date = st.date_input("End Date", value=default_end.date(), key="custom_end_date")
+                    end_time = st.time_input("End Time", value=default_end.time(), key="custom_end_time")
+                    graph_end = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(end_date, end_time))
+
             df_graph = df[(df["timestamp"] >= graph_start) & (df["timestamp"] <= graph_end)].sort_values("timestamp")
-            
+
             if not df_graph.empty:
-                # Create prominent flow chart
                 fig_main_flow = go.Figure()
-                
                 fig_main_flow.add_trace(go.Scatter(
                     x=df_graph["timestamp"],
                     y=df_graph["flow_lps"],
                     mode='lines+markers',
-                    name='Flow Rate',
-                    line=dict(color='#0066cc', width=3),
-                    marker=dict(size=6, color='#0066cc'),
+                    name='Flow Rate (L/s)',
+                    line=dict(color='#0f4c81', width=2.5),
+                    marker=dict(size=5, color='#0f4c81'),
                     fill='tozeroy',
-                    fillcolor='rgba(0, 102, 204, 0.1)',
+                    fillcolor='rgba(15, 76, 129, 0.07)',
                     hovertemplate='<b>%{x|%Y-%m-%d %H:%M}</b><br>Flow: %{y:.2f} L/s<extra></extra>'
                 ))
-                
                 fig_main_flow.update_layout(
-                    title=dict(
-                        text=f"Flow Rate Over Time - {selected_device_name}",
-                        font=dict(size=20, family="Helvetica Neue, sans-serif", weight=500)
-                    ),
                     xaxis_title="Time",
                     yaxis_title="Flow Rate (L/s)",
                     hovermode="x unified",
-                    height=500,
+                    height=420,
                     template="plotly_white",
-                    font=dict(family="Helvetica Neue, sans-serif"),
-                    xaxis=dict(
-                        showgrid=True,
-                        gridcolor='rgba(0,0,0,0.05)',
-                        showline=True,
-                        linecolor='rgba(0,0,0,0.2)'
-                    ),
-                    yaxis=dict(
-                        showgrid=True,
-                        gridcolor='rgba(0,0,0,0.05)',
-                        showline=True,
-                        linecolor='rgba(0,0,0,0.2)'
-                    )
+                    paper_bgcolor="#ffffff",
+                    plot_bgcolor="#ffffff",
+                    font=dict(family='Inter, -apple-system, sans-serif', color='#233047', size=12),
+                    margin=dict(l=0, r=0, t=20, b=0),
+                    xaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
+                    yaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
+                    legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
                 )
-                
                 st.plotly_chart(fig_main_flow, use_container_width=True)
-                
-                # Show statistics for the selected range
+
                 col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                 with col_stat1:
-                    st.metric("Average Flow", f"{df_graph['flow_lps'].mean():.2f} L/s")
+                    st.metric("Avg Flow", f"{df_graph['flow_lps'].mean():.1f} L/s")
                 with col_stat2:
-                    st.metric("Peak Flow", f"{df_graph['flow_lps'].max():.2f} L/s")
+                    st.metric("Peak Flow", f"{df_graph['flow_lps'].max():.1f} L/s")
                 with col_stat3:
-                    st.metric("Minimum Flow", f"{df_graph['flow_lps'].min():.2f} L/s")
+                    st.metric("Min Flow", f"{df_graph['flow_lps'].min():.1f} L/s")
                 with col_stat4:
-                    total_volume = df_graph['flow_lps'].sum() * 60 / 1000  # Approximate total volume in m³
-                    st.metric("Est. Total Volume", f"{total_volume:.2f} m³")
+                    total_vol = df_graph['flow_lps'].sum() * 60 / 1000
+                    st.metric("Est. Volume", f"{total_vol:.1f} m³")
             else:
-                st.info(f"📊 No data available for the selected date range ({graph_start.strftime('%Y-%m-%d %H:%M')} to {graph_end.strftime('%Y-%m-%d %H:%M')})")
-            
-            st.markdown("---")
-            
-            # Data quality indicators with enhanced styling
-            st.markdown("""
-            <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
-            """, unsafe_allow_html=True)
-
-            # CSV Export
-            st.markdown("""
-            <p style="font-weight: 300; font-size: 0.9rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-                Export Data
-            </p>
-            """, unsafe_allow_html=True)
-            export_csv = st.button("📥 Download CSV", type="secondary", use_container_width=True)
-            
-            if export_csv:
-                st.download_button(
-                    label="💾 Click to download CSV",
-                    data=df.to_csv(index=False),
-                    file_name=f"data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv",
+                st.info(
+                    f"📊 No data for {graph_start.strftime('%Y-%m-%d %H:%M')} "
+                    f"→ {graph_end.strftime('%Y-%m-%d %H:%M')}"
                 )
 
-            col_info1, col_info2, col_info3 = st.columns(3)
-            with col_info1:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">🕒 Last Update</strong><br>
-                    {last_update.strftime('%Y-%m-%d %H:%M:%S')}
-                </p>
-                """, unsafe_allow_html=True)
-            with col_info2:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">📊 Data Points</strong><br>
-                    {len(df)} in {time_range}h window
-                </p>
-                """, unsafe_allow_html=True)
-            with col_info3:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">⏱️ Collection Rate</strong><br>
-                    {len(df)/(time_range if time_range > 0 else 1):.1f} pts/hr
-                </p>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-            st.markdown("---")
-            
-            # Advanced analytics
-            st.markdown("""
-            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
-                Time Series Analysis
-            </h3>
-            """, unsafe_allow_html=True)
-            
-            if len(df) >= 1:
-                # Create tabs for different views - show even with 1 data point
-                tab1, tab2, tab3, tab4 = st.tabs(["Depth", "Velocity", "Flow", "Summary Statistics"])
-                
-                with tab1:
-                    fig_depth = px.line(
-                        df, x="timestamp", y="depth_mm",
-                        title="Water Depth Over Time",
-                        labels={"depth_mm": "Depth (mm)", "timestamp": "Time"},
-                        markers=True
-                    )
-                    fig_depth.update_traces(
-                        line=dict(color="#0066cc", width=2.5),
-                        marker=dict(size=5, color="#0066cc")
-                    )
-                    fig_depth.update_layout(
-                        hovermode="x unified",
-                        height=500,
-                        font=dict(family="Helvetica Neue Light, sans-serif", size=12, color="#333"),
-                        plot_bgcolor="#f8f9fa",
-                        paper_bgcolor="#ffffff",
-                        margin=dict(l=60, r=40, t=60, b=60),
-                        title_font=dict(size=18, family="Helvetica Neue Light, sans-serif", color="#002f6c"),
-                    )
-                    fig_depth.update_xaxes(
-                        showgrid=True,
-                        gridwidth=1,
-                        gridcolor="#e8eaed",
-                        showline=True,
-                        linewidth=1,
-                        linecolor="#333",
-                    )
-                    fig_depth.update_yaxes(
-                        showgrid=True,
-                        gridwidth=1,
-                        gridcolor="#e8eaed",
-                        showline=True,
-                        linewidth=1,
-                        linecolor="#333",
-                    )
-                    st.plotly_chart(fig_depth, use_container_width=True)
-                    
-                    if len(df) > 0:
-                        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
-                        with col_stats1:
-                            st.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
-                        with col_stats2:
-                            st.metric("Max", f"{df['depth_mm'].max():.1f} mm")
-                        with col_stats3:
-                            st.metric("Min", f"{df['depth_mm'].min():.1f} mm")
-                        with col_stats4:
-                            st.metric("Std Dev", f"{df['depth_mm'].std():.1f} mm")
-                
+            st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
 
-                with tab2:
-                    fig_velocity = px.line(
-                        df, x="timestamp", y="velocity_mps",
-                        title="Flow Velocity Over Time",
-                        labels={"velocity_mps": "Velocity (m/s)", "timestamp": "Time"},
-                        markers=True
+            # ── Time-series tabs ───────────────────────────────────────────
+            st.markdown('<p class="section-title">📈 Time Series Analysis</p>', unsafe_allow_html=True)
+
+            _chart_layout = dict(
+                hovermode="x unified",
+                height=400,
+                template="plotly_white",
+                paper_bgcolor="#ffffff",
+                plot_bgcolor="#ffffff",
+                font=dict(family='Inter, -apple-system, sans-serif', color='#233047', size=12),
+                margin=dict(l=0, r=0, t=20, b=0),
+                xaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef', title='Time'),
+                yaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
+            )
+
+            tab1, tab2, tab3, tab4 = st.tabs(["💧 Depth", "⚡ Velocity", "🌊 Flow", "📋 Statistics"])
+
+            with tab1:
+                fig_depth = px.line(df, x="timestamp", y="depth_mm",
+                                    labels={"depth_mm": "Depth (mm)", "timestamp": "Time"},
+                                    markers=True)
+                fig_depth.update_traces(line=dict(color="#0f4c81", width=2.5), marker=dict(size=5))
+                fig_depth.update_layout(**_chart_layout)
+                fig_depth.update_yaxes(title_text="Depth (mm)")
+                st.plotly_chart(fig_depth, use_container_width=True)
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                col_s1.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
+                col_s2.metric("Max", f"{df['depth_mm'].max():.1f} mm")
+                col_s3.metric("Min", f"{df['depth_mm'].min():.1f} mm")
+                col_s4.metric("Std Dev", f"{df['depth_mm'].std():.1f} mm")
+
+            with tab2:
+                fig_vel = px.line(df, x="timestamp", y="velocity_mps",
+                                  labels={"velocity_mps": "Velocity (m/s)", "timestamp": "Time"},
+                                  markers=True)
+                fig_vel.update_traces(line=dict(color="#047c3d", width=2.5), marker=dict(size=5))
+                fig_vel.update_layout(**_chart_layout)
+                fig_vel.update_yaxes(title_text="Velocity (m/s)")
+                st.plotly_chart(fig_vel, use_container_width=True)
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                col_s1.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
+                col_s2.metric("Max", f"{df['velocity_mps'].max():.3f} m/s")
+                col_s3.metric("Min", f"{df['velocity_mps'].min():.3f} m/s")
+                col_s4.metric("Std Dev", f"{df['velocity_mps'].std():.3f} m/s")
+
+            with tab3:
+                fig_flow = px.line(df, x="timestamp", y="flow_lps",
+                                   labels={"flow_lps": "Flow (L/s)", "timestamp": "Time"},
+                                   markers=True)
+                fig_flow.update_traces(line=dict(color="#b45309", width=2.5), marker=dict(size=5))
+                fig_flow.update_layout(**_chart_layout)
+                fig_flow.update_yaxes(title_text="Flow Rate (L/s)")
+                st.plotly_chart(fig_flow, use_container_width=True)
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                col_s1.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
+                col_s2.metric("Max", f"{df['flow_lps'].max():.1f} L/s")
+                col_s3.metric("Min", f"{df['flow_lps'].min():.1f} L/s")
+                col_s4.metric("Std Dev", f"{df['flow_lps'].std():.1f} L/s")
+
+            with tab4:
+                st.markdown("#### Aggregate Statistics")
+                col_sum1, col_sum2, col_sum3 = st.columns(3)
+                with col_sum1:
+                    st.markdown("**💧 Water Depth**")
+                    st.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
+                    st.metric("Median", f"{df['depth_mm'].median():.1f} mm")
+                    st.metric("Range", f"{df['depth_mm'].max() - df['depth_mm'].min():.1f} mm")
+                with col_sum2:
+                    st.markdown("**⚡ Flow Velocity**")
+                    st.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
+                    st.metric("Median", f"{df['velocity_mps'].median():.3f} m/s")
+                    st.metric("Range", f"{df['velocity_mps'].max() - df['velocity_mps'].min():.3f} m/s")
+                with col_sum3:
+                    st.markdown("**🌊 Flow Rate**")
+                    st.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
+                    st.metric("Median", f"{df['flow_lps'].median():.1f} L/s")
+                    st.metric("Range", f"{df['flow_lps'].max() - df['flow_lps'].min():.1f} L/s")
+
+                st.markdown("---")
+                st.markdown("#### Distribution")
+                dist_col1, dist_col2 = st.columns(2)
+                with dist_col1:
+                    fig_hist_d = px.histogram(df, x="depth_mm", nbins=20,
+                                              labels={"depth_mm": "Depth (mm)"})
+                    fig_hist_d.update_traces(marker_color="#0f4c81")
+                    fig_hist_d.update_layout(
+                        height=280, template="plotly_white", paper_bgcolor="#ffffff",
+                        plot_bgcolor="#ffffff", margin=dict(l=0, r=0, t=10, b=0),
+                        font=dict(family='Inter, sans-serif', size=11),
+                        xaxis=dict(gridcolor='#f0f4f8'), yaxis=dict(gridcolor='#f0f4f8')
                     )
-                    fig_velocity.update_traces(
-                        line=dict(color="#10b981", width=2.5),
-                        marker=dict(size=5, color="#10b981")
+                    st.plotly_chart(fig_hist_d, use_container_width=True)
+                with dist_col2:
+                    fig_hist_f = px.histogram(df, x="flow_lps", nbins=20,
+                                              labels={"flow_lps": "Flow (L/s)"})
+                    fig_hist_f.update_traces(marker_color="#b45309")
+                    fig_hist_f.update_layout(
+                        height=280, template="plotly_white", paper_bgcolor="#ffffff",
+                        plot_bgcolor="#ffffff", margin=dict(l=0, r=0, t=10, b=0),
+                        font=dict(family='Inter, sans-serif', size=11),
+                        xaxis=dict(gridcolor='#f0f4f8'), yaxis=dict(gridcolor='#f0f4f8')
                     )
-                    fig_velocity.update_layout(
-                        hovermode="x unified",
-                        height=500,
-                        font=dict(family="Helvetica Neue Light, sans-serif", size=12, color="#333"),
-                        plot_bgcolor="#f8f9fa",
-                        paper_bgcolor="#ffffff",
-                        margin=dict(l=60, r=40, t=60, b=60),
-                        title_font=dict(size=18, family="Helvetica Neue Light, sans-serif", color="#002f6c"),
-                    )
-                    fig_velocity.update_xaxes(
-                        showgrid=True,
-                        gridwidth=1,
-                        gridcolor="#e8eaed",
-                        showline=True,
-                        linewidth=1,
-                        linecolor="#333",
-                    )
-                    fig_velocity.update_yaxes(
-                        showgrid=True,
-                        gridwidth=1,
-                        gridcolor="#e8eaed",
-                        showline=True,
-                        linewidth=1,
-                        linecolor="#333",
-                    )
-                    st.plotly_chart(fig_velocity, use_container_width=True)
-                    
-                    if len(df) > 0:
-                        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
-                        with col_stats1:
-                            st.metric("Mean", f"{df['velocity_mps'].mean():.2f} m/s")
-                        with col_stats2:
-                            st.metric("Max", f"{df['velocity_mps'].max():.2f} m/s")
-                        with col_stats3:
-                            st.metric("Min", f"{df['velocity_mps'].min():.2f} m/s")
-                        with col_stats4:
-                            st.metric("Std Dev", f"{df['velocity_mps'].std():.2f} m/s")
-                
-                
-                with tab3:
-                    fig_flow = px.line(
-                        df, x="timestamp", y="flow_lps",
-                        title="Flow Rate Over Time",
-                        labels={"flow_lps": "Flow (L/s)", "timestamp": "Time"},
-                        markers=True
-                    )
-                    fig_flow.update_traces(
-                        line=dict(color="#f59e0b", width=2.5),
-                        marker=dict(size=5, color="#f59e0b")
-                    )
-                    fig_flow.update_layout(
-                        hovermode="x unified",
-                        height=500,
-                        font=dict(family="Helvetica Neue Light, sans-serif", size=12, color="#333"),
-                        plot_bgcolor="#f8f9fa",
-                        paper_bgcolor="#ffffff",
-                        margin=dict(l=60, r=40, t=60, b=60),
-                        title_font=dict(size=18, family="Helvetica Neue Light, sans-serif", color="#002f6c"),
-                    )
-                    fig_flow.update_xaxes(
-                        showgrid=True,
-                        gridwidth=1,
-                        gridcolor="#e8eaed",
-                        showline=True,
-                        linewidth=1,
-                        linecolor="#333",
-                    )
-                    fig_flow.update_yaxes(
-                        showgrid=True,
-                        gridwidth=1,
-                        gridcolor="#e8eaed",
-                        showline=True,
-                        linewidth=1,
-                        linecolor="#333",
-                    )
-                    st.plotly_chart(fig_flow, use_container_width=True)
-                
-                with tab4:
-                    st.markdown("""
-                    <h4 style="font-weight: 500; letter-spacing: 0.3px; margin-bottom: 1.5rem;">
-                        Aggregate Statistics
-                    </h4>
-                    """, unsafe_allow_html=True)
-                    
-                    # Create 3 columns for the three metrics
-                    col_summary1, col_summary2, col_summary3 = st.columns(3)
-                    
-                    # DEPTH STATISTICS
-                    with col_summary1:
-                        st.markdown("<p style='font-weight: 500; color: #0066cc; margin-bottom: 1rem;'>💧 WATER DEPTH</p>", unsafe_allow_html=True)
-                        
-                        depth_mean = df['depth_mm'].mean()
-                        depth_median = df['depth_mm'].median()
-                        depth_std = df['depth_mm'].std()
-                        depth_min = df['depth_mm'].min()
-                        depth_max = df['depth_mm'].max()
-                        depth_range = depth_max - depth_min
-                        
-                        st.metric("Mean", f"{depth_mean:.1f} mm")
-                        st.metric("Median", f"{depth_median:.1f} mm")
-                        st.metric("Std Dev", f"{depth_std:.1f} mm")
-                        st.metric("Min", f"{depth_min:.1f} mm")
-                        st.metric("Max", f"{depth_max:.1f} mm")
-                        st.metric("Range", f"{depth_range:.1f} mm")
-                    
-                    # VELOCITY STATISTICS
-                    with col_summary2:
-                        st.markdown("<p style='font-weight: 500; color: #0066cc; margin-bottom: 1rem;'>⚡ FLOW VELOCITY</p>", unsafe_allow_html=True)
-                        
-                        vel_mean = df['velocity_mps'].mean()
-                        vel_median = df['velocity_mps'].median()
-                        vel_std = df['velocity_mps'].std()
-                        vel_min = df['velocity_mps'].min()
-                        vel_max = df['velocity_mps'].max()
-                        vel_range = vel_max - vel_min
-                        
-                        st.metric("Mean", f"{vel_mean:.3f} m/s")
-                        st.metric("Median", f"{vel_median:.3f} m/s")
-                        st.metric("Std Dev", f"{vel_std:.3f} m/s")
-                        st.metric("Min", f"{vel_min:.3f} m/s")
-                        st.metric("Max", f"{vel_max:.3f} m/s")
-                        st.metric("Range", f"{vel_range:.3f} m/s")
-                    
-                    # FLOW STATISTICS
-                    with col_summary3:
-                        st.markdown("<p style='font-weight: 500; color: #0066cc; margin-bottom: 1rem;'>🌊 FLOW RATE</p>", unsafe_allow_html=True)
-                        
-                        flow_mean = df['flow_lps'].mean()
-                        flow_median = df['flow_lps'].median()
-                        flow_std = df['flow_lps'].std()
-                        flow_min = df['flow_lps'].min()
-                        flow_max = df['flow_lps'].max()
-                        flow_range = flow_max - flow_min
-                        
-                        st.metric("Mean", f"{flow_mean:.1f} L/s")
-                        st.metric("Median", f"{flow_median:.1f} L/s")
-                        st.metric("Std Dev", f"{flow_std:.1f} L/s")
-                        st.metric("Min", f"{flow_min:.1f} L/s")
-                        st.metric("Max", f"{flow_max:.1f} L/s")
-                        st.metric("Range", f"{flow_range:.1f} L/s")
-                    
-                    # Distribution charts
-                    st.markdown("---")
-                    st.markdown("<h4 style='font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;'>Distribution Analysis</h4>", unsafe_allow_html=True)
-                    
-                    dist_col1, dist_col2 = st.columns(2)
-                    
-                    with dist_col1:
-                        fig_hist_depth = px.histogram(
-                            df, x="depth_mm",
-                            title="Depth Distribution",
-                            nbins=20,
-                            labels={"depth_mm": "Depth (mm)", "count": "Frequency"}
-                        )
-                        fig_hist_depth.update_traces(marker=dict(color="#1f77b4"))
-                        st.plotly_chart(fig_hist_depth, width="stretch", use_container_width=True)
-                    
-                    with dist_col2:
-                        fig_hist_flow = px.histogram(
-                            df, x="flow_lps",
-                            title="Flow Distribution",
-                            nbins=20,
-                            labels={"flow_lps": "Flow (L/s)", "count": "Frequency"}
-                        )
-                        fig_hist_flow.update_traces(marker=dict(color="#ff7f0e"))
-                        st.plotly_chart(fig_hist_flow, width="stretch", use_container_width=True)
-                    
-                    # Data collection info
-                    st.markdown("---")
-                    st.markdown("<h4 style='font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;'>Collection Summary</h4>", unsafe_allow_html=True)
-                    
-                    collection_col1, collection_col2, collection_col3, collection_col4 = st.columns(4)
-                    
-                    with collection_col1:
-                        st.metric("Total Points", len(df))
-                    
-                    with collection_col2:
-                        time_span_hours = (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 3600
-                        st.metric("Time Span", f"{time_span_hours:.1f}h")
-                    
-                    with collection_col3:
-                        collection_rate = len(df) / max(1, time_span_hours)
-                        st.metric("Collection Rate", f"{collection_rate:.1f}/hr")
-                    
-                    with collection_col4:
-                        completeness = (len(df) - df[['depth_mm', 'velocity_mps', 'flow_lps']].isna().sum().max()) / max(1, len(df)) * 100
-                        st.metric("Data Completeness", f"{completeness:.0f}%")
-            
-            # Data table
-            st.markdown("""
-            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
-                📋 Data Table
-            </h3>
-            """, unsafe_allow_html=True)
+                    st.plotly_chart(fig_hist_f, use_container_width=True)
+
+                st.markdown("---")
+                st.markdown("#### Collection Summary")
+                col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+                col_c1.metric("Total Records", len(df))
+                time_span_h = (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 3600
+                col_c2.metric("Time Span", f"{time_span_h:.1f} h")
+                col_c3.metric("Rate", f"{len(df) / max(1, time_span_h):.1f}/hr")
+                completeness = (len(df) - df[['depth_mm', 'velocity_mps', 'flow_lps']].isna().sum().max()) / max(1, len(df)) * 100
+                col_c4.metric("Completeness", f"{completeness:.0f}%")
+
+            # ── Data table & export ────────────────────────────────────────
+            st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
+            st.markdown('<p class="section-title">📋 Data Table & Export</p>', unsafe_allow_html=True)
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
-            st.dataframe(display_df, width="stretch", hide_index=True)
-            
-            # Export functionality
-            st.markdown("""
-            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
-                📥 Export Data
-            </h3>
-            """, unsafe_allow_html=True)
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                csv = display_df.to_csv(index=False)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+            col_dl1, col_dl2, _ = st.columns([1, 1, 2])
+            with col_dl1:
                 st.download_button(
-                    label="Download as CSV",
-                    data=csv,
-                    file_name=f"flow_data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
+                    "⬇ Download CSV",
+                    data=display_df.to_csv(index=False),
+                    file_name=f"flow_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
                 )
-            
-            with col2:
-                json_str = df.to_json(orient="records", date_format="iso")
+            with col_dl2:
                 st.download_button(
-                    label="Download as JSON",
-                    data=json_str,
-                    file_name=f"flow_data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json"
+                    "⬇ Download JSON",
+                    data=df.to_json(orient="records", date_format="iso"),
+                    file_name=f"flow_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    mime="application/json",
+                    use_container_width=True
                 )
         else:
-            st.info("No data available for the selected time range.")
-            
-            # Show Flow Graph section even without data
-            st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("""
-            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;">
-                📊 Flow Rate Analysis
-            </h2>
+            <div style="background: #ffffff; border: 1px solid #dfe7ef; border-radius: 18px; padding: 40px; text-align: center; margin: 2rem 0;">
+                <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
+                <h3 style="color: #233047; margin: 0 0 0.5rem;">No data in selected window</h3>
+                <p style="color: #6b7280; margin: 0;">Try a wider time window, or start the <code>monitor.py</code> service to collect data.</p>
+            </div>
             """, unsafe_allow_html=True)
-            
-            st.warning("""
-            ⚠️ **No data available to display graph**
-            
-            The flow graph will appear here once data is being collected. Current status:
-            - ✅ Device is reachable (see "Show Real-Time Data" in sidebar)
-            - ❌ No data points stored in database yet
-            
-            **To start seeing data:**
-            1. Ensure the monitor service is running (separate container/process)
-            2. OR enable `ALLOW_STREAMLIT_WRITES=true` in environment variables, then use "Store This Reading" button in sidebar
-            3. Wait for automatic collection (every 60 seconds when values change)
-            """)
     else:
-        st.warning("📊 **No measurements found in database**")
-        
         st.markdown("""
-        <div style="background: #fff3cd; padding: 20px; border-radius: 10px; border-left: 4px solid #ffc107; margin: 20px 0;">
-        <h3 style="margin-top: 0; color: #856404;">🔧 Quick Start Guide</h3>
-        
-        <p><strong>Your device is online!</strong> Click "Show Real-Time Data" in the sidebar to verify connectivity.</p>
-        
-        <p><strong>To start seeing historical data and graphs:</strong></p>
-        
-        <p><strong>Option 1: Run the Monitor Service</strong> (Recommended for production)</p>
-        <ul>
-            <li>Start the monitor service: <code>python monitor.py</code></li>
-            <li>Or use Docker: <code>docker-compose up -d</code></li>
-            <li>Data will be collected automatically every 60 seconds</li>
-        </ul>
-        
-        <p><strong>Option 2: Manual Data Storage</strong> (Quick testing)</p>
-        <ul>
-            <li>Set environment variable: <code>ALLOW_STREAMLIT_WRITES=true</code></li>
-            <li>Restart the app</li>
-            <li>Click "Show Real-Time Data" then "Store This Reading" in the sidebar</li>
-            <li>Repeat a few times to build up data points</li>
-        </ul>
-        
-        <p style="margin-bottom: 0;"><strong>Once data is stored:</strong> The flow graph and analytics will appear automatically!</p>
+        <div style="background: #ffffff; border: 1px solid #dfe7ef; border-radius: 18px; padding: 40px; text-align: center; margin: 2rem 0;">
+            <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
+            <h3 style="color: #233047; margin: 0 0 0.5rem;">Awaiting first reading</h3>
+            <p style="color: #6b7280; margin: 0 0 1.5rem;">No measurements have been stored yet.</p>
+            <p style="color: #6b7280; font-size: 0.9rem;">Run <code>python monitor.py</code> or <code>docker-compose up</code> to start collecting data automatically.</p>
         </div>
         """, unsafe_allow_html=True)
 else:
     st.info("👈 Select a device from the sidebar to view data.")
 
-# Footer
-st.markdown("---")
-st.markdown(
-    f"<small>Last update: {datetime.now(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z')} | "
-    f"Timezone: {DEFAULT_TZ}</small>",
-    unsafe_allow_html=True
-)
+# ── Footer ──────────────────────────────────────────────────────────────────
+now_footer = datetime.now(pytz.timezone(DEFAULT_TZ))
+st.markdown(f"""
+<div class="app-footer">
+    <span class="app-footer-brand">e-flow™ by EDS</span>
+    <span class="app-footer-meta">
+        🕐 {now_footer.strftime('%Y-%m-%d %H:%M %Z')} &nbsp;·&nbsp;
+        Timezone: {DEFAULT_TZ} &nbsp;·&nbsp;
+        Monitor service: {'enabled' if MONITOR_ENABLED else 'disabled'}
+    </span>
+</div>
+""", unsafe_allow_html=True)
