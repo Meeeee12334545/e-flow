@@ -67,20 +67,8 @@ def _bg_collect_once():
 
 
 def _bg_collection_worker():
-    """Daemon thread: collect data every 60 seconds indefinitely."""
-    logger.info("Background collection thread started – interval 60 s")
-    while True:
-        try:
-            _bg_collect_once()
-        except Exception as exc:
-            logger.error(f"BG collection worker error: {exc}")
-        _time_module.sleep(60)
-
-
-@st.cache_resource
-def start_background_collection():
-    """Start the background collection thread exactly once per app instance."""
-    # Ensure Playwright is installed before the thread tries to use it
+    """Daemon thread: install Playwright if needed, then collect data every 60 s."""
+    # Install Playwright browsers in the background so the UI is never blocked
     try:
         subprocess.run(
             [sys.executable, "-m", "playwright", "install-deps", "chromium"],
@@ -92,11 +80,32 @@ def start_background_collection():
         )
     except Exception:
         pass
+    logger.info("Background collection thread started – interval 60 s")
+    while True:
+        try:
+            _bg_collect_once()
+        except Exception as exc:
+            logger.error(f"BG collection worker error: {exc}")
+        _time_module.sleep(60)
+
+
+@st.cache_resource
+def start_background_collection():
+    """Start the background collection thread exactly once per app instance.
+    Returns immediately so the UI is never blocked by browser installation."""
     t = threading.Thread(target=_bg_collection_worker, daemon=True, name="eflow-bg-collector")
     t.start()
     logger.info("✅ Background data collection thread launched")
     return {"started_at": datetime.now().isoformat(), "interval_s": 60}
 
+
+# Page config MUST be the first Streamlit command
+st.set_page_config(
+    page_title="e-flow | EDS Hydrological Analytics",
+    page_icon="💧",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Launch background collection (cached – only runs once per Streamlit worker)
 _bg_status = start_background_collection()
@@ -109,51 +118,48 @@ if not is_authenticated():
     login_page()
     st.stop()
 
-st.set_page_config(
-    page_title="e-flow | EDS Hydrological Analytics",
-    page_icon="💧",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # ── EDS professional styling ────────────────────────────────────────────────
 st.markdown("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    /* ── Material Symbols – ensure icon font renders, not text ── */
-    .material-symbols-rounded {
+    /* ── Font imports (more reliable than <link> tags in Streamlit) ── */
+    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    /* ── Global UI font (excludes icon elements) ── */
+    body, p, div, input, select, textarea, button,
+    h1, h2, h3, h4, h5, h6, li, td, th, label {
+        font-family: 'Inter', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── Material Symbols: all icon elements get the icon font ──
+       Placed AFTER the global font rule; attribute selector (0,1,0)
+       beats tag/universal selectors, so this always wins. ── */
+    .material-symbols-rounded,
+    [data-testid="stIconMaterial"] {
         font-family: 'Material Symbols Rounded' !important;
-        font-weight: normal;
-        font-style: normal;
-        font-size: 20px;
-        line-height: 1;
-        letter-spacing: normal;
-        text-transform: none;
+        font-weight: normal !important;
+        font-style: normal !important;
+        font-size: 20px !important;
+        line-height: 1 !important;
+        letter-spacing: normal !important;
+        text-transform: none !important;
         display: inline-block;
         white-space: nowrap;
         word-wrap: normal;
         direction: ltr;
-        font-feature-settings: 'liga';
+        font-feature-settings: 'liga' 1;
         -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Hide Streamlit sidebar nav collapse button icon artefacts ── */
-    [data-testid="stSidebarNavCollapseButton"] span,
+    /* ── Clip Streamlit's sidebar collapse/nav icon to prevent text overflow ── */
+    [data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
     [data-testid="stSidebarNavCollapseButton"] [data-testid="stIconMaterial"] {
         overflow: hidden;
-        width: 22px;
-        height: 22px;
+        max-width: 24px;
+        max-height: 24px;
         display: inline-block;
-    }
-
-    /* ── Global font ── */
-    *, body, p, span, div, input, select, textarea, button {
-        font-family: 'Inter', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
     }
 
     /* ── EDS top header bar ── */
@@ -522,7 +528,7 @@ st.markdown("""
 <div class="eds-header">
     <div>
         <h1>💧 e-flow</h1>
-        <div class="eds-subtitle">by EDS — Environmental &amp; Data Solutions &nbsp;|&nbsp;
+        <div class="eds-subtitle">by EDS — Environmental Data Services &nbsp;|&nbsp;
             <a href="https://www.e-d-s.com.au" target="_blank"
                style="color:#ffc20e; text-decoration:none; font-weight:500;">www.e-d-s.com.au</a>
         </div>
@@ -680,19 +686,20 @@ with st.sidebar:
         st.metric("Stations", db.get_device_count())
     with col2:
         st.metric("Records", total_measurements)
-    latest_rows = db.get_measurements(limit=1)
-    if latest_rows:
+    # Show last record for the currently selected device (not global)
+    device_latest = db.get_measurements(device_id=selected_device_id, limit=1) if selected_device_id else []
+    if device_latest:
         try:
-            ts_raw = latest_rows[0]["timestamp"]
+            ts_raw = device_latest[0]["timestamp"]
             latest_ts = pd.to_datetime(ts_raw)
             if latest_ts.tzinfo is None:
                 latest_ts = latest_ts.tz_localize(pytz.utc)
             local_ts = latest_ts.astimezone(pytz.timezone(DEFAULT_TZ))
-            st.caption(f"Last saved: {local_ts.strftime('%d/%m/%Y %H:%M:%S')}")
+            st.caption(f"Last record: {local_ts.strftime('%d/%m/%Y %H:%M')} AEST")
         except Exception:
-            st.caption(f"Last saved: {latest_rows[0]['timestamp']}")
-    elif total_measurements == 0:
-        st.caption("Waiting for first collection cycle…")
+            st.caption(f"Last record: {device_latest[0]['timestamp']}")
+    else:
+        st.caption("No data yet for this device")
 
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
@@ -1283,7 +1290,7 @@ else:
 st.markdown(
     f"""<div class="eds-footer">
         e-flow &copy; {datetime.now().year} &nbsp;·&nbsp;
-        <a href="https://www.e-d-s.com.au" target="_blank">EDS — Environmental &amp; Data Solutions</a>
+        <a href="https://www.e-d-s.com.au" target="_blank">EDS — Environmental Data Services</a>
         &nbsp;·&nbsp; {datetime.now(pytz.timezone(DEFAULT_TZ)).strftime('%d/%m/%Y %H:%M %Z')}
         &nbsp;·&nbsp; Auto-collection active
     </div>""",

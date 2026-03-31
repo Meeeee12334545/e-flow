@@ -130,7 +130,7 @@ def render_auth_header():
                     unsafe_allow_html=True,
                 )
             with col2:
-                if st.button("⏏", key="logout_btn", help="Logout"):
+                if st.button("✕", key="logout_btn", help="Logout"):
                     logout()
             
             # Admin quick links

@@ -60,3 +60,4 @@ htmlcov/
 # Node (if using frontend tools)
 node_modules/
 package-lock.json
+flow_data.db
