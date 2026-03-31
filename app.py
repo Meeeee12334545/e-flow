@@ -764,11 +764,11 @@ if page_mode == 'Simplified View':
                 st.info('No data for last 24 hours. Showing all available data below.')
 
             # Download ALL data as CSV
-            csv_data = df_all[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
-            csv_data.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
+            export_df = df_all[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
+            export_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             st.download_button(
                 f'⬇️ Download ALL Data as CSV ({len(df_all)} records)',
-                data=csv_data.to_csv(index=False),
+                data=export_df.to_csv(index=False),
                 file_name=f'{selected_device_id}_all_data.csv',
                 mime='text/csv',
                 use_container_width=True,
@@ -831,17 +831,17 @@ if selected_device_id:
 
             # ── Download ALL data (single CSV) ───────────────────────────
             all_measurements = db.get_measurements(device_id=selected_device_id, limit=100000)
-            all_df = pd.DataFrame(all_measurements) if all_measurements else df.copy()
-            all_df_display = all_df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
-            all_df_display.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
-            csv_all = all_df_display.to_csv(index=False)
-            st.download_button(
-                label=f"⬇️ Download ALL data as CSV ({len(all_df)} records)",
-                data=csv_all,
-                file_name=f"eflow_{selected_device_id}_all_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
+            if all_measurements:
+                all_df = pd.DataFrame(all_measurements)
+                all_df_display = all_df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
+                all_df_display.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
+                st.download_button(
+                    label=f"⬇️ Download ALL data as CSV ({len(all_df)} records)",
+                    data=all_df_display.to_csv(index=False),
+                    file_name=f"eflow_{selected_device_id}_all_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
 
             st.markdown("<br>", unsafe_allow_html=True)
 

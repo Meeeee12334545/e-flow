@@ -145,7 +145,7 @@ def render_auth_header():
                         st.switch_page("pages/profile.py")
             else:
                 st.markdown("---")
-                if st.button("👤 My Profile", use_container_width=True, key="profile_btn"):
+                if st.button("👤 My Profile", use_container_width=True, key="my_profile_btn"):
                     st.switch_page("pages/profile.py")
         else:
             st.markdown("*Not logged in*")
