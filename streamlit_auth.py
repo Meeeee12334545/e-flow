@@ -4,6 +4,7 @@ Streamlit Authentication UI Module
 Handles login/logout, session management, and auth state in Streamlit.
 """
 
+import html
 import streamlit as st
 from auth import AuthDatabase
 
@@ -125,8 +126,8 @@ def render_auth_header():
             col1, col2 = st.columns([4, 1])
             with col1:
                 st.markdown(
-                    f"<div style='font-size:0.9rem; font-weight:600; color:#002f6c;'>{user['username']}</div>"
-                    f"<div style='font-size:0.75rem; color:#6b7a99;'>{role_badge}</div>",
+                    f"<div style='font-size:0.9rem; font-weight:600; color:#002f6c;'>{html.escape(user['username'])}</div>"
+                    f"<div style='font-size:0.75rem; color:#6b7a99;'>{html.escape(role_badge)}</div>",
                     unsafe_allow_html=True,
                 )
             with col2:
