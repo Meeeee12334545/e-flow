@@ -13,6 +13,7 @@ import pandas as pd
 import pytz
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from database import FlowDatabase
 from scraper import DataScraper
@@ -643,25 +644,119 @@ if page_mode == 'Simplified View':
             df = pd.DataFrame(measurements)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             latest = df.iloc[-1]
+            now_local = datetime.now(pytz.timezone(DEFAULT_TZ))
 
-            st.metric('Latest Depth', f"{latest['depth_mm']:.1f} mm" if pd.notna(latest['depth_mm']) else 'N/A')
-            st.metric('Latest Velocity', f"{latest['velocity_mps']:.3f} m/s" if pd.notna(latest['velocity_mps']) else 'N/A')
-            st.metric('Latest Flow', f"{latest['flow_lps']:.1f} L/s" if pd.notna(latest['flow_lps']) else 'N/A')
+            st.markdown("""
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 1.5rem;">
+                <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
+                    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Depth</p>
+                    <p style="font-size: 2.6rem; color: #0f4c81; margin: 0; font-weight: 700;">{f'{latest['depth_mm']:.1f}' if pd.notna(latest['depth_mm']) else 'N/A'}</p>
+                    <span style="color: #475569; font-size: 0.95rem;">mm</span>
+                </div>
+                <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
+                    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Velocity</p>
+                    <p style="font-size: 2.6rem; color: #047c3d; margin: 0; font-weight: 700;">{f'{latest['velocity_mps']:.3f}' if pd.notna(latest['velocity_mps']) else 'N/A'}</p>
+                    <span style="color: #475569; font-size: 0.95rem;">m/s</span>
+                </div>
+                <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
+                    <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Flow</p>
+                    <p style="font-size: 2.6rem; color: #b45309; margin: 0; font-weight: 700;">{f'{latest['flow_lps']:.1f}' if pd.notna(latest['flow_lps']) else 'N/A'}</p>
+                    <span style="color: #475569; font-size: 0.95rem;">L/s</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            st.subheader('Time Series (last 24h)')
-            cutoff = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=24)
-            df24 = df[df['timestamp'] >= cutoff]
-            if not df24.empty:
-                chart = px.line(df24, x='timestamp', y=['depth_mm', 'velocity_mps', 'flow_lps'], markers=True)
-                chart.update_layout(legend_title_text='Metric')
-                st.plotly_chart(chart, use_container_width=True)
-            else:
-                st.info('No data for last 24 hours.')
+            st.markdown("""
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.03em;">24-hour performance</h2>
+                    <p style="margin: 0.35rem 0 0 0; color: #475569;">Adjust the time window to compare recent flow, depth and velocity trends.</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            time_window_options = [
+                (24, '24 hours'),
+                (48, '2 days'),
+                (72, '3 days'),
+                (168, '7 days'),
+                (720, '30 days')
+            ]
+            selected_window = st.selectbox(
+                'View period',
+                options=time_window_options,
+                format_func=lambda x: x[1],
+                index=0,
+                key='simplified_view_window'
+            )[0]
+
+            cutoff = now_local - timedelta(hours=selected_window)
+            df_window = df[df['timestamp'] >= cutoff].sort_values('timestamp')
+            show_note = False
+            if df_window.empty:
+                show_note = True
+                df_window = df.sort_values('timestamp')
+
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+            fig.add_trace(
+                go.Scatter(
+                    x=df_window['timestamp'],
+                    y=df_window['flow_lps'],
+                    mode='lines+markers',
+                    name='Flow (L/s)',
+                    line=dict(color='#0f4c81', width=3),
+                    marker=dict(size=6)
+                ),
+                secondary_y=False
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=df_window['timestamp'],
+                    y=df_window['depth_mm'],
+                    mode='lines+markers',
+                    name='Depth (mm)',
+                    line=dict(color='#047c3d', width=3, dash='dash'),
+                    marker=dict(size=6)
+                ),
+                secondary_y=False
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=df_window['timestamp'],
+                    y=df_window['velocity_mps'],
+                    mode='lines+markers',
+                    name='Velocity (m/s)',
+                    line=dict(color='#b45309', width=3, dash='dot'),
+                    marker=dict(size=6)
+                ),
+                secondary_y=True
+            )
+            fig.update_layout(
+                title=dict(text=f'Flow, Depth & Velocity - {selected_device_name}', x=0.01, xanchor='left'),
+                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                hovermode='x unified',
+                margin=dict(l=40, r=40, t=80, b=40),
+                template='plotly_white',
+                height=520,
+                font=dict(family='Inter, sans-serif', color='#1f2937')
+            )
+            fig.update_xaxes(title_text='Time')
+            fig.update_yaxes(title_text='Flow / Depth', secondary_y=False)
+            fig.update_yaxes(title_text='Velocity (m/s)', secondary_y=True)
+            st.plotly_chart(fig, use_container_width=True)
+
+            if show_note:
+                st.info(
+                    f'No data was captured in the last {selected_window} hours. Showing the latest available history instead.'
+                )
 
             csv_data = df.to_csv(index=False)
             json_data = df.to_json(orient='records', date_format='iso')
-            st.download_button('Download CSV', data=csv_data, file_name=f'{selected_device_id}_data.csv', mime='text/csv')
-            st.download_button('Download JSON', data=json_data, file_name=f'{selected_device_id}_data.json', mime='application/json')
+            col_download1, col_download2 = st.columns(2)
+            with col_download1:
+                st.download_button('Download CSV', data=csv_data, file_name=f'{selected_device_id}_data.csv', mime='text/csv')
+            with col_download2:
+                st.download_button('Download JSON', data=json_data, file_name=f'{selected_device_id}_data.json', mime='application/json')
         else:
             st.warning('No measurements available yet. Run the monitor service or store readings from real-time view.')
     else:
