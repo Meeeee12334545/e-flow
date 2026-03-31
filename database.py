@@ -85,8 +85,12 @@ class FlowDatabase:
             cur.close()
             conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
+
+            # Enable WAL mode for better concurrency and reliability
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
 
             # Create table for device information
             cursor.execute(
@@ -147,7 +151,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             try:
                 cursor.execute(
@@ -163,8 +167,8 @@ class FlowDatabase:
 
     def add_measurement(self, device_id: str, timestamp: datetime,
                         depth_mm: float = None, velocity_mps: float = None,
-                        flow_lps: float = None):
-        """Add a measurement record."""
+                        flow_lps: float = None) -> bool:
+        """Add a measurement record. Returns True if a new row was inserted."""
         if self.use_postgres:
             conn = psycopg2.connect(self.pg_dsn)
             cur = conn.cursor()
@@ -178,11 +182,12 @@ class FlowDatabase:
                     (device_id, timestamp, depth_mm, velocity_mps, flow_lps),
                 )
                 conn.commit()
+                return cur.rowcount > 0
             finally:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             try:
                 cursor.execute(
@@ -194,6 +199,7 @@ class FlowDatabase:
                     (device_id, timestamp, depth_mm, velocity_mps, flow_lps),
                 )
                 conn.commit()
+                return cursor.rowcount > 0
             finally:
                 conn.close()
 
@@ -232,7 +238,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             if device_id:
@@ -275,7 +281,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM devices ORDER BY device_name")
@@ -296,7 +302,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM devices")
             count = cursor.fetchone()[0]
@@ -316,7 +322,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM measurements")
             count = cursor.fetchone()[0]
@@ -336,11 +342,26 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute("DELETE FROM measurements")
             cursor.execute("DELETE FROM devices")
             conn.commit()
+            conn.close()
+
+    def flush_db(self):
+        """Force a WAL checkpoint to ensure all data is written to the main database file.
+
+        Call this after a batch of writes (e.g. at the end of a monitor cycle) to guarantee
+        that data is visible to other processes and is not only in the WAL file.
+        """
+        if self.use_postgres:
+            return  # Postgres handles durability natively
+        conn = sqlite3.connect(self.db_path, timeout=30)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(FULL)")
+            conn.commit()
+        finally:
             conn.close()
 
 

@@ -351,7 +351,7 @@ def fetch_latest_reading(device_id: str):
 
     # Display-only; never stored
     timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
-    message = "✓ Real-time data retrieved (display only, not saved to database)"
+    message = "✓ Real-time data retrieved (monitor service saves data automatically to database)"
     return True, message, timestamp, payload
 
 
@@ -374,7 +374,7 @@ with col2:
     st.markdown("""
     <div class="status-card">
         <div class="status-pill">LIVE</div>
-        <div class="status-note">Auto-sync enabled • Dashboard view only</div>
+        <div class="status-note">Auto-sync enabled • Data saved automatically</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -511,7 +511,7 @@ with st.sidebar:
                     </div>
                 </div>
                 <div style="margin-top: 8px; font-size: 0.7rem; color: #999; text-align: center;">
-                    ⚠️ Display only - Not stored in database
+                    ✓ Data is automatically saved to the database by the monitor service
                 </div>
             </div>
             """, unsafe_allow_html=True)
