@@ -29,40 +29,41 @@ DATABASE_PATH = Path(__file__).parent / "flow_data.db"
 
 
 class AuthDatabase:
-        def reset_password(self, username: str, new_password: str) -> bool:
-            """Reset the password for a user by username. Returns True if successful."""
-            password_hash, _ = self.hash_password(new_password)
-            if self.use_postgres:
-                import psycopg2
-                conn = psycopg2.connect(self.pg_dsn)
-                cur = conn.cursor()
-                try:
-                    cur.execute(
-                        """
-                        UPDATE users SET password_hash = %s WHERE username = %s
-                        """,
-                        (password_hash, username),
-                    )
-                    conn.commit()
-                    return cur.rowcount > 0
-                finally:
-                    cur.close()
-                    conn.close()
-            else:
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
-                try:
-                    cursor.execute(
-                        """
-                        UPDATE users SET password_hash = ? WHERE username = ?
-                        """,
-                        (password_hash, username),
-                    )
-                    conn.commit()
-                    return cursor.rowcount > 0
-                finally:
-                    conn.close()
     """User authentication and authorization database."""
+
+    def reset_password(self, username: str, new_password: str) -> bool:
+        """Reset the password for a user by username. Returns True if successful."""
+        password_hash, _ = self.hash_password(new_password)
+        if self.use_postgres:
+            import psycopg2
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    UPDATE users SET password_hash = %s WHERE username = %s
+                    """,
+                    (password_hash, username),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE users SET password_hash = ? WHERE username = ?
+                    """,
+                    (password_hash, username),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
 
     def __init__(self, db_path: str = None):
         self.use_postgres = bool(DATABASE_URL and _PG_AVAILABLE)
