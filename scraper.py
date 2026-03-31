@@ -524,7 +524,8 @@ async def main():
             device_name="FIT100 Main Inflow Lismore STP",
             depth_mm=0.0,
             velocity_mps=0.0,
-            flow_lps=0.0
+            flow_lps=0.0,
+            allow_storage=True
         )
         
         logger.info("Data processed successfully")
