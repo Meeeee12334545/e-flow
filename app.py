@@ -3,6 +3,7 @@ import os
 import sys
 import subprocess
 import threading
+import time as _time_module
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
@@ -20,6 +21,86 @@ from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
 
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user
 
+# Setup logging before anything else
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Background data collection – runs every 60 s, always stores readings
+# ---------------------------------------------------------------------------
+
+def _bg_collect_once():
+    """Run one data-collection pass for every configured device."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        _db = FlowDatabase()
+        _scraper = DataScraper(_db)
+        for device_id, device_info in DEVICES.items():
+            try:
+                data = loop.run_until_complete(
+                    _scraper.fetch_monitor_data(
+                        device_info.get("url", MONITOR_URL),
+                        device_info.get("selectors"),
+                    )
+                )
+                if data and data.get("data"):
+                    payload = data["data"]
+                    stored = _scraper.store_measurement(
+                        device_id=device_id,
+                        device_name=device_info.get("name", device_id),
+                        depth_mm=payload.get("depth_mm"),
+                        velocity_mps=payload.get("velocity_mps"),
+                        flow_lps=payload.get("flow_lps"),
+                        allow_storage=True,
+                    )
+                    logger.info(
+                        f"BG collect {device_id}: stored={stored} "
+                        f"D={payload.get('depth_mm')} V={payload.get('velocity_mps')} F={payload.get('flow_lps')}"
+                    )
+                else:
+                    logger.warning(f"BG collect {device_id}: no data returned")
+            except Exception as exc:
+                logger.error(f"BG collect error for {device_id}: {exc}")
+    finally:
+        loop.close()
+
+
+def _bg_collection_worker():
+    """Daemon thread: collect data every 60 seconds indefinitely."""
+    logger.info("Background collection thread started – interval 60 s")
+    while True:
+        try:
+            _bg_collect_once()
+        except Exception as exc:
+            logger.error(f"BG collection worker error: {exc}")
+        _time_module.sleep(60)
+
+
+@st.cache_resource
+def start_background_collection():
+    """Start the background collection thread exactly once per app instance."""
+    # Ensure Playwright is installed before the thread tries to use it
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install-deps", "chromium"],
+            capture_output=True, timeout=120
+        )
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            capture_output=True, timeout=120
+        )
+    except Exception:
+        pass
+    t = threading.Thread(target=_bg_collection_worker, daemon=True, name="eflow-bg-collector")
+    t.start()
+    logger.info("✅ Background data collection thread launched")
+    return {"started_at": datetime.now().isoformat(), "interval_s": 60}
+
+
+# Launch background collection (cached – only runs once per Streamlit worker)
+_bg_status = start_background_collection()
+
 # Initialize authentication state
 init_auth_state()
 
@@ -28,237 +109,324 @@ if not is_authenticated():
     login_page()
     st.stop()
 
-# Ensure Playwright browsers are installed for Streamlit Cloud
-@st.cache_resource
-def ensure_playwright_installed():
-    """Install Playwright browsers if not already installed."""
-    try:
-        # Ensure system deps (libnspr4, libnss3, etc.) and browser are present
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install-deps", "chromium"],
-            capture_output=True,
-            timeout=120
-        )
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
-            capture_output=True,
-            timeout=120
-        )
-    except Exception as e:
-        pass  # Silent fail - monitoring happens elsewhere
-    return True
-
-# Install on startup (cached so only runs once)
-ensure_playwright_installed()
-
-# Setup logging before anything else
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Data collection runs in a separate monitor service/container.
-# This Streamlit app is read-only and visualizes stored data.
-
 st.set_page_config(
-    page_title="e-flow | Hydrological Analytics",
+    page_title="e-flow | EDS Hydrological Analytics",
+    page_icon="💧",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Professional styling with Helvetica Neue
+# ── EDS professional styling ────────────────────────────────────────────────
 st.markdown("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
-    * {
-        font-family: 'Helvetica Neue', 'Helvetica Neue Light', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+    /* ── Material Symbols – ensure icon font renders, not text ── */
+    .material-symbols-rounded {
+        font-family: 'Material Symbols Rounded' !important;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 20px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Hide Streamlit sidebar nav collapse button icon artefacts ── */
+    [data-testid="stSidebarNavCollapseButton"] span,
+    [data-testid="stSidebarNavCollapseButton"] [data-testid="stIconMaterial"] {
+        overflow: hidden;
+        width: 22px;
+        height: 22px;
+        display: inline-block;
+    }
+
+    /* ── Global font ── */
+    *, body, p, span, div, input, select, textarea, button {
+        font-family: 'Inter', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
-    
-    /* Main text styling */
-    body, p, span, div {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 300;
-        letter-spacing: 0.3px;
-        line-height: 1.6;
+
+    /* ── EDS top header bar ── */
+    .eds-header {
+        background: linear-gradient(135deg, #002f6c 0%, #01408f 100%);
+        color: #ffffff;
+        padding: 18px 28px;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 20px rgba(0,47,108,0.25);
+    }
+    .eds-header h1 {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #ffffff !important;
+        letter-spacing: -0.3px;
+    }
+    .eds-header .eds-subtitle {
+        color: rgba(255,255,255,0.8);
+        font-size: 0.9rem;
+        margin-top: 4px;
+        font-weight: 400;
+    }
+    .eds-header .eds-live-badge {
+        background: rgba(255,255,255,0.15);
+        border: 1px solid rgba(255,194,14,0.6);
+        border-radius: 20px;
+        padding: 6px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #ffc20e;
+        font-weight: 600;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+    .eds-live-dot {
+        width: 8px;
+        height: 8px;
+        background: #ffc20e;
+        border-radius: 50%;
+        animation: pulse-gold 1.5s infinite;
+        display: inline-block;
+    }
+    @keyframes pulse-gold {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    /* ── Sidebar ── */
+    section[data-testid="stSidebar"] {
+        background: #ffffff !important;
+        border-right: 1px solid #e8ecf4;
+    }
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 0 !important;
+    }
+    .sidebar-logo {
+        background: linear-gradient(135deg, #002f6c 0%, #01408f 100%);
+        padding: 18px 16px;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    .sidebar-logo h2 {
+        color: #ffffff !important;
+        font-size: 1.2rem !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        letter-spacing: 1px;
+    }
+    .sidebar-logo .sidebar-tagline {
+        color: #ffc20e;
+        font-size: 0.7rem;
+        font-weight: 500;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        margin-top: 3px;
+    }
+
+    /* ── Sidebar section labels ── */
+    .sidebar-section-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: #002f6c;
+        padding: 0 4px;
+        margin: 1.2rem 0 0.4rem 0;
+        border-left: 3px solid #ffc20e;
+        padding-left: 8px;
+    }
+
+    /* ── Station info card in sidebar ── */
+    .station-info-card {
+        background: #f4f7fc;
+        border: 1px solid #dce5f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin: 0.5rem 0 1rem 0;
+        font-size: 0.82rem;
+        line-height: 1.7;
         color: #333;
     }
-    
-    /* Headers */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        font-weight: 300;
-        letter-spacing: 0.3px;
-        margin-top: 0.8rem;
-        margin-bottom: 1rem;
+    .station-info-card strong {
         color: #002f6c;
+        font-weight: 600;
     }
-    
-    h1 {
-        font-size: 2.8rem;
-        font-weight: 300;
-        color: #002f6c;
-        letter-spacing: 0px;
-        margin-bottom: 1.2rem;
+
+    /* ── Auto-collect status pill ── */
+    .collect-status-active {
+        background: #e8f5e9;
+        border: 1px solid #81c784;
+        border-radius: 20px;
+        padding: 5px 12px;
+        font-size: 0.78rem;
+        color: #2e7d32;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 0.5rem;
     }
-    
-    h2 {
-        font-size: 2rem;
-        font-weight: 300;
-        color: #1a1a1a;
-        margin-top: 1.5rem;
-        margin-bottom: 1.2rem;
-        letter-spacing: 0.3px;
+
+    /* ── KPI metric cards ── */
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #dce5f0;
+        border-top: 4px solid #002f6c;
+        border-radius: 10px;
+        padding: 18px 20px;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,47,108,0.07);
+        transition: box-shadow 0.2s, transform 0.2s;
     }
-    
-    h3 {
-        font-size: 1.4rem;
-        font-weight: 300;
-        color: #2a2a2a;
-        letter-spacing: 0.3px;
-        margin-bottom: 0.8rem;
-    }
-    
-    /* Metric cards */
-    .metric-card {
-        background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
-        padding: 24px;
-        border-radius: 12px;
-        border: 1px solid #ced8e9;
-        border-left: 4px solid #002f6c;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-    }
-    
-    .metric-card:hover {
-        box-shadow: 0 8px 16px rgba(0, 102, 204, 0.12);
-        border-left-color: #0052a3;
+    .kpi-card:hover {
+        box-shadow: 0 6px 18px rgba(0,47,108,0.14);
         transform: translateY(-2px);
     }
-    
-    .metric-card h4 {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        font-weight: 300;
-        font-size: 0.9rem;
-        color: #666;
+    .kpi-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 1px;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin: 0 0 0.5rem 0;
+        color: #6b7a99;
+        margin-bottom: 6px;
     }
-    
-    /* Status indicators */
-    .status-active { 
-        color: #10b981; 
-        font-weight: 500;
-        font-size: 1.1rem;
-        letter-spacing: 0.5px;
+    .kpi-value {
+        font-size: 2.1rem;
+        font-weight: 700;
+        color: #002f6c;
+        line-height: 1.1;
     }
-    .status-idle { 
-        color: #f59e0b; 
-        font-weight: 500;
-        font-size: 1.1rem;
+    .kpi-unit {
+        font-size: 0.85rem;
+        font-weight: 400;
+        color: #8892a4;
+        margin-left: 3px;
     }
-    .status-error { 
-        color: #ef4444; 
-        font-weight: 500;
-        font-size: 1.1rem;
+
+    /* ── Section headings ── */
+    h1, h2, h3, h4, h5, h6 {
+        color: #002f6c;
+        font-weight: 600;
     }
-    
-    /* Dividers */
-    hr {
-        border: none;
-        height: 1px;
-        background: linear-gradient(to right, #e0e0e0 0%, transparent);
-        margin: 2rem 0;
-    }
-    
-    /* Input styling */
-    .stSelectbox, .stSlider, .stNumberInput, .stTextInput {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-    }
-    
-    /* Sidebar styling */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-    }
-    
-    section[data-testid="stSidebar"] h2 {
-        font-weight: 500;
-        margin-top: 1.5rem;
-        margin-bottom: 1rem;
-        color: #1a1a1a;
-        letter-spacing: 0.3px;
-    }
-    
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] button {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 500;
-        font-size: 0.95rem;
-        letter-spacing: 0.3px;
-    }
-    
-    /* Expander styling */
-    details > summary {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 500;
-        cursor: pointer;
-    }
-    
-    /* Caption styling */
-    .caption {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 300;
-        font-size: 0.9rem;
-        color: #666;
-        letter-spacing: 0.2px;
-    }
-    
-    /* Button styling */
-    button[kind="primary"] {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif !important;
-        font-weight: 500;
-        letter-spacing: 0.4px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%) !important;
-        color: white !important;
+    h2 { font-size: 1.5rem; margin: 1.4rem 0 0.8rem 0; }
+    h3 { font-size: 1.2rem; margin: 1.2rem 0 0.6rem 0; }
+
+    /* ── Download button ── */
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #002f6c 0%, #01408f 100%) !important;
+        color: #ffffff !important;
         border: none !important;
-        padding: 0.75rem 1.5rem !important;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0, 102, 204, 0.2);
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        padding: 0.55rem 1.2rem !important;
+        letter-spacing: 0.3px;
+        box-shadow: 0 2px 8px rgba(0,47,108,0.2);
     }
-    
-    button[kind="primary"]:hover {
-        box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4) !important;
+    .stDownloadButton > button:hover {
+        box-shadow: 0 4px 14px rgba(0,47,108,0.35) !important;
         transform: translateY(-1px);
     }
-    
-    /* Secondary buttons */
-    button[kind="secondary"] {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif !important;
-        font-weight: 400;
+
+    /* ── Primary button ── */
+    [data-testid="baseButton-primary"] {
+        background: linear-gradient(135deg, #002f6c 0%, #01408f 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
         letter-spacing: 0.3px;
-        border-radius: 8px;
-        border: 1px solid #ddd !important;
     }
-    
-    /* Info/Warning boxes */
+
+    /* ── Tabs ── */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 4px;
+        border-bottom: 2px solid #e8ecf4;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-weight: 500 !important;
+        font-size: 0.88rem !important;
+        padding: 8px 18px !important;
+        border-radius: 6px 6px 0 0 !important;
+        color: #6b7a99 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #002f6c !important;
+        background: #f4f7fc !important;
+        border-bottom: 2px solid #002f6c !important;
+    }
+
+    /* ── Alert boxes ── */
     .stAlert {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+        border-radius: 8px !important;
+        font-size: 0.88rem;
+    }
+
+    /* ── Metrics (native Streamlit) ── */
+    [data-testid="metric-container"] {
+        background: #f4f7fc;
         border-radius: 8px;
-        padding: 1rem;
-        font-weight: 300;
+        padding: 12px 16px;
+        border-left: 3px solid #002f6c;
     }
-    
-    /* Code blocks */
-    code {
-        font-family: 'Monaco', 'Courier New', monospace;
-        font-size: 0.9rem;
-        background-color: #f5f5f5;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
+
+    /* ── Divider ── */
+    hr {
+        border: none !important;
+        border-top: 1px solid #e8ecf4 !important;
+        margin: 1.5rem 0 !important;
     }
+
+    /* ── Footer ── */
+    .eds-footer {
+        text-align: center;
+        color: #9aa0b0;
+        font-size: 0.78rem;
+        padding: 1rem 0 0.5rem 0;
+        border-top: 1px solid #e8ecf4;
+        margin-top: 2rem;
+    }
+    .eds-footer a { color: #002f6c; text-decoration: none; font-weight: 500; }
+
+    /* ── Live real-time sidebar card ── */
+    .rt-card {
+        background: #f4f7fc;
+        border: 1px solid #dce5f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 0.8rem;
+    }
+    .rt-card-header {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: #6b7a99;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .rt-value-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 4px;
+        text-align: center;
+    }
+    .rt-val-label { font-size: 0.68rem; color: #9aa0b0; }
+    .rt-val-num { font-size: 1.1rem; font-weight: 700; color: #002f6c; }
+    .rt-val-unit { font-size: 0.65rem; color: #b0b8cc; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -349,201 +517,142 @@ def fetch_latest_reading(device_id: str):
     return True, message, timestamp, payload
 
 
-# Page header
-col1, col2 = st.columns([3, 1])
-with col1:
+# ── EDS Header Banner ───────────────────────────────────────────────────────
+st.markdown("""
+<div class="eds-header">
+    <div>
+        <h1>💧 e-flow</h1>
+        <div class="eds-subtitle">by EDS — Environmental &amp; Data Solutions &nbsp;|&nbsp;
+            <a href="https://www.e-d-s.com.au" target="_blank"
+               style="color:#ffc20e; text-decoration:none; font-weight:500;">www.e-d-s.com.au</a>
+        </div>
+        <div style="color:rgba(255,255,255,0.65); font-size:0.8rem; margin-top:4px;">
+            Sewer Flow Monitoring &nbsp;·&nbsp; Depth &nbsp;·&nbsp; Velocity &nbsp;·&nbsp; Flow Rate
+        </div>
+    </div>
+    <div class="eds-live-badge">
+        <span class="eds-live-dot"></span>
+        AUTO-COLLECT ACTIVE
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── Sidebar ──────────────────────────────────────────────────────────────────
+with st.sidebar:
+    # EDS logo strip
     st.markdown("""
-    <h1 style="margin-bottom: 0; font-weight: 700; letter-spacing: -0.5px; font-size: 3rem; color: #002f6c;">
-        e-flow by EDS
-    </h1>
-    <p style="margin-top: 0.2rem; color: #444; font-size: 1.1rem; font-weight: 400; letter-spacing: 0.5px;">
-        Sewer Flow Monitoring | Depth • Velocity • Flow
-        <br><small style="color:#666;">www.e-d-s.com.au</small>
-    </p>
-    """, unsafe_allow_html=True)
-with col2:
-    st.markdown("""
-    <div style="text-align: right; padding-top: 0.5rem;">
-        <span class="status-active" style="font-size: 1.2rem;">●</span>
-        <span style="color: #10b981; font-weight: 500; margin-left: 0.5rem;">LIVE</span>
+    <div class="sidebar-logo">
+        <h2>e-flow</h2>
+        <div class="sidebar-tagline">by EDS — e-d-s.com.au</div>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("---")
-
-
-# Sidebar configuration
-with st.sidebar:
-    # Add authentication header
+    # Auth header (logout / admin links)
     render_auth_header()
 
-    st.markdown("""
-    <h2 style="font-weight: 500; letter-spacing: 0.3px;">EDS Experience Mode</h2>
-    """, unsafe_allow_html=True)
-
+    # ── View mode ──
+    st.markdown('<div class="sidebar-section-label">View Mode</div>', unsafe_allow_html=True)
     page_mode = st.selectbox(
         "Interface Mode",
         options=["Simplified View", "Full Dashboard", "EDS Product Overview"],
         index=0,
-        help="Simplified View for standard users, Full Dashboard for power users, EDS Product Overview for sales demos."
+        help="Simplified View for standard users, Full Dashboard for power users, EDS Product Overview for sales demos.",
+        label_visibility="collapsed",
     )
     st.session_state['page_mode'] = page_mode
 
-    st.markdown("""
-    <h2 style="font-weight: 500; letter-spacing: 0.3px;">Configuration & Status</h2>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div style="background: #f0f7ff; border-left: 3px solid #002f6c; padding: 12px; border-radius: 6px; margin-bottom: 1.5rem;">
-        <p style="font-size: 0.9rem; margin: 0; color: #1a1a1a; line-height: 1.6;">
-            <strong style="font-weight: 500;">Device Status:</strong> Connected & streaming<br>
-            <span style="color: #666; font-size: 0.85rem;">• Update interval: 60 seconds</span><br>
-            <span style="color: #666; font-size: 0.85rem;">• Protocol: Direct device telemetry</span><br>
-            <span style="color: #666; font-size: 0.85rem;">• Storage: Local data repository</span>
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Monitor status (app is read-only; collection handled by monitor service)
-    if MONITOR_ENABLED:
-        st.success("✔ Auto-collect: Enabled (monitor service). Dashboard is read-only.")
-    else:
-        st.info("ℹ️ Auto-collect: Disabled here. Start the monitor service to collect data.")
-    
-    # Build device mapping from database
+    # ── Device selector ──
+    st.markdown('<div class="sidebar-section-label">Device</div>', unsafe_allow_html=True)
+
     devices = db.get_devices()
-    
-    # Filter devices based on user's access rights
     devices = filter_devices_for_user(devices)
-    
     device_names = {d['device_name']: d['device_id'] for d in devices}
-    
+
     if not device_names:
         st.warning("⚠️ No devices assigned to your account")
         if is_admin():
-            st.info("As an admin, go to the Admin Panel to manage device assignments")
+            st.info("Go to Admin Panel to assign devices")
         st.stop()
-    
+
     selected_device_name: str = st.selectbox(
         "Select Device",
         options=sorted(device_names.keys()),
         key="device_selector",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
     selected_device_id = device_names[selected_device_name]
-    
-    # Get selected device info
+
+    # Station details (plain card, no expander to avoid icon artefacts)
     device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
     if device_info:
-        with st.expander("📋 Station Details", expanded=False):
-            st.markdown(f"""
-            <div style="font-family: 'Helvetica Neue', sans-serif; font-weight: 300; line-height: 1.8;">
-                <p><strong style="font-weight: 500;">Station ID</strong><br><code>{device_info['device_id']}</code></p>
-                <p><strong style="font-weight: 500;">Location</strong><br>{device_info['location'] or 'Not specified'}</p>
-                <p><strong style="font-weight: 500;">Initialized</strong><br><code>{device_info['created_at']}</code></p>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="station-info-card">
+            <strong>Station ID:</strong> {device_info['device_id']}<br>
+            <strong>Location:</strong> {device_info['location'] or 'Not specified'}<br>
+            <strong>Since:</strong> {str(device_info['created_at'])[:10]}
+        </div>
+        """, unsafe_allow_html=True)
 
-        # Manual refresh to pull the newest reading into the app (fast API path)
-        refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
-        
-        if refresh_clicked:
-            success, message, ts, payload = fetch_latest_reading(selected_device_id)
-            if success and payload:
-                st.session_state['realtime_data'] = {
-                    'depth_mm': payload.get("depth_mm"),
-                    'velocity_mps': payload.get("velocity_mps"),
-                    'flow_lps': payload.get("flow_lps"),
-                    'timestamp': ts
-                }
-                ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
-                st.success(f"{message} at {ts_str}")
-            else:
-                st.error(message)
-        
-        # Display real-time data if available
-        if 'realtime_data' in st.session_state:
-            rtd = st.session_state['realtime_data']
-            depth = rtd.get('depth_mm')
-            velocity = rtd.get('velocity_mps')
-            flow = rtd.get('flow_lps')
-            ts = rtd.get('timestamp')
-            
-            # Determine if we have valid data (green) or no data (red)
-            has_data = depth is not None or velocity is not None or flow is not None
-            bg_color = "linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%)" if has_data else "linear-gradient(135deg, #ffebee 0%, #ffffff 100%)"
-            border_color = "#4caf50" if has_data else "#f44336"
-            text_color = "#2e7d32" if has_data else "#c62828"
-            status_icon = "🟢" if has_data else "🔴"
-            
-            st.markdown(f"""
-            <div style="background: {bg_color}; 
-                        padding: 15px; border-radius: 10px; border: 2px solid {border_color};
-                        margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <span style="font-size: 0.85rem; color: {text_color}; font-weight: 500;">{status_icon} LIVE DATA</span>
-                    <span style="font-size: 0.75rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
+    # ── Auto-collect status ──
+    st.markdown(
+        '<div class="collect-status-active">✔ Auto-collecting every 60 s</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Live data refresh ──
+    refresh_clicked = st.button("🔄 Show Real-Time Data", type="primary", key="refresh_button",
+                                use_container_width=True)
+    if refresh_clicked:
+        success, message, ts, payload = fetch_latest_reading(selected_device_id)
+        if success and payload:
+            st.session_state['realtime_data'] = {
+                'depth_mm': payload.get("depth_mm"),
+                'velocity_mps': payload.get("velocity_mps"),
+                'flow_lps': payload.get("flow_lps"),
+                'timestamp': ts,
+            }
+            ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%H:%M:%S %Z') if ts else ""
+            st.success(f"Live data retrieved at {ts_str}")
+        else:
+            st.error(message)
+
+    if 'realtime_data' in st.session_state:
+        rtd = st.session_state['realtime_data']
+        depth_rt = rtd.get('depth_mm')
+        vel_rt = rtd.get('velocity_mps')
+        flow_rt = rtd.get('flow_lps')
+        ts_rt = rtd.get('timestamp')
+        has_rt = depth_rt is not None or vel_rt is not None or flow_rt is not None
+        status_col = "#2e7d32" if has_rt else "#c62828"
+        st.markdown(f"""
+        <div class="rt-card">
+            <div class="rt-card-header">
+                <span style="color:{status_col};">{'● LIVE' if has_rt else '● NO DATA'}</span>
+                <span>{ts_rt.strftime('%H:%M:%S') if ts_rt else ''}</span>
+            </div>
+            <div class="rt-value-row">
+                <div>
+                    <div class="rt-val-label">Depth</div>
+                    <div class="rt-val-num">{f'{depth_rt:.1f}' if depth_rt is not None else '—'}</div>
+                    <div class="rt-val-unit">mm</div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <div style="text-align: center;">
-                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Depth</div>
-                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
-                        <div style="font-size: 0.7rem; color: #888;">mm</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Velocity</div>
-                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
-                        <div style="font-size: 0.7rem; color: #888;">m/s</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Flow</div>
-                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
-                        <div style="font-size: 0.7rem; color: #888;">L/s</div>
-                    </div>
+                <div>
+                    <div class="rt-val-label">Velocity</div>
+                    <div class="rt-val-num">{f'{vel_rt:.3f}' if vel_rt is not None else '—'}</div>
+                    <div class="rt-val-unit">m/s</div>
                 </div>
-                <div style="margin-top: 8px; font-size: 0.7rem; color: #999; text-align: center;">
-                    ⚠️ Display only - Not stored in database
+                <div>
+                    <div class="rt-val-label">Flow</div>
+                    <div class="rt-val-num">{f'{flow_rt:.1f}' if flow_rt is not None else '—'}</div>
+                    <div class="rt-val-unit">L/s</div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
-            # Optional: allow one-click store from Streamlit (for Cloud testing)
-            allow_streamlit_writes = os.getenv("ALLOW_STREAMLIT_WRITES", "").lower() in ("1", "true", "yes")
-            if allow_streamlit_writes and has_data:
-                col_store, _ = st.columns([1,3])
-                with col_store:
-                    if st.button("Store This Reading (admin)", key="store_now_button"):
-                        try:
-                            writer = DataScraper(db)
-                            stored = writer.store_measurement(
-                                device_id=selected_device_id,
-                                device_name=selected_device_name,
-                                depth_mm=depth,
-                                velocity_mps=velocity,
-                                flow_lps=flow,
-                                allow_storage=True
-                            )
-                            if stored:
-                                st.success("✅ Reading stored to database")
-                            else:
-                                st.info("ℹ️ No change detected — not stored")
-                        except Exception as e:
-                            st.error(f"❌ Failed to store reading: {e}")
-    else:
-        st.error("⚠️ No devices configured")
-        st.info("Expected devices: " + ", ".join(DEVICES.keys()))
-        selected_device_id = None
-    
-    st.divider()
-
-    # Time range selection
-
-    st.markdown("""
-    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-        Query Parameters
-    </p>
-    """, unsafe_allow_html=True)
-    # Enhanced time window selection with 24h default and days/months options
+    # ── Time range ──
+    st.markdown('<div class="sidebar-section-label">Time Window</div>', unsafe_allow_html=True)
     time_options = [
         (24, "24 hours"),
         (48, "2 days"),
@@ -554,31 +663,23 @@ with st.sidebar:
         (4320, "6 months"),
         (8760, "12 months"),
     ]
-    default_index = 0  # 24 hours
     time_range = st.selectbox(
         "Time Window",
         options=time_options,
         format_func=lambda x: x[1],
-        index=default_index,
+        index=0,
         key="time_range",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )[0]
-    
-    st.divider()
-    
-    # Database stats
-    st.markdown("""
-    <p style="font-weight: 500; font-size: 0.95rem; margin-bottom: 1rem; letter-spacing: 0.2px;">
-        System Metrics
-    </p>
-    """, unsafe_allow_html=True)
+
+    # ── System metrics ──
+    st.markdown('<div class="sidebar-section-label">System</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
+    total_measurements = db.get_measurement_count()
     with col1:
-        st.metric("Stations", db.get_device_count(), help="Number of connected field devices")
+        st.metric("Stations", db.get_device_count())
     with col2:
-        total_measurements = db.get_measurement_count()
-        st.metric("Data Points", total_measurements, help="Total measurements recorded")
-    # Last ingest indicator
+        st.metric("Records", total_measurements)
     latest_rows = db.get_measurements(limit=1)
     if latest_rows:
         try:
@@ -586,22 +687,17 @@ with st.sidebar:
             latest_ts = pd.to_datetime(ts_raw)
             if latest_ts.tzinfo is None:
                 latest_ts = latest_ts.tz_localize(pytz.utc)
-            else:
-                latest_ts = pd.Timestamp(latest_ts)
             local_ts = latest_ts.astimezone(pytz.timezone(DEFAULT_TZ))
-            st.caption(f"Last ingest: {local_ts.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            st.caption(f"Last saved: {local_ts.strftime('%d/%m/%Y %H:%M:%S')}")
         except Exception:
-            st.caption(f"Last ingest: {latest_rows[0]['timestamp']}")
-    
-    # Debug info for troubleshooting
-    if total_measurements == 0:
-        st.warning("⚠️ No measurements found yet.")
-        st.info("If this is a fresh deploy, the monitor service will populate data shortly. You can also click 'Show Real-Time Data' for a live view without storing.")
-    
+            st.caption(f"Last saved: {latest_rows[0]['timestamp']}")
+    elif total_measurements == 0:
+        st.caption("Waiting for first collection cycle…")
+
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
         if stats:
-            st.metric("Collection Rate", f"{stats.get('collection_rate', 0):.1f}/min", help="Average points per minute")
+            st.metric("Rate", f"{stats.get('collection_rate', 0):.1f}/min")
 
 # Main content area
 page_mode = st.session_state.get('page_mode', 'Simplified View')
@@ -625,32 +721,60 @@ if page_mode == 'EDS Product Overview':
 
 if page_mode == 'Simplified View':
     if selected_device_id:
-        measurements = db.get_measurements(device_id=selected_device_id)
+        measurements = db.get_measurements(device_id=selected_device_id, limit=100000)
         if measurements:
-            df = pd.DataFrame(measurements)
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            latest = df.iloc[-1]
+            df_all = pd.DataFrame(measurements)
+            df_all['timestamp'] = pd.to_datetime(df_all['timestamp'])
+            latest = df_all.iloc[-1]
 
-            st.metric('Latest Depth', f"{latest['depth_mm']:.1f} mm" if pd.notna(latest['depth_mm']) else 'N/A')
-            st.metric('Latest Velocity', f"{latest['velocity_mps']:.3f} m/s" if pd.notna(latest['velocity_mps']) else 'N/A')
-            st.metric('Latest Flow', f"{latest['flow_lps']:.1f} L/s" if pd.notna(latest['flow_lps']) else 'N/A')
+            # KPI row
+            st.markdown(f"""
+            <h2 style="margin-bottom:1rem;">📍 {selected_device_name}</h2>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:1.5rem;">
+                <div class="kpi-card">
+                    <div class="kpi-label">💧 Water Depth</div>
+                    <div class="kpi-value">{f"{latest['depth_mm']:.1f}" if pd.notna(latest['depth_mm']) else '—'}<span class="kpi-unit">mm</span></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">⚡ Flow Velocity</div>
+                    <div class="kpi-value">{f"{latest['velocity_mps']:.3f}" if pd.notna(latest['velocity_mps']) else '—'}<span class="kpi-unit">m/s</span></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">🌊 Flow Rate</div>
+                    <div class="kpi-value">{f"{latest['flow_lps']:.1f}" if pd.notna(latest['flow_lps']) else '—'}<span class="kpi-unit">L/s</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            st.subheader('Time Series (last 24h)')
+            st.markdown("### 📊 Flow — Last 24 Hours")
             cutoff = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=24)
-            df24 = df[df['timestamp'] >= cutoff]
+            df24 = df_all[df_all['timestamp'] >= cutoff]
             if not df24.empty:
-                chart = px.line(df24, x='timestamp', y=['depth_mm', 'velocity_mps', 'flow_lps'], markers=True)
-                chart.update_layout(legend_title_text='Metric')
+                chart = px.line(df24, x='timestamp', y=['depth_mm', 'velocity_mps', 'flow_lps'],
+                                labels={'value': 'Reading', 'variable': 'Metric', 'timestamp': 'Time'},
+                                markers=False, template='plotly_white')
+                chart.update_layout(
+                    legend_title_text='Metric',
+                    hovermode='x unified',
+                    height=380,
+                    font=dict(family='Inter, sans-serif'),
+                )
                 st.plotly_chart(chart, use_container_width=True)
             else:
-                st.info('No data for last 24 hours.')
+                st.info('No data for last 24 hours. Showing all available data below.')
 
-            csv_data = df.to_csv(index=False)
-            json_data = df.to_json(orient='records', date_format='iso')
-            st.download_button('Download CSV', data=csv_data, file_name=f'{selected_device_id}_data.csv', mime='text/csv')
-            st.download_button('Download JSON', data=json_data, file_name=f'{selected_device_id}_data.json', mime='application/json')
+            # Download ALL data as CSV
+            export_df = df_all[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
+            export_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
+            st.download_button(
+                f'⬇️ Download ALL Data as CSV ({len(df_all)} records)',
+                data=export_df.to_csv(index=False),
+                file_name=f'{selected_device_id}_all_data.csv',
+                mime='text/csv',
+                use_container_width=True,
+            )
         else:
-            st.warning('No measurements available yet. Run the monitor service or store readings from real-time view.')
+            st.info('⏳ Waiting for first data collection. The background service collects every 60 seconds — refresh shortly.')
     else:
         st.warning('No device selected. Choose a device in the sidebar.')
     st.stop()
@@ -675,85 +799,64 @@ if selected_device_id:
         df = df_filtered
         
         if not df.empty:
-            # Latest values with enhanced metrics
-            st.markdown(f"""
-            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-bottom: 1.5rem;">
-                Current Status: {selected_device_name}
-            </h2>
-            """, unsafe_allow_html=True)
-            
+            # ── Latest KPI cards ──────────────────────────────────────────
             latest = df.iloc[-1]
             last_update = latest["timestamp"]
-            
-            # KPI Metrics
-            metric_cols = st.columns(3, gap="medium")
-            
-            with metric_cols[0]:
-                depth = latest["depth_mm"]
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
-                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
-                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
-                        WATER DEPTH
-                    </p>
-                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {f'{depth:.1f}' if depth is not None else 'N/A'} <span style="font-size: 1rem;">mm</span>
-                    </p>
+            depth = latest["depth_mm"]
+            velocity = latest["velocity_mps"]
+            flow = latest["flow_lps"]
+
+            st.markdown(f"""
+            <h2 style="margin-bottom:1rem;">📍 {selected_device_name}</h2>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:1.5rem;">
+                <div class="kpi-card">
+                    <div class="kpi-label">💧 Water Depth</div>
+                    <div class="kpi-value">{f'{depth:.1f}' if depth is not None else '—'}<span class="kpi-unit">mm</span></div>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            with metric_cols[1]:
-                velocity = latest["velocity_mps"]
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
-                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
-                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
-                        FLOW VELOCITY
-                    </p>
-                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {f'{velocity:.3f}' if velocity is not None else 'N/A'} <span style="font-size: 1rem;">m/s</span>
-                    </p>
+                <div class="kpi-card">
+                    <div class="kpi-label">⚡ Flow Velocity</div>
+                    <div class="kpi-value">{f'{velocity:.3f}' if velocity is not None else '—'}<span class="kpi-unit">m/s</span></div>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            with metric_cols[2]:
-                flow = latest["flow_lps"]
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); 
-                            padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0;
-                            text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                    <p style="color: #666; font-size: 0.9rem; font-weight: 300; margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">
-                        FLOW RATE
-                    </p>
-                    <p style="font-size: 2rem; font-weight: 400; margin: 0; color: #0066cc;">
-                        {f'{flow:.1f}' if flow is not None else 'N/A'} <span style="font-size: 1rem;">L/s</span>
-                    </p>
+                <div class="kpi-card">
+                    <div class="kpi-label">🌊 Flow Rate</div>
+                    <div class="kpi-value">{f'{flow:.1f}' if flow is not None else '—'}<span class="kpi-unit">L/s</span></div>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Flow Graph Section - Prominent display with date range selection
-            st.markdown("""
-            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;">
-                📊 Flow Rate Analysis
-            </h2>
+            </div>
+            <div style="font-size:0.78rem; color:#9aa0b0; margin-bottom:1.5rem;">
+                Last reading: {last_update.strftime('%d/%m/%Y %H:%M:%S')}
+                &nbsp;·&nbsp; {len(df)} data points in window
+                &nbsp;·&nbsp; Auto-saving every 60 s
+            </div>
             """, unsafe_allow_html=True)
-            
-            # Date range selector
+
+            # ── Download ALL data (single CSV) ───────────────────────────
+            all_measurements = db.get_measurements(device_id=selected_device_id, limit=100000)
+            if all_measurements:
+                all_df = pd.DataFrame(all_measurements)
+                all_df_display = all_df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
+                all_df_display.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
+                st.download_button(
+                    label=f"⬇️ Download ALL data as CSV ({len(all_df)} records)",
+                    data=all_df_display.to_csv(index=False),
+                    file_name=f"eflow_{selected_device_id}_all_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # ── Flow Rate chart ──────────────────────────────────────────
+            st.markdown("## 📊 Flow Rate Analysis")
+
             col_range1, col_range2 = st.columns([1, 2])
-            
             with col_range1:
                 range_mode = st.radio(
                     "Date Range Mode",
                     options=["Quick Select", "Custom Range"],
                     index=0,
-                    horizontal=True
+                    horizontal=True,
                 )
-            
-            # Initialize default date range (24 hours)
+
             default_start = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=24)
             default_end = datetime.now(pytz.timezone(DEFAULT_TZ))
             
@@ -870,60 +973,19 @@ if selected_device_id:
             
             st.markdown("---")
             
-            # Data quality indicators with enhanced styling
-            st.markdown("""
-            <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
-            """, unsafe_allow_html=True)
-
-            # CSV Export
-            st.markdown("""
-            <p style="font-weight: 300; font-size: 0.9rem; margin-bottom: 0.75rem; letter-spacing: 0.2px;">
-                Export Data
-            </p>
-            """, unsafe_allow_html=True)
-            export_csv = st.button("📥 Download CSV", type="secondary", use_container_width=True)
-            
-            if export_csv:
-                st.download_button(
-                    label="💾 Click to download CSV",
-                    data=df.to_csv(index=False),
-                    file_name=f"data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv",
-                )
-
+            # ── Info row ─────────────────────────────────────────────────
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">🕒 Last Update</strong><br>
-                    {last_update.strftime('%Y-%m-%d %H:%M:%S')}
-                </p>
-                """, unsafe_allow_html=True)
+                st.metric("🕒 Last Update", last_update.strftime('%d/%m %H:%M:%S'))
             with col_info2:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">📊 Data Points</strong><br>
-                    {len(df)} in {time_range}h window
-                </p>
-                """, unsafe_allow_html=True)
+                st.metric("📊 Data Points", f"{len(df)} in {time_range}h")
             with col_info3:
-                st.markdown(f"""
-                <p style="font-family: 'Helvetica Neue Light', 'Helvetica Neue', sans-serif; font-size: 0.85rem; color: #666; margin: 0; letter-spacing: 0.2px;">
-                    <strong style="color: #333;">⏱️ Collection Rate</strong><br>
-                    {len(df)/(time_range if time_range > 0 else 1):.1f} pts/hr
-                </p>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+                st.metric("⏱️ Rate", f"{len(df)/(time_range if time_range > 0 else 1):.1f} pts/hr")
             
             st.markdown("---")
             
             # Advanced analytics
-            st.markdown("""
-            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
-                Time Series Analysis
-            </h3>
-            """, unsafe_allow_html=True)
+            st.markdown("### 📈 Time Series Analysis")
             
             if len(df) >= 1:
                 # Create tabs for different views - show even with 1 data point
@@ -1179,100 +1241,51 @@ if selected_device_id:
                         st.metric("Data Completeness", f"{completeness:.0f}%")
             
             # Data table
-            st.markdown("""
-            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
-                📋 Data Table
-            </h3>
-            """, unsafe_allow_html=True)
+            st.markdown("### 📋 Data Table")
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
-            st.dataframe(display_df, width="stretch", hide_index=True)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
             
             # Export functionality
-            st.markdown("""
-            <h3 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 2rem; margin-bottom: 1rem;">
-                📥 Export Data
-            </h3>
-            """, unsafe_allow_html=True)
+            st.markdown("### 📥 Export Data")
             col1, col2 = st.columns(2)
             
             with col1:
                 csv = display_df.to_csv(index=False)
                 st.download_button(
-                    label="Download as CSV",
+                    label="⬇️ Download Current View (CSV)",
                     data=csv,
                     file_name=f"flow_data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
+                    mime="text/csv",
+                    use_container_width=True,
                 )
             
             with col2:
                 json_str = df.to_json(orient="records", date_format="iso")
                 st.download_button(
-                    label="Download as JSON",
+                    label="⬇️ Download Current View (JSON)",
                     data=json_str,
                     file_name=f"flow_data_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json"
+                    mime="application/json",
+                    use_container_width=True,
                 )
         else:
-            st.info("No data available for the selected time range.")
-            
-            # Show Flow Graph section even without data
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("""
-            <h2 style="font-weight: 500; letter-spacing: 0.3px; margin-top: 1.5rem; margin-bottom: 1rem;">
-                📊 Flow Rate Analysis
-            </h2>
-            """, unsafe_allow_html=True)
-            
-            st.warning("""
-            ⚠️ **No data available to display graph**
-            
-            The flow graph will appear here once data is being collected. Current status:
-            - ✅ Device is reachable (see "Show Real-Time Data" in sidebar)
-            - ❌ No data points stored in database yet
-            
-            **To start seeing data:**
-            1. Ensure the monitor service is running (separate container/process)
-            2. OR enable `ALLOW_STREAMLIT_WRITES=true` in environment variables, then use "Store This Reading" button in sidebar
-            3. Wait for automatic collection (every 60 seconds when values change)
-            """)
+            st.info("No data available for the selected time range. Background collection is running — check back shortly.")
+            st.markdown("## 📊 Flow Rate Analysis")
+            st.warning("No data in the selected time window. Try selecting a longer time range.")
     else:
-        st.warning("📊 **No measurements found in database**")
-        
-        st.markdown("""
-        <div style="background: #fff3cd; padding: 20px; border-radius: 10px; border-left: 4px solid #ffc107; margin: 20px 0;">
-        <h3 style="margin-top: 0; color: #856404;">🔧 Quick Start Guide</h3>
-        
-        <p><strong>Your device is online!</strong> Click "Show Real-Time Data" in the sidebar to verify connectivity.</p>
-        
-        <p><strong>To start seeing historical data and graphs:</strong></p>
-        
-        <p><strong>Option 1: Run the Monitor Service</strong> (Recommended for production)</p>
-        <ul>
-            <li>Start the monitor service: <code>python monitor.py</code></li>
-            <li>Or use Docker: <code>docker-compose up -d</code></li>
-            <li>Data will be collected automatically every 60 seconds</li>
-        </ul>
-        
-        <p><strong>Option 2: Manual Data Storage</strong> (Quick testing)</p>
-        <ul>
-            <li>Set environment variable: <code>ALLOW_STREAMLIT_WRITES=true</code></li>
-            <li>Restart the app</li>
-            <li>Click "Show Real-Time Data" then "Store This Reading" in the sidebar</li>
-            <li>Repeat a few times to build up data points</li>
-        </ul>
-        
-        <p style="margin-bottom: 0;"><strong>Once data is stored:</strong> The flow graph and analytics will appear automatically!</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.info("⏳ **Waiting for first data collection** — the background service is running and will store data within the next 60 seconds. Refresh this page shortly.")
 else:
     st.info("👈 Select a device from the sidebar to view data.")
 
-# Footer
-st.markdown("---")
+# ── Footer ───────────────────────────────────────────────────────────────────
 st.markdown(
-    f"<small>Last update: {datetime.now(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z')} | "
-    f"Timezone: {DEFAULT_TZ}</small>",
-    unsafe_allow_html=True
+    f"""<div class="eds-footer">
+        e-flow &copy; {datetime.now().year} &nbsp;·&nbsp;
+        <a href="https://www.e-d-s.com.au" target="_blank">EDS — Environmental &amp; Data Solutions</a>
+        &nbsp;·&nbsp; {datetime.now(pytz.timezone(DEFAULT_TZ)).strftime('%d/%m/%Y %H:%M %Z')}
+        &nbsp;·&nbsp; Auto-collection active
+    </div>""",
+    unsafe_allow_html=True,
 )
