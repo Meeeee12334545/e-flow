@@ -38,22 +38,30 @@ async def ingest_data():
         if data:
             logger.info(f"Data retrieved successfully: {data}")
             
-            # Extract values from the data
-            # Note: The actual extraction depends on how the website structures its data
-            # This is a placeholder - adjust based on actual data structure
-            
+            # Extract values from the monitor data payload
+            payload = data.get("data", {})
             device_id = "FIT100"
             device_name = "FIT100 Main Inflow Lismore STP"
-            
-            # Store in database
-            scraper.store_measurement(
+            depth_mm = payload.get("depth_mm") or payload.get("depth")
+            velocity_mps = payload.get("velocity_mps") or payload.get("velocity")
+            flow_lps = payload.get("flow_lps") or payload.get("flow")
+
+            logger.info(f"Parsed values from monitor payload: depth_mm={depth_mm}, velocity_mps={velocity_mps}, flow_lps={flow_lps}")
+
+            # Store in database (allow_storage required for monitor mode)
+            stored = scraper.store_measurement(
                 device_id=device_id,
                 device_name=device_name,
-                depth_mm=0.0,
-                velocity_mps=0.0,
-                flow_lps=0.0,
+                depth_mm=depth_mm,
+                velocity_mps=velocity_mps,
+                flow_lps=flow_lps,
                 allow_storage=True
             )
+
+            if stored:
+                logger.info("✅ Data ingestion stored a new record")
+            else:
+                logger.info("ℹ️ Data ingestion did not store (duplicate/no-change or no-values)")
             
             logger.info("✅ Data ingestion completed successfully")
             logger.info(f"Total devices: {db.get_device_count()}")
