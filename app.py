@@ -645,22 +645,25 @@ if page_mode == 'Simplified View':
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             latest = df.iloc[-1]
             now_local = datetime.now(pytz.timezone(DEFAULT_TZ))
+            latest_depth = f"{latest['depth_mm']:.1f}" if pd.notna(latest['depth_mm']) else 'N/A'
+            latest_velocity = f"{latest['velocity_mps']:.3f}" if pd.notna(latest['velocity_mps']) else 'N/A'
+            latest_flow = f"{latest['flow_lps']:.1f}" if pd.notna(latest['flow_lps']) else 'N/A'
 
-            st.markdown("""
+            st.markdown(f"""
             <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 1.5rem;">
                 <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
                     <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Depth</p>
-                    <p style="font-size: 2.6rem; color: #0f4c81; margin: 0; font-weight: 700;">{f'{latest['depth_mm']:.1f}' if pd.notna(latest['depth_mm']) else 'N/A'}</p>
+                    <p style="font-size: 2.6rem; color: #0f4c81; margin: 0; font-weight: 700;">{latest_depth}</p>
                     <span style="color: #475569; font-size: 0.95rem;">mm</span>
                 </div>
                 <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
                     <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Velocity</p>
-                    <p style="font-size: 2.6rem; color: #047c3d; margin: 0; font-weight: 700;">{f'{latest['velocity_mps']:.3f}' if pd.notna(latest['velocity_mps']) else 'N/A'}</p>
+                    <p style="font-size: 2.6rem; color: #047c3d; margin: 0; font-weight: 700;">{latest_velocity}</p>
                     <span style="color: #475569; font-size: 0.95rem;">m/s</span>
                 </div>
                 <div style="background: #ffffff; border: 1px solid #dbe4ef; border-radius: 18px; padding: 22px; box-shadow: 0 18px 35px rgba(15, 76, 129, 0.08);">
                     <p style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #6b7280; letter-spacing: 0.05em;">Latest Flow</p>
-                    <p style="font-size: 2.6rem; color: #b45309; margin: 0; font-weight: 700;">{f'{latest['flow_lps']:.1f}' if pd.notna(latest['flow_lps']) else 'N/A'}</p>
+                    <p style="font-size: 2.6rem; color: #b45309; margin: 0; font-weight: 700;">{latest_flow}</p>
                     <span style="color: #475569; font-size: 0.95rem;">L/s</span>
                 </div>
             </div>
