@@ -64,200 +64,205 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Professional styling with Helvetica Neue
+# Professional styling with Inter and polished components
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
+
+    :root {
+        --bg: #f4f7fb;
+        --surface: #ffffff;
+        --surface-soft: #f8fbff;
+        --border: #dfe7ef;
+        --text: #233047;
+        --muted: #6b7280;
+        --primary: #0f4c81;
+        --primary-soft: #e7f0ff;
+        --accent: #0b76ca;
+        --accent-soft: #dbe9ff;
+    }
+
+    html, body, [data-testid="stAppViewContainer"] {
+        background: linear-gradient(180deg, #eef4fb 0%, #f9fbff 100%) !important;
+    }
+
     * {
-        font-family: 'Helvetica Neue', 'Helvetica Neue Light', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif !important;
+        color: var(--text) !important;
+        box-sizing: border-box;
     }
-    
-    /* Main text styling */
-    body, p, span, div {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 300;
-        letter-spacing: 0.3px;
-        line-height: 1.6;
-        color: #333;
+
+    .block-container {
+        padding: 2rem 2rem 2.5rem !important;
     }
-    
-    /* Headers */
+
+    .css-1lcbmhc.e1fqkh3o1 {
+        padding-top: 0 !important;
+    }
+
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        font-weight: 300;
-        letter-spacing: 0.3px;
-        margin-top: 0.8rem;
-        margin-bottom: 1rem;
-        color: #002f6c;
+        color: var(--text) !important;
+        letter-spacing: 0.05em;
     }
-    
+
     h1 {
-        font-size: 2.8rem;
-        font-weight: 300;
-        color: #002f6c;
-        letter-spacing: 0px;
-        margin-bottom: 1.2rem;
+        font-size: 3.2rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 0.5rem !important;
     }
-    
+
     h2 {
-        font-size: 2rem;
-        font-weight: 300;
-        color: #1a1a1a;
-        margin-top: 1.5rem;
-        margin-bottom: 1.2rem;
-        letter-spacing: 0.3px;
+        font-size: 2rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 1rem !important;
     }
-    
-    h3 {
-        font-size: 1.4rem;
-        font-weight: 300;
-        color: #2a2a2a;
-        letter-spacing: 0.3px;
-        margin-bottom: 0.8rem;
+
+    p, span, li, label {
+        font-weight: 400 !important;
+        line-height: 1.7 !important;
     }
-    
-    /* Metric cards */
-    .metric-card {
-        background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
-        padding: 24px;
-        border-radius: 12px;
-        border: 1px solid #ced8e9;
-        border-left: 4px solid #002f6c;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
+
+    .hero-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f3f8ff 100%);
+        border: 1px solid rgba(15, 76, 129, 0.12);
+        border-radius: 24px;
+        padding: 32px;
+        box-shadow: 0 24px 60px rgba(15, 76, 129, 0.08);
     }
-    
-    .metric-card:hover {
-        box-shadow: 0 8px 16px rgba(0, 102, 204, 0.12);
-        border-left-color: #0052a3;
-        transform: translateY(-2px);
+
+    .hero-title {
+        font-size: 3.6rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--primary);
+        line-height: 1.05;
     }
-    
-    .metric-card h4 {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-        font-weight: 300;
-        font-size: 0.9rem;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin: 0 0 0.5rem 0;
+
+    .hero-subtitle {
+        margin: 1rem 0 1.5rem 0;
+        font-size: 1.05rem;
+        color: #475569;
+        max-width: 760px;
     }
-    
-    /* Status indicators */
-    .status-active { 
-        color: #10b981; 
-        font-weight: 500;
-        font-size: 1.1rem;
-        letter-spacing: 0.5px;
-    }
-    .status-idle { 
-        color: #f59e0b; 
-        font-weight: 500;
-        font-size: 1.1rem;
-    }
-    .status-error { 
-        color: #ef4444; 
-        font-weight: 500;
-        font-size: 1.1rem;
-    }
-    
-    /* Dividers */
-    hr {
-        border: none;
-        height: 1px;
-        background: linear-gradient(to right, #e0e0e0 0%, transparent);
-        margin: 2rem 0;
-    }
-    
-    /* Input styling */
-    .stSelectbox, .stSlider, .stNumberInput, .stTextInput {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-    }
-    
-    /* Sidebar styling */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-    }
-    
-    section[data-testid="stSidebar"] h2 {
-        font-weight: 500;
-        margin-top: 1.5rem;
-        margin-bottom: 1rem;
-        color: #1a1a1a;
-        letter-spacing: 0.3px;
-    }
-    
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] button {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 500;
+
+    .hero-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
         font-size: 0.95rem;
-        letter-spacing: 0.3px;
     }
-    
-    /* Expander styling */
-    details > summary {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 500;
-        cursor: pointer;
+
+    .hero-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
     }
-    
-    /* Caption styling */
-    .caption {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 300;
-        font-size: 0.9rem;
-        color: #666;
-        letter-spacing: 0.2px;
+
+    .status-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 22px;
+        box-shadow: 0 16px 35px rgba(31, 64, 110, 0.08);
+        text-align: center;
     }
-    
-    /* Button styling */
-    button[kind="primary"] {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif !important;
-        font-weight: 500;
-        letter-spacing: 0.4px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%) !important;
+
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.85rem 1rem;
+        border-radius: 999px;
+        background: #daf9e6;
+        color: #047c3d;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.75rem;
+    }
+
+    .status-note {
+        font-size: 0.95rem;
+        color: #475569;
+    }
+
+    .section-card {
+        background: var(--surface);
+        border: 1px solid rgba(15, 76, 129, 0.08);
+        border-radius: 22px;
+        padding: 24px;
+        box-shadow: 0 20px 40px rgba(15, 76, 129, 0.05);
+    }
+
+    .section-title {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        color: var(--primary);
+    }
+
+    .stMetric, div[data-testid="metric-container"] {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 18px !important;
+        padding: 1rem 1.2rem !important;
+        box-shadow: 0 14px 32px rgba(15, 76, 129, 0.06) !important;
+    }
+
+    .css-1avcm0n.e1fqkh3o4 {
+        background: var(--surface) !important;
+    }
+
+    button, .stButton button {
+        border-radius: 12px !important;
+        background: linear-gradient(135deg, #0f4c81 0%, #0a3c67 100%) !important;
         color: white !important;
         border: none !important;
-        padding: 0.75rem 1.5rem !important;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0, 102, 204, 0.2);
+        box-shadow: 0 10px 24px rgba(15, 76, 129, 0.18) !important;
+        padding: 0.85rem 1.35rem !important;
     }
-    
-    button[kind="primary"]:hover {
-        box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4) !important;
+
+    button:hover, .stButton button:hover {
         transform: translateY(-1px);
     }
-    
-    /* Secondary buttons */
-    button[kind="secondary"] {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif !important;
-        font-weight: 400;
-        letter-spacing: 0.3px;
-        border-radius: 8px;
-        border: 1px solid #ddd !important;
+
+    section[data-testid="stSidebar"] {
+        background: #ffffff !important;
+        border-right: 1px solid rgba(15, 76, 129, 0.12);
+        box-shadow: inset -1px 0 0 rgba(15, 76, 129, 0.04);
     }
-    
-    /* Info/Warning boxes */
-    .stAlert {
-        font-family: 'Helvetica Neue Light', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        border-radius: 8px;
-        padding: 1rem;
-        font-weight: 300;
+
+    section[data-testid="stSidebar"] h2 {
+        font-size: 1.1rem !important;
+        letter-spacing: 0.04em;
+        color: #102a43 !important;
     }
-    
-    /* Code blocks */
+
+    .sidebar-card {
+        background: var(--surface-soft);
+        border: 1px solid rgba(15, 76, 129, 0.1);
+        border-radius: 18px;
+        padding: 18px;
+        margin-bottom: 1.5rem;
+    }
+
+    .sidebar-card p {
+        margin: 0.35rem 0;
+        color: #475569;
+    }
+
+    .caption {
+        color: #546e7a !important;
+    }
+
     code {
-        font-family: 'Monaco', 'Courier New', monospace;
-        font-size: 0.9rem;
-        background-color: #f5f5f5;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
+        background: #f1f5f9 !important;
+        padding: 0.2rem 0.45rem !important;
+        border-radius: 6px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -353,19 +358,22 @@ def fetch_latest_reading(device_id: str):
 col1, col2 = st.columns([3, 1])
 with col1:
     st.markdown("""
-    <h1 style="margin-bottom: 0; font-weight: 700; letter-spacing: -0.5px; font-size: 3rem; color: #002f6c;">
-        e-flow by EDS
-    </h1>
-    <p style="margin-top: 0.2rem; color: #444; font-size: 1.1rem; font-weight: 400; letter-spacing: 0.5px;">
-        Sewer Flow Monitoring | Depth • Velocity • Flow
-        <br><small style="color:#666;">www.e-d-s.com.au</small>
-    </p>
+    <div class="hero-card">
+        <p class="hero-pill">Hydrological Intelligence</p>
+        <h1 class="hero-title">e-flow™ by EDS</h1>
+        <p class="hero-subtitle">Professional sewer flow monitoring, analytics and reporting for depth, velocity and flow performance.</p>
+        <div style="display:flex; flex-wrap: wrap; gap: 10px;">
+            <span style="background: rgba(15, 76, 129, 0.08); color: #0f4c81; padding: 0.65rem 1rem; border-radius: 999px; font-weight: 600;">Live data overview</span>
+            <span style="background: rgba(2, 120, 212, 0.12); color: #075985; padding: 0.65rem 1rem; border-radius: 999px; font-weight: 600;">Historical analytics</span>
+            <span style="background: rgba(16, 185, 129, 0.12); color: #047c3d; padding: 0.65rem 1rem; border-radius: 999px; font-weight: 600;">Operational insights</span>
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 with col2:
     st.markdown("""
-    <div style="text-align: right; padding-top: 0.5rem;">
-        <span class="status-active" style="font-size: 1.2rem;">●</span>
-        <span style="color: #10b981; font-weight: 500; margin-left: 0.5rem;">LIVE</span>
+    <div class="status-card">
+        <div class="status-pill">LIVE</div>
+        <div class="status-note">Auto-sync enabled • Dashboard view only</div>
     </div>
     """, unsafe_allow_html=True)
 
