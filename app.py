@@ -86,20 +86,20 @@ st.markdown("""
     
     /* Headers */
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
-        font-weight: 500;
-        letter-spacing: 0.4px;
+        font-family: 'Inter', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        font-weight: 600;
+        letter-spacing: 0.3px;
         margin-top: 0.8rem;
         margin-bottom: 1rem;
-        color: #1a1a1a;
+        color: #002f6c;
     }
     
     h1 {
         font-size: 2.8rem;
-        font-weight: 600;
-        color: #000;
+        font-weight: 700;
+        color: #002f6c;
         letter-spacing: 0px;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.2rem;
     }
     
     h2 {
@@ -121,12 +121,12 @@ st.markdown("""
     
     /* Metric cards */
     .metric-card {
-        background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
+        background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
         padding: 24px;
         border-radius: 12px;
-        border: 1px solid #e0e0e0;
-        border-left: 4px solid #0066cc;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #ced8e9;
+        border-left: 4px solid #002f6c;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
         transition: all 0.3s ease;
     }
     
@@ -353,11 +353,12 @@ def fetch_latest_reading(device_id: str):
 col1, col2 = st.columns([3, 1])
 with col1:
     st.markdown("""
-    <h1 style="margin-bottom: 0; font-weight: 600; letter-spacing: -0.5px; font-size: 3rem;">
-        e-flow
+    <h1 style="margin-bottom: 0; font-weight: 700; letter-spacing: -0.5px; font-size: 3rem; color: #002f6c;">
+        e-flow by EDS
     </h1>
-    <p style="margin-top: 0.2rem; color: #666; font-size: 1.1rem; font-weight: 300; letter-spacing: 0.6px;">
-        Hydrological Analytics Platform
+    <p style="margin-top: 0.2rem; color: #444; font-size: 1.1rem; font-weight: 400; letter-spacing: 0.5px;">
+        Sewer Flow Monitoring | Depth • Velocity • Flow
+        <br><small style="color:#666;">www.e-d-s.com.au</small>
     </p>
     """, unsafe_allow_html=True)
 with col2:
@@ -375,13 +376,25 @@ st.markdown("---")
 with st.sidebar:
     # Add authentication header
     render_auth_header()
-    
+
+    st.markdown("""
+    <h2 style="font-weight: 500; letter-spacing: 0.3px;">EDS Experience Mode</h2>
+    """, unsafe_allow_html=True)
+
+    page_mode = st.selectbox(
+        "Interface Mode",
+        options=["Simplified View", "Full Dashboard", "EDS Product Overview"],
+        index=0,
+        help="Simplified View for standard users, Full Dashboard for power users, EDS Product Overview for sales demos."
+    )
+    st.session_state['page_mode'] = page_mode
+
     st.markdown("""
     <h2 style="font-weight: 500; letter-spacing: 0.3px;">Configuration & Status</h2>
     """, unsafe_allow_html=True)
     
     st.markdown("""
-    <div style="background: #f0f7ff; border-left: 3px solid #0066cc; padding: 12px; border-radius: 6px; margin-bottom: 1.5rem;">
+    <div style="background: #f0f7ff; border-left: 3px solid #002f6c; padding: 12px; border-radius: 6px; margin-bottom: 1.5rem;">
         <p style="font-size: 0.9rem; margin: 0; color: #1a1a1a; line-height: 1.6;">
             <strong style="font-weight: 500;">Device Status:</strong> Connected & streaming<br>
             <span style="color: #666; font-size: 0.85rem;">• Update interval: 60 seconds</span><br>
@@ -615,6 +628,57 @@ with st.sidebar:
             st.metric("Collection Rate", f"{stats.get('collection_rate', 0):.1f}/min", help="Average points per minute")
 
 # Main content area
+page_mode = st.session_state.get('page_mode', 'Simplified View')
+
+if page_mode == 'EDS Product Overview':
+    st.markdown('''
+        <div style="background: linear-gradient(135deg, #002f6c 0%, #003f8f 90%); color: #fff; padding: 25px; border-radius: 14px;">
+            <h2 style="margin-bottom: 0.4rem;">e-flow™ by EDS</h2>
+            <p style="margin-bottom: 1.2rem; color: #f8f8f8; font-size: 1.1rem;">A premium sewer flow monitoring solution for depth, velocity, and flow data visualization, export, and reporting.</p>
+            <ul style="margin: 0 0 1rem 1.2rem;">
+                <li>🏆 Professional UI for water utilities</li>
+                <li>📊 Real-time metrics and configurable dashboards</li>
+                <li>📥 Data export (CSV/JSON/PDF) included</li>
+                <li>🔒 Team roles + admin controls</li>
+                <li>🌐 Deployable via Docker & Streamlit</li>
+            </ul>
+            <p style="margin-bottom:0;">Learn more at <a href='https://www.e-d-s.com.au' style='color:#ffc20e; font-weight:700;' target='_blank'>www.e-d-s.com.au</a></p>
+        </div>
+    ''', unsafe_allow_html=True)
+    st.stop()
+
+if page_mode == 'Simplified View':
+    if selected_device_id:
+        measurements = db.get_measurements(device_id=selected_device_id)
+        if measurements:
+            df = pd.DataFrame(measurements)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            latest = df.iloc[-1]
+
+            st.metric('Latest Depth', f"{latest['depth_mm']:.1f} mm" if pd.notna(latest['depth_mm']) else 'N/A')
+            st.metric('Latest Velocity', f"{latest['velocity_mps']:.3f} m/s" if pd.notna(latest['velocity_mps']) else 'N/A')
+            st.metric('Latest Flow', f"{latest['flow_lps']:.1f} L/s" if pd.notna(latest['flow_lps']) else 'N/A')
+
+            st.subheader('Time Series (last 24h)')
+            cutoff = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=24)
+            df24 = df[df['timestamp'] >= cutoff]
+            if not df24.empty:
+                chart = px.line(df24, x='timestamp', y=['depth_mm', 'velocity_mps', 'flow_lps'], markers=True)
+                chart.update_layout(legend_title_text='Metric')
+                st.plotly_chart(chart, use_container_width=True)
+            else:
+                st.info('No data for last 24 hours.')
+
+            csv_data = df.to_csv(index=False)
+            json_data = df.to_json(orient='records', date_format='iso')
+            st.download_button('Download CSV', data=csv_data, file_name=f'{selected_device_id}_data.csv', mime='text/csv')
+            st.download_button('Download JSON', data=json_data, file_name=f'{selected_device_id}_data.json', mime='application/json')
+        else:
+            st.warning('No measurements available yet. Run the monitor service or store readings from real-time view.')
+    else:
+        st.warning('No device selected. Choose a device in the sidebar.')
+    st.stop()
+
 if selected_device_id:
     # Get measurements for selected device
     measurements = db.get_measurements(device_id=selected_device_id)
