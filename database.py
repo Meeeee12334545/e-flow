@@ -32,6 +32,13 @@ class FlowDatabase:
             self.pg_dsn = DATABASE_URL
         self.init_db()
 
+    def _get_sqlite_conn(self) -> sqlite3.Connection:
+        """Return a SQLite connection with WAL journal mode and busy timeout configured."""
+        conn = sqlite3.connect(self.db_path, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        return conn
+
     def init_db(self):
         """Initialize the database with required tables."""
         if self.use_postgres:
@@ -85,7 +92,7 @@ class FlowDatabase:
             cur.close()
             conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             cursor = conn.cursor()
 
             # Create table for device information
@@ -147,7 +154,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             cursor = conn.cursor()
             try:
                 cursor.execute(
@@ -182,7 +189,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             cursor = conn.cursor()
             try:
                 cursor.execute(
@@ -232,7 +239,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             if device_id:
@@ -275,7 +282,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM devices ORDER BY device_name")
@@ -296,7 +303,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM devices")
             count = cursor.fetchone()[0]
@@ -316,7 +323,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM measurements")
             count = cursor.fetchone()[0]
@@ -336,7 +343,7 @@ class FlowDatabase:
                 cur.close()
                 conn.close()
         else:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_sqlite_conn()
             cursor = conn.cursor()
             cursor.execute("DELETE FROM measurements")
             cursor.execute("DELETE FROM devices")

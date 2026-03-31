@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 
 from database import FlowDatabase
 from scraper import DataScraper
-from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
+from config import DEVICES, MONITOR_URL, MONITOR_ENABLED, MONITOR_INTERVAL
 
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user
 
@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Background data collection – runs every 60 s, always stores readings
+# Background data collection – runs every MONITOR_INTERVAL seconds
 # ---------------------------------------------------------------------------
 
 def _bg_collect_once():
@@ -54,7 +54,7 @@ def _bg_collect_once():
                         depth_mm=payload.get("depth_mm"),
                         velocity_mps=payload.get("velocity_mps"),
                         flow_lps=payload.get("flow_lps"),
-                        allow_storage=True,
+                        allow_storage=not MONITOR_ENABLED,
                     )
                     logger.info(
                         f"BG collect {device_id}: stored={stored} "
@@ -69,26 +69,31 @@ def _bg_collect_once():
 
 
 def _bg_collection_worker():
-    """Daemon thread: install Playwright if needed, then collect data every 60 s."""
-    # Install Playwright browsers in the background so the UI is never blocked
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install-deps", "chromium"],
-            capture_output=True, timeout=120
-        )
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
-            capture_output=True, timeout=120
-        )
-    except Exception:
-        pass
-    logger.info("Background collection thread started – interval 60 s")
+    """Daemon thread: collect data every MONITOR_INTERVAL seconds."""
+    # Playwright browsers are installed during the Docker build; log a warning
+    # if the install step fails so the worker can still proceed via the API path.
+    for cmd in (
+        [sys.executable, "-m", "playwright", "install-deps", "chromium"],
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+    ):
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            if result.returncode != 0:
+                logger.warning(
+                    "Playwright setup step returned non-zero exit code %d: %s",
+                    result.returncode,
+                    result.stderr.decode(errors="replace")[:500],
+                )
+        except Exception as exc:
+            logger.warning("Playwright setup step failed (non-fatal): %s", exc)
+
+    logger.info("Background collection thread started – interval %d s", MONITOR_INTERVAL)
     while True:
         try:
             _bg_collect_once()
         except Exception as exc:
             logger.error(f"BG collection worker error: {exc}")
-        _time_module.sleep(60)
+        _time_module.sleep(MONITOR_INTERVAL)
 
 
 @st.cache_resource
@@ -98,7 +103,7 @@ def start_background_collection():
     t = threading.Thread(target=_bg_collection_worker, daemon=True, name="eflow-bg-collector")
     t.start()
     logger.info("✅ Background data collection thread launched")
-    return {"started_at": datetime.now().isoformat(), "interval_s": 60}
+    return {"started_at": datetime.now().isoformat(), "interval_s": MONITOR_INTERVAL}
 
 
 # Page config MUST be the first Streamlit command
@@ -109,8 +114,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Launch background collection (cached – only runs once per Streamlit worker)
-_bg_status = start_background_collection()
+# Launch background collection only when explicitly enabled via MONITOR_ENABLED env var
+_bg_status = start_background_collection() if MONITOR_ENABLED else None
 
 # Initialize authentication state
 init_auth_state()
@@ -526,7 +531,12 @@ def fetch_latest_reading(device_id: str):
 
 
 # ── EDS Header Banner ───────────────────────────────────────────────────────
-st.markdown("""
+_collect_badge = (
+    '<div class="eds-live-badge"><span class="eds-live-dot"></span>AUTO-COLLECT ACTIVE</div>'
+    if _bg_status
+    else ""
+)
+st.markdown(f"""
 <div class="eds-header">
     <div>
         <h1>💧 e-flow</h1>
@@ -538,10 +548,7 @@ st.markdown("""
             Sewer Flow Monitoring &nbsp;·&nbsp; Depth &nbsp;·&nbsp; Velocity &nbsp;·&nbsp; Flow Rate
         </div>
     </div>
-    <div class="eds-live-badge">
-        <span class="eds-live-dot"></span>
-        AUTO-COLLECT ACTIVE
-    </div>
+    {_collect_badge}
 </div>
 """, unsafe_allow_html=True)
 
@@ -734,7 +741,7 @@ if page_mode == 'Simplified View':
         if measurements:
             df_all = pd.DataFrame(measurements)
             df_all['timestamp'] = pd.to_datetime(df_all['timestamp'])
-            latest = df_all.iloc[-1]
+            latest = df_all.iloc[0]  # first row is latest (query returns DESC order)
 
             # KPI row
             st.markdown(f"""
@@ -834,20 +841,20 @@ if selected_device_id:
             <div style="font-size:0.78rem; color:#9aa0b0; margin-bottom:1.5rem;">
                 Last reading: {last_update.strftime('%d/%m/%Y %H:%M:%S')}
                 &nbsp;·&nbsp; {len(df)} data points in window
-                &nbsp;·&nbsp; Auto-saving every 60 s
+                {f"&nbsp;·&nbsp; Auto-saving every {MONITOR_INTERVAL} s" if _bg_status else ""}
             </div>
             """, unsafe_allow_html=True)
 
-            # ── Download ALL data (single CSV) ───────────────────────────
+            # ── Download recent data (single CSV, capped at 100,000 records) ─
             all_measurements = db.get_measurements(device_id=selected_device_id, limit=100000)
             if all_measurements:
                 all_df = pd.DataFrame(all_measurements)
                 all_df_display = all_df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
                 all_df_display.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
                 st.download_button(
-                    label=f"⬇️ Download ALL data as CSV ({len(all_df)} records)",
+                    label=f"⬇️ Download recent data as CSV ({len(all_df)} records, up to 100,000)",
                     data=all_df_display.to_csv(index=False),
-                    file_name=f"eflow_{selected_device_id}_all_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    file_name=f"eflow_{selected_device_id}_recent_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     mime="text/csv",
                     use_container_width=True,
                 )
