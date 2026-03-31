@@ -515,12 +515,15 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
 
-            # Optional: allow one-click store from Streamlit (for Cloud testing)
+            # Optional: allow one-click store from Streamlit or admin override
             allow_streamlit_writes = os.getenv("ALLOW_STREAMLIT_WRITES", "").lower() in ("1", "true", "yes")
-            if allow_streamlit_writes and has_data:
+            can_store = allow_streamlit_writes or is_admin()
+            if can_store and has_data:
+                if is_admin() and not allow_streamlit_writes:
+                    st.info("Admin override enabled: You can store this current reading directly to the database.")
                 col_store, _ = st.columns([1,3])
                 with col_store:
-                    if st.button("Store This Reading (admin)", key="store_now_button"):
+                    if st.button("Save current live reading to database", key="store_now_button"):
                         try:
                             writer = DataScraper(db)
                             stored = writer.store_measurement(
@@ -537,6 +540,8 @@ with st.sidebar:
                                 st.info("ℹ️ No change detected — not stored")
                         except Exception as e:
                             st.error(f"❌ Failed to store reading: {e}")
+            elif has_data:
+                st.caption("Enable ALLOW_STREAMLIT_WRITES or sign in as admin to store the current reading.")
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
