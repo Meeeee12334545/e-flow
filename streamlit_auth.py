@@ -22,7 +22,19 @@ def init_auth_state():
 
 def login_page():
     """Display login page."""
-    st.markdown("# 🔐 e-flow Login")
+    st.markdown("""
+    <div style="text-align:center; padding: 2rem 0 1rem 0;">
+        <div style="background:linear-gradient(135deg,#002f6c 0%,#01408f 100%);
+                    display:inline-block; padding:18px 36px; border-radius:12px;
+                    box-shadow:0 4px 20px rgba(0,47,108,0.25); margin-bottom:1.5rem;">
+            <div style="color:#ffffff; font-size:2rem; font-weight:700; letter-spacing:-0.5px;">💧 e-flow</div>
+            <div style="color:#ffc20e; font-size:0.75rem; font-weight:600; letter-spacing:2px; text-transform:uppercase;">
+                by EDS — e-d-s.com.au
+            </div>
+        </div>
+        <div style="color:#6b7a99; font-size:0.9rem;">Sewer Flow Monitoring Platform</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
@@ -108,14 +120,17 @@ def render_auth_header():
         
         if is_authenticated():
             user = get_current_user()
-            col1, col2 = st.columns([3, 1])
+            role_badge = "👨‍💼 Admin" if is_admin() else "👤 User"
             
+            col1, col2 = st.columns([4, 1])
             with col1:
-                role_badge = "👨‍💼 Admin" if is_admin() else "👤 User"
-                st.markdown(f"**{user['username']}**  \n{role_badge}")
-            
+                st.markdown(
+                    f"<div style='font-size:0.9rem; font-weight:600; color:#002f6c;'>{user['username']}</div>"
+                    f"<div style='font-size:0.75rem; color:#6b7a99;'>{role_badge}</div>",
+                    unsafe_allow_html=True,
+                )
             with col2:
-                if st.button("🚪"):
+                if st.button("⏏", key="logout_btn", help="Logout"):
                     logout()
             
             # Admin quick links
@@ -123,14 +138,14 @@ def render_auth_header():
                 st.markdown("---")
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("👨‍💼 Admin Panel", use_container_width=True):
+                    if st.button("🛠 Admin", use_container_width=True, key="admin_panel_btn"):
                         st.switch_page("pages/admin.py")
                 with col2:
-                    if st.button("👤 Profile", use_container_width=True):
+                    if st.button("👤 Profile", use_container_width=True, key="profile_btn"):
                         st.switch_page("pages/profile.py")
             else:
                 st.markdown("---")
-                if st.button("👤 My Profile", use_container_width=True):
+                if st.button("👤 My Profile", use_container_width=True, key="profile_btn"):
                     st.switch_page("pages/profile.py")
         else:
             st.markdown("*Not logged in*")
