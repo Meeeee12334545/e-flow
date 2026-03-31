@@ -38,10 +38,12 @@ def _bg_collect_once():
         _scraper = DataScraper(_db)
         for device_id, device_info in DEVICES.items():
             try:
+                # For background collection, force the lightweight API/requests path
+                # by not passing selectors (which would trigger Playwright).
                 data = loop.run_until_complete(
                     _scraper.fetch_monitor_data(
                         device_info.get("url", MONITOR_URL),
-                        device_info.get("selectors"),
+                        None,
                     )
                 )
                 if data and data.get("data"):
