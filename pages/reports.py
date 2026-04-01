@@ -54,26 +54,18 @@ st.logo(str(_ASSETS / "logo_wide.svg"), icon_image=str(_ASSETS / "logo_icon.svg"
 DEFAULT_TZ = "Australia/Brisbane"
 db = FlowDatabase()
 
+# ── Load devices (outside sidebar so they are accessible everywhere) ────────
+devices = db.get_devices()
+devices = filter_devices_for_user(devices)
+device_names = {d["device_name"]: d["device_id"] for d in devices}
+
+if not device_names:
+    st.warning("⚠️ No devices assigned to your account.")
+    st.stop()
+
 # ── Sidebar ────────────────────────────────────────────────────────────────
 with st.sidebar:
     render_auth_header()
-    st.markdown("## Device")
-    devices = db.get_devices()
-    devices = filter_devices_for_user(devices)
-    device_names = {d["device_name"]: d["device_id"] for d in devices}
-
-    if not device_names:
-        st.warning("⚠️ No devices assigned to your account")
-        st.stop()
-
-    selected_device_name: str = st.selectbox(
-        "Select Device",
-        options=sorted(device_names.keys()),
-        key="report_device_selector",
-        label_visibility="collapsed",
-    )
-    selected_device_id = device_names[selected_device_name]
-    device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
 
 # ── Page header ────────────────────────────────────────────────────────────
 st.markdown("""
@@ -94,6 +86,15 @@ col_cfg, col_prev = st.columns([1, 2])
 
 with col_cfg:
     st.markdown("### Report Settings")
+
+    # ── Site / device selector ─────────────────────────────────────────────
+    selected_device_name: str = st.selectbox(
+        "Select Site",
+        options=sorted(device_names.keys()),
+        key="report_device_selector",
+    )
+    selected_device_id = device_names[selected_device_name]
+    device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
 
     report_type = st.selectbox(
         "Report Type",
