@@ -19,6 +19,21 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+# ── Timezone helper ───────────────────────────────────────────────────────────
+
+def _to_utc_naive(series: pd.Series) -> pd.Series:
+    """Convert a datetime Series to UTC-naive (strips or converts tz info).
+
+    Ensures tz-aware and tz-naive timestamps can be joined/compared without
+    raising ``TypeError: Cannot join tz-naive and tz-aware DatetimeIndexes``.
+    """
+    series = pd.to_datetime(series)
+    if series.dt.tz is not None:
+        series = series.dt.tz_convert("UTC").dt.tz_localize(None)
+    return series
+
+
 # ── Thresholds (adjustable via keyword args) ──────────────────────────────────
 _DEFAULT_RAIN_THRESHOLD_MM = 1.0      # minimum mm/hr to count as "raining"
 _DEFAULT_II_MULTIPLIER     = 1.5      # flow > baseline × this → I/I flag
@@ -95,7 +110,7 @@ def compute_dry_weather_baseline(
         return 0.0
 
     df_f = df_flow[["timestamp", "flow_lps"]].copy()
-    df_f["timestamp"] = pd.to_datetime(df_f["timestamp"])
+    df_f["timestamp"] = _to_utc_naive(df_f["timestamp"])
     df_f = df_f.dropna(subset=["timestamp", "flow_lps"])
 
     if df_f.empty:
@@ -111,7 +126,7 @@ def compute_dry_weather_baseline(
     # If rainfall data is available, mask out wet periods
     if df_rainfall is not None and not df_rainfall.empty and "rainfall_mm" in df_rainfall.columns:
         df_r = df_rainfall[["timestamp", "rainfall_mm"]].copy()
-        df_r["timestamp"] = pd.to_datetime(df_r["timestamp"])
+        df_r["timestamp"] = _to_utc_naive(df_r["timestamp"])
         df_r = df_r.dropna(subset=["timestamp"])
 
         # Merge on nearest hour
@@ -162,7 +177,7 @@ def detect_rain_events(
         return []
 
     df = df_rainfall[["timestamp", "rainfall_mm"]].copy()
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = _to_utc_naive(df["timestamp"])
     df = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
 
     if "rainfall_mm" not in df.columns:
@@ -280,13 +295,13 @@ def detect_inflow_infiltration(
         return result
 
     df_f = df_flow[["timestamp", "flow_lps"]].copy()
-    df_f["timestamp"] = pd.to_datetime(df_f["timestamp"])
+    df_f["timestamp"] = _to_utc_naive(df_f["timestamp"])
     df_f = df_f.dropna(subset=["timestamp", "flow_lps"]).sort_values("timestamp")
 
     # Compute dry/wet period counts for context
     if df_rainfall is not None and not df_rainfall.empty:
         df_r = df_rainfall[["timestamp", "rainfall_mm"]].copy()
-        df_r["timestamp"] = pd.to_datetime(df_r["timestamp"])
+        df_r["timestamp"] = _to_utc_naive(df_r["timestamp"])
         df_r["is_wet"] = df_r["rainfall_mm"].fillna(0) >= rain_threshold_mm
         result.wet_period_count = int(df_r["is_wet"].sum())
         result.dry_period_count = int((~df_r["is_wet"]).sum())
