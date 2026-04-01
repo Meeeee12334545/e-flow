@@ -168,7 +168,7 @@ with col_prev:
             df = pd.DataFrame(rows) if rows else pd.DataFrame()
 
             if not df.empty:
-                df["timestamp"] = pd.to_datetime(df["timestamp"])
+                df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
                 df.sort_values("timestamp", inplace=True)
                 # Normalise both the filter bounds and the df timestamps to UTC-naive
                 # for a timezone-agnostic comparison.

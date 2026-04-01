@@ -71,7 +71,7 @@ def compute_calculations(df: pd.DataFrame, selections: ReportSelections) -> Dict
 
     # Ensure timestamp is datetime and sorted ascending
     dfx = df.copy()
-    dfx["timestamp"] = pd.to_datetime(dfx["timestamp"])  # tz-aware preserved
+    dfx["timestamp"] = pd.to_datetime(dfx["timestamp"], utc=True)  # normalise to UTC
     dfx = dfx.sort_values("timestamp")
 
     for var in selections.variables:
@@ -125,7 +125,7 @@ def create_charts(df: pd.DataFrame, selections: ReportSelections) -> Dict[str, g
     if df.empty:
         return charts
     dfx = df.copy()
-    dfx["timestamp"] = pd.to_datetime(dfx["timestamp"])
+    dfx["timestamp"] = pd.to_datetime(dfx["timestamp"], utc=True)
     dfx = dfx.sort_values("timestamp")
 
     for var in selections.variables:
@@ -167,7 +167,7 @@ def build_html_report(device_name: str,
 
     # Period label
     if not df.empty:
-        ts = pd.to_datetime(df["timestamp"])
+        ts = pd.to_datetime(df["timestamp"], utc=True)
         period_start = ts.min().strftime("%Y-%m-%d %H:%M")
         period_end = ts.max().strftime("%Y-%m-%d %H:%M")
         period_label = f"{period_start} → {period_end}"
@@ -412,7 +412,7 @@ def _build_pdf_reportlab(device_name: str,
     story.append(Paragraph('Site Information', h2_style))
 
     if not df.empty:
-        ts = pd.to_datetime(df['timestamp'])
+        ts = pd.to_datetime(df['timestamp'], utc=True)
         period_start = ts.min().strftime('%d/%m/%Y %H:%M')
         period_end   = ts.max().strftime('%d/%m/%Y %H:%M')
         period_label = f'{period_start} → {period_end}'
