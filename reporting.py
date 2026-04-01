@@ -30,6 +30,21 @@ try:
 except Exception:
     _WEASYPRINT_AVAILABLE = False
 
+# Pure-Python PDF fallback (no system-level dependencies)
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        HRFlowable, Image as RLImage,
+    )
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.enums import TA_CENTER
+    _REPORTLAB_AVAILABLE = True
+except Exception:
+    _REPORTLAB_AVAILABLE = False
+
 
 @dataclass
 class ReportSelections:
@@ -302,23 +317,224 @@ def build_html_report(device_name: str,
     return intro + metrics_html + charts_html + outro
 
 
+def _build_pdf_reportlab(device_name: str,
+                         df: pd.DataFrame,
+                         selections: ReportSelections,
+                         calculations: Dict[str, Dict[str, float]],
+                         charts: Dict[str, go.Figure]) -> bytes:
+    """Generate a professional PDF using reportlab (pure Python, no system deps)."""
+    buf = io.BytesIO()
+
+    PAGE_W, PAGE_H = A4
+    MARGIN = 20 * mm
+    USABLE_W = PAGE_W - 2 * MARGIN
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=MARGIN, rightMargin=MARGIN,
+        topMargin=MARGIN, bottomMargin=MARGIN,
+    )
+
+    # ── Colour palette ───────────────────────────────────────────────────────
+    C_GREEN = rl_colors.HexColor('#3A7F5F')
+    C_DARK_GREEN = rl_colors.HexColor('#2F6B50')
+    C_LIGHT_GREEN = rl_colors.HexColor('#E8F3EE')
+    C_TEXT = rl_colors.HexColor('#4A4A4A')
+    C_MUTED = rl_colors.HexColor('#6b7280')
+    C_BORDER = rl_colors.HexColor('#D9D9D9')
+    C_ROW_ALT = rl_colors.HexColor('#F9FAF9')
+
+    # ── Styles ───────────────────────────────────────────────────────────────
+    base = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'ReportTitle', parent=base['Title'],
+        fontSize=22, textColor=C_GREEN, spaceAfter=4, fontName='Helvetica-Bold',
+    )
+    h2_style = ParagraphStyle(
+        'H2', parent=base['Heading2'],
+        fontSize=13, textColor=C_DARK_GREEN,
+        spaceBefore=14, spaceAfter=6, fontName='Helvetica-Bold',
+    )
+    h3_style = ParagraphStyle(
+        'H3', parent=base['Heading3'],
+        fontSize=10, textColor=C_GREEN,
+        spaceBefore=8, spaceAfter=3, fontName='Helvetica-Bold',
+    )
+    body_style = ParagraphStyle(
+        'Body', parent=base['Normal'],
+        fontSize=9, textColor=C_TEXT, spaceAfter=4, fontName='Helvetica',
+    )
+    small_style = ParagraphStyle(
+        'Small', parent=base['Normal'],
+        fontSize=8, textColor=C_MUTED, fontName='Helvetica',
+    )
+    footer_style = ParagraphStyle(
+        'Footer', parent=small_style, alignment=TA_CENTER, spaceBefore=4,
+    )
+
+    def _tbl(data, col_widths=None):
+        t = Table(data, colWidths=col_widths)
+        t.setStyle(TableStyle([
+            ('BACKGROUND',   (0, 0), (-1, 0), C_LIGHT_GREEN),
+            ('TEXTCOLOR',    (0, 0), (-1, 0), C_DARK_GREEN),
+            ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',     (0, 0), (-1, -1), 9),
+            ('FONTNAME',     (0, 1), (-1, -1), 'Helvetica'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, C_ROW_ALT]),
+            ('GRID',         (0, 0), (-1, -1), 0.5, C_BORDER),
+            ('ALIGN',        (1, 0), (-1, -1), 'RIGHT'),
+            ('ALIGN',        (0, 0), (0, -1), 'LEFT'),
+            ('TOPPADDING',   (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING',  (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        return t
+
+    story = []
+
+    # ── Header ───────────────────────────────────────────────────────────────
+    report_type_label = {
+        'daily': 'Daily Summary', 'weekly': 'Weekly Summary',
+        'monthly': 'Monthly Summary', 'custom': 'Custom Report',
+    }.get(selections.report_type, 'Technical Report')
+
+    generated_at = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+    story.append(Paragraph(f'e-flow™ {report_type_label}', title_style))
+    story.append(Paragraph(f'Generated: {generated_at}', small_style))
+    story.append(HRFlowable(width='100%', thickness=2, color=C_GREEN, spaceAfter=10))
+
+    # ── Site information ─────────────────────────────────────────────────────
+    story.append(Paragraph('Site Information', h2_style))
+
+    if not df.empty:
+        ts = pd.to_datetime(df['timestamp'])
+        period_start = ts.min().strftime('%d/%m/%Y %H:%M')
+        period_end   = ts.max().strftime('%d/%m/%Y %H:%M')
+        period_label = f'{period_start} → {period_end}'
+    else:
+        period_label = f'Last {selections.time_window_hours} hours'
+
+    site_rows = [['Field', 'Value'],
+                 ['Station', html.escape(device_name)]]
+    if selections.site_id:
+        site_rows.append(['Site ID', html.escape(selections.site_id)])
+    if selections.location:
+        site_rows.append(['Location', html.escape(selections.location)])
+    site_rows += [
+        ['Monitoring Period', period_label],
+        ['Variables', ', '.join(selections.variables)],
+        ['Data Points', str(len(df))],
+    ]
+    story.append(_tbl(site_rows, col_widths=[55 * mm, USABLE_W - 55 * mm]))
+    story.append(Spacer(1, 6 * mm))
+
+    # ── AI Insights ──────────────────────────────────────────────────────────
+    ar: Optional[AnomalyReport] = selections.anomaly_report
+    if ar is not None:
+        story.append(Paragraph('AI Insights & Data Quality', h2_style))
+        ai_rows = [
+            ['Metric', 'Value'],
+            ['Data Quality', ar.quality_label],
+            ['Confidence Score', f'{ar.confidence_score:.1f} / 100'],
+            ['Total Anomalies', str(len(ar.flags))],
+            ['Valid Data', f'{ar.pct_valid:.1f}%'],
+            ['Flagged Data', f'{ar.pct_flagged:.1f}%'],
+            ['Flatline Events', str(ar.flatline_count)],
+            ['Spikes', str(ar.spike_count)],
+            ['Data Gaps', str(ar.dropout_count)],
+            ['Out-of-Range', str(ar.out_of_range_count)],
+            ['Statistical Outliers', str(ar.zscore_count)],
+        ]
+        story.append(_tbl(ai_rows, col_widths=[80 * mm, USABLE_W - 80 * mm]))
+        if ar.summary:
+            story.append(Spacer(1, 3 * mm))
+            story.append(Paragraph(f'<i>Summary: {html.escape(ar.summary)}</i>', body_style))
+        story.append(Spacer(1, 6 * mm))
+
+    # ── Summary statistics ───────────────────────────────────────────────────
+    if calculations:
+        story.append(Paragraph('Summary Statistics', h2_style))
+        VAR_LABELS = {
+            'depth_mm': 'Water Depth (mm)',
+            'velocity_mps': 'Flow Velocity (m/s)',
+            'flow_lps': 'Flow Rate (L/s)',
+        }
+        METRIC_LABELS = {
+            'mean': 'Mean', 'max': 'Maximum', 'min': 'Minimum',
+            'std': 'Std Deviation', 'p50': 'Median (P50)', 'p95': 'P95',
+            'range': 'Range', 'count': 'Count',
+            'volume_liters': 'Total Volume (L)', 'volume_m3': 'Total Volume (m³)',
+        }
+        for var, stats in calculations.items():
+            if not stats:
+                continue
+            story.append(Paragraph(VAR_LABELS.get(var, var), h3_style))
+            stat_rows = [['Metric', 'Value']] + [
+                [METRIC_LABELS.get(k, k), f'{v:,.3f}'] for k, v in stats.items()
+            ]
+            story.append(_tbl(stat_rows, col_widths=[80 * mm, USABLE_W - 80 * mm]))
+        story.append(Spacer(1, 6 * mm))
+
+    # ── Charts ───────────────────────────────────────────────────────────────
+    if charts and _KALEIDO_AVAILABLE:
+        story.append(Paragraph('Charts', h2_style))
+        VAR_LABELS = {
+            'depth_mm': 'Water Depth (mm)',
+            'velocity_mps': 'Flow Velocity (m/s)',
+            'flow_lps': 'Flow Rate (L/s)',
+        }
+        for var, fig in charts.items():
+            b64 = fig_to_base64_png(fig)
+            if b64:
+                img_buf = io.BytesIO(base64.b64decode(b64))
+                img = RLImage(img_buf, width=USABLE_W, height=USABLE_W * 0.45)
+                story.append(Paragraph(VAR_LABELS.get(var, var), h3_style))
+                story.append(img)
+                story.append(Spacer(1, 4 * mm))
+
+    # ── Footer ───────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 6 * mm))
+    story.append(HRFlowable(width='100%', thickness=1, color=C_BORDER))
+    story.append(Paragraph('e-flow™ by EDS — Hydrological Intelligence Platform', footer_style))
+
+    doc.build(story)
+    return buf.getvalue()
+
+
 def build_pdf_report(device_name: str,
                      df: pd.DataFrame,
                      selections: ReportSelections,
                      calculations: Dict[str, Dict[str, float]],
                      charts: Dict[str, go.Figure],
                      logo_path: Optional[str] = None) -> bytes:
-    """Generate a PDF report from HTML with logo support.
+    """Generate a PDF report.
 
-    Returns: PDF bytes, or empty bytes if weasyprint is unavailable.
+    Tries WeasyPrint first (richer HTML-CSS rendering); falls back to a
+    pure-Python reportlab implementation that requires no system libraries.
+    Returns empty bytes only if both engines are unavailable.
     """
-    if not _WEASYPRINT_AVAILABLE:
-        return b""
+    # ── WeasyPrint path ──────────────────────────────────────────────────────
+    if _WEASYPRINT_AVAILABLE:
+        try:
+            html_content = build_html_report(
+                device_name, df, selections, calculations, charts, logo_path
+            )
+            pdf_bytes = HTML(string=html_content).write_pdf()
+            if pdf_bytes:
+                return pdf_bytes
+        except Exception as e:
+            print(f"WeasyPrint PDF generation failed, falling back to reportlab: {e}")
 
-    try:
-        html_content = build_html_report(device_name, df, selections, calculations, charts, logo_path)
-        pdf_bytes = HTML(string=html_content).write_pdf()
-        return pdf_bytes
-    except Exception as e:
-        print(f"Error generating PDF report: {e}")
-        return b""
+    # ── reportlab fallback ───────────────────────────────────────────────────
+    if _REPORTLAB_AVAILABLE:
+        try:
+            return _build_pdf_reportlab(
+                device_name, df, selections, calculations, charts
+            )
+        except Exception as e:
+            print(f"reportlab PDF generation failed: {e}")
+
+    return b""
