@@ -251,7 +251,6 @@ with st.sidebar:
         "Select Device",
         options=sorted(device_names.keys()),
         key="device_selector",
-        label_visibility="collapsed"
     )
     selected_device_id = device_names[selected_device_name]
     
@@ -260,15 +259,20 @@ with st.sidebar:
     if device_info:
         with st.expander("📋 Station Details", expanded=False):
             st.markdown(f"""
-            <div style="font-family: 'Helvetica Neue', sans-serif; font-weight: 300; line-height: 1.8;">
-                <p><strong style="font-weight: 500;">Station ID</strong><br><code>{device_info['device_id']}</code></p>
-                <p><strong style="font-weight: 500;">Location</strong><br>{device_info['location'] or 'Not specified'}</p>
-                <p><strong style="font-weight: 500;">Initialized</strong><br><code>{device_info['created_at']}</code></p>
+            <div style="line-height: 1.7; word-break: break-word; overflow-wrap: break-word;">
+                <p style="margin: 0 0 0.5rem 0;"><strong>Station ID</strong><br>
+                    <code style="display: block; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap;">{device_info['device_id']}</code></p>
+                <p style="margin: 0 0 0.5rem 0;"><strong>Location</strong><br>
+                    <span>{device_info['location'] or 'Not specified'}</span></p>
+                <p style="margin: 0;"><strong>Initialized</strong><br>
+                    <code style="display: block; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap;">{device_info['created_at']}</code></p>
             </div>
             """, unsafe_allow_html=True)
 
+        st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
+
         # Manual refresh to pull the newest reading into the app (fast API path)
-        refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button")
+        refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button", use_container_width=True)
         
         if refresh_clicked:
             success, message, ts, payload = fetch_latest_reading(selected_device_id)
@@ -280,7 +284,25 @@ with st.sidebar:
                     'timestamp': ts
                 }
                 ts_str = ts.astimezone(pytz.timezone(DEFAULT_TZ)).strftime('%Y-%m-%d %H:%M:%S %Z') if ts else ""
-                st.success(f"{message} at {ts_str}")
+                # Auto-save the reading to the database
+                try:
+                    writer = DataScraper(db)
+                    stored = writer.store_measurement(
+                        device_id=selected_device_id,
+                        device_name=selected_device_name,
+                        depth_mm=payload.get("depth_mm"),
+                        velocity_mps=payload.get("velocity_mps"),
+                        flow_lps=payload.get("flow_lps"),
+                        allow_storage=True
+                    )
+                    if stored:
+                        get_cached_measurements.clear()
+                        get_cached_measurement_count.clear()
+                        st.success(f"✅ Reading fetched and saved to database at {ts_str}")
+                    else:
+                        st.info(f"✓ Reading fetched at {ts_str} (no change from last stored value)")
+                except Exception as e:
+                    st.warning(f"⚠️ Reading fetched at {ts_str} but could not save: {e}")
             else:
                 st.error(message)
         
@@ -301,65 +323,53 @@ with st.sidebar:
             
             st.markdown(f"""
             <div style="background: {bg_color}; 
-                        padding: 15px; border-radius: 10px; border: 2px solid {border_color};
-                        margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <span style="font-size: 0.85rem; color: {text_color}; font-weight: 500;">{status_icon} LIVE DATA</span>
-                    <span style="font-size: 0.75rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
+                        padding: 14px; border-radius: 10px; border: 2px solid {border_color};
+                        margin-top: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.82rem; color: {text_color}; font-weight: 600;">{status_icon} LIVE DATA</span>
+                    <span style="font-size: 0.72rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <div style="text-align: center;">
-                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Depth</div>
-                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
-                        <div style="font-size: 0.7rem; color: #888;">mm</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center;">
+                    <div>
+                        <div style="font-size: 0.7rem; color: #666; margin-bottom: 2px;">Depth</div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: {text_color}; line-height: 1.2;">{f'{depth:.1f}' if depth is not None else 'N/A'}</div>
+                        <div style="font-size: 0.65rem; color: #888;">mm</div>
                     </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Velocity</div>
-                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
-                        <div style="font-size: 0.7rem; color: #888;">m/s</div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: #666; margin-bottom: 2px;">Velocity</div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: {text_color}; line-height: 1.2;">{f'{velocity:.3f}' if velocity is not None else 'N/A'}</div>
+                        <div style="font-size: 0.65rem; color: #888;">m/s</div>
                     </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 3px;">Flow</div>
-                        <div style="font-size: 1.3rem; font-weight: 500; color: {text_color};">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
-                        <div style="font-size: 0.7rem; color: #888;">L/s</div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: #666; margin-bottom: 2px;">Flow</div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: {text_color}; line-height: 1.2;">{f'{flow:.1f}' if flow is not None else 'N/A'}</div>
+                        <div style="font-size: 0.65rem; color: #888;">L/s</div>
                     </div>
-                </div>
-                <div style="margin-top: 8px; font-size: 0.7rem; color: #999; text-align: center;">
-                    ✓ Data is automatically saved to the database by the monitor service
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Optional: allow one-click store from Streamlit or admin override
-            allow_streamlit_writes = os.getenv("ALLOW_STREAMLIT_WRITES", "").lower() in ("1", "true", "yes")
-            can_store = allow_streamlit_writes or is_admin()
-            if can_store and has_data:
-                if is_admin() and not allow_streamlit_writes:
-                    st.info("Admin override enabled: You can store this current reading directly to the database.")
-                col_store, _ = st.columns([1,3])
-                with col_store:
-                    if st.button("Save current live reading to database", key="store_now_button"):
-                        try:
-                            writer = DataScraper(db)
-                            stored = writer.store_measurement(
-                                device_id=selected_device_id,
-                                device_name=selected_device_name,
-                                depth_mm=depth,
-                                velocity_mps=velocity,
-                                flow_lps=flow,
-                                allow_storage=True
-                            )
-                            if stored:
-                                st.success("✅ Reading stored to database")
-                                # Invalidate caches so the new record is reflected immediately
-                                get_cached_measurements.clear()
-                                get_cached_measurement_count.clear()
-                            else:
-                                st.info("ℹ️ No change detected — not stored")
-                        except Exception as e:
-                            st.error(f"❌ Failed to store reading: {e}")
-            elif has_data:
-                st.caption("Enable ALLOW_STREAMLIT_WRITES or sign in as admin to store the current reading.")
+            # Save button available to all authenticated users
+            if has_data:
+                if st.button("💾 Save reading to database", key="store_now_button", use_container_width=True):
+                    try:
+                        writer = DataScraper(db)
+                        stored = writer.store_measurement(
+                            device_id=selected_device_id,
+                            device_name=selected_device_name,
+                            depth_mm=depth,
+                            velocity_mps=velocity,
+                            flow_lps=flow,
+                            allow_storage=True
+                        )
+                        if stored:
+                            st.success("✅ Reading saved to database")
+                            get_cached_measurements.clear()
+                            get_cached_measurement_count.clear()
+                        else:
+                            st.info("ℹ️ No change detected — reading already stored")
+                    except Exception as e:
+                        st.error(f"❌ Failed to save reading: {e}")
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
