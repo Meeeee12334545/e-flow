@@ -53,12 +53,63 @@ def ensure_playwright_installed():
 # Install on startup (cached so only runs once)
 ensure_playwright_installed()
 
+
+@st.cache_resource
+def start_background_monitor():
+    """Start monitor.py as a background subprocess if it is not already running.
+
+    Uses monitor.py's own SingletonProcessLock so a second instance launched
+    externally (e.g. via docker-compose or start.sh) is simply ignored here.
+    Returns the Popen object (or None on failure).
+    """
+    import atexit
+    try:
+        monitor_script = Path(__file__).parent / "monitor.py"
+        if not monitor_script.exists():
+            return None
+        env = os.environ.copy()
+        env.setdefault("MONITOR_ENABLED", "true")
+        env.setdefault("MONITOR_INTERVAL", "60")
+        env.setdefault("SCRAPER_FORCE_REQUESTS", "1")
+        env.setdefault("STORE_ALL_READINGS", "false")
+        # Keep EXIT_ON_UNHEALTHY=false here: without a process manager to
+        # restart the subprocess on failure, letting it call sys.exit(1) would
+        # permanently kill background collection.  supervisord.conf sets this
+        # to true because supervisord will automatically restart the process.
+        env.setdefault("EXIT_ON_UNHEALTHY", "false")
+        # Redirect stderr to monitor.log (append mode) so crash tracebacks are
+        # captured without the pipe-buffer deadlock that stderr=PIPE can cause.
+        # monitor.py already has a RotatingFileHandler on monitor.log, so all
+        # structured log output goes there via the logging framework regardless.
+        log_path = monitor_script.parent / "monitor.log"
+        # Use a 'with' block so the parent's file handle is always closed even
+        # if Popen() raises; the subprocess inherits the fd before we close.
+        with open(log_path, "ab") as log_fp:
+            proc = subprocess.Popen(
+                [sys.executable, str(monitor_script)],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=log_fp,
+            )
+        # Ensure the monitor subprocess is terminated when Streamlit exits
+        atexit.register(lambda: proc.terminate())
+        return proc
+    except Exception as e:
+        logging.getLogger(__name__).warning(
+            "Could not start background monitor: %s", e, exc_info=True
+        )
+        return None
+
+
+# Launch background monitor so data is collected automatically even when
+# running Streamlit alone (without a separate monitor.py process).
+# monitor.py's SingletonProcessLock prevents a second instance if one is
+# already running externally.
+_monitor_proc = start_background_monitor()
+
 # Setup logging before anything else
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Data collection runs in a separate monitor service/container.
-# This Streamlit app is read-only and visualizes stored data.
 
 st.set_page_config(
     page_title="e-flow | Hydrological Analytics",
@@ -232,10 +283,12 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # Monitor status
-    if MONITOR_ENABLED:
+    if _monitor_proc is not None:
+        st.success("✔ Monitor service: running (auto-collecting data)")
+    elif MONITOR_ENABLED:
         st.success("✔ Monitor service: active")
     else:
-        st.info("ℹ️ Monitor service: not running locally. Start monitor.py to collect data.")
+        st.info("ℹ️ Monitor service: not running. Start monitor.py to collect data.")
 
     # Build device mapping from database
     devices = db.get_devices()
@@ -404,7 +457,10 @@ with st.sidebar:
 
     if total_measurements == 0:
         st.warning("⚠️ No measurements yet.")
-        st.info("Start the monitor service to collect data automatically.")
+        if _monitor_proc is not None:
+            st.info("⏳ Background monitor is running — first reading will arrive within 60 seconds. You can also click **Show Real-Time Data** above to fetch and save a reading right now.")
+        else:
+            st.info("Click **Show Real-Time Data** to fetch and save a live reading, or start monitor.py to collect data automatically.")
 
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)

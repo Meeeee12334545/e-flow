@@ -13,7 +13,7 @@ WORKDIR /app
 # Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (includes supervisor for process management)
 RUN pip install --no-cache-dir -r requirements.txt && \
     playwright install chromium --with-deps
 
@@ -27,9 +27,15 @@ RUN mkdir -p /app/data
 ENV PYTHONUNBUFFERED=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
+# Expose Streamlit port
+EXPOSE 8501
+
 # Health check (uses health.py to ensure recent data)
 HEALTHCHECK --interval=5m --timeout=30s --start-period=60s --retries=3 \
     CMD python health.py || exit 1
 
-# Run the monitor
-CMD ["python", "monitor.py"]
+# Default: run both monitor and dashboard via supervisord.
+# Override CMD in docker-compose when you want a single-purpose container:
+#   monitor service:   command: python monitor.py
+#   dashboard service: command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+CMD ["supervisord", "-c", "/app/supervisord.conf"]

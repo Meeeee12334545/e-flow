@@ -1,10 +1,11 @@
 version: '3.8'
 
 services:
-  # Data collection service
+  # Data collection service (monitor only — no dashboard)
   monitor:
     build: .
     container_name: e-flow-monitor
+    command: python monitor.py
     restart: unless-stopped
     volumes:
       - ./flow_data.db:/app/flow_data.db
@@ -34,7 +35,7 @@ services:
           cpus: '0.25'
           memory: 256M
 
-  # Dashboard service (optional)
+  # Dashboard service (Streamlit only — reads/writes shared DB)
   dashboard:
     build: .
     container_name: e-flow-dashboard
@@ -43,7 +44,7 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - ./flow_data.db:/app/flow_data.db:ro
+      - ./flow_data.db:/app/flow_data.db
     depends_on:
       - monitor
     environment:
@@ -62,3 +63,39 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+
+  # Standalone all-in-one service: supervisord manages both monitor and
+  # Streamlit in a single container.  Useful for single-host deployments
+  # where you just want `docker-compose up standalone`.
+  standalone:
+    build: .
+    container_name: e-flow-standalone
+    # CMD defaults to supervisord — no override needed
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./flow_data.db:/app/flow_data.db
+      - ./monitor.log:/app/monitor.log
+    environment:
+      - MONITOR_ENABLED=true
+      - MONITOR_INTERVAL=60
+      - SCRAPER_FORCE_REQUESTS=1
+      - TIMEZONE=Australia/Brisbane
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    profiles:
+      - standalone
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 384M
