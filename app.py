@@ -351,7 +351,7 @@ with st.sidebar:
         st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
 
         # Manual refresh to pull the newest reading into the app (fast API path)
-        refresh_clicked = st.button("Show Real-Time Data", type="primary", key="refresh_button", use_container_width=True)
+        refresh_clicked = st.button("Get Latest Data", type="primary", key="refresh_button", use_container_width=True)
         
         if refresh_clicked:
             success, message, ts, payload = fetch_latest_reading(selected_device_id)
@@ -457,9 +457,9 @@ with st.sidebar:
     if total_measurements == 0:
         st.warning("⚠️ No measurements yet.")
         if _monitor_proc is not None:
-            st.info("⏳ Background monitor is running — first reading will arrive within 60 seconds. You can also click **Show Real-Time Data** above to fetch and save a reading right now.")
+            st.info("⏳ Background monitor is running — first reading will arrive within 60 seconds. You can also click **Get Latest Data** above to fetch and save a reading right now.")
         else:
-            st.info("Click **Show Real-Time Data** to fetch and save a live reading, or start monitor.py to collect data automatically.")
+            st.info("Click **Get Latest Data** to fetch and save a live reading, or start monitor.py to collect data automatically.")
 
     if selected_device_id:
         stats = get_collection_stats(selected_device_id)
