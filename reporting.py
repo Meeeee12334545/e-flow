@@ -174,13 +174,15 @@ def build_html_report(device_name: str,
     else:
         period_label = f"Last {selections.time_window_hours} hours"
 
-    # Logo HTML (if provided)
+    # Logo HTML (if provided) — supports PNG and SVG
     logo_html = ""
     if logo_path and Path(logo_path).exists():
         try:
             with open(logo_path, "rb") as f:
                 logo_b64 = base64.b64encode(f.read()).decode()
-                logo_html = f"<img src='data:image/png;base64,{logo_b64}' style='height:60px;margin-bottom:20px;'/>"
+            suffix = Path(logo_path).suffix.lower()
+            mime = "image/svg+xml" if suffix == ".svg" else "image/png"
+            logo_html = f"<img src='data:{mime};base64,{logo_b64}' style='height:60px;margin-bottom:20px;'/>"
         except Exception:
             pass
 

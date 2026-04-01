@@ -8,15 +8,19 @@ Streamlit page for administrators to:
 
 import streamlit as st
 import pandas as pd
+from pathlib import Path
 from auth import AuthDatabase
 from database import FlowDatabase
 from shared_styles import apply_styles
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, get_current_user
 
+_ASSETS = Path(__file__).parent.parent / "assets"
+
 
 def render_admin_panel():
     """Render the admin management panel."""
     apply_styles()
+    st.logo(str(_ASSETS / "logo_wide.svg"), icon_image=str(_ASSETS / "logo_icon.svg"))
 
     if not is_authenticated():
         st.error("❌ You must be logged in")

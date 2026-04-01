@@ -4,9 +4,13 @@ Streamlit Authentication UI Module
 Handles login/logout, session management, and auth state in Streamlit.
 """
 
+import base64
 import streamlit as st
+from pathlib import Path
 from auth import AuthDatabase
 from shared_styles import apply_styles
+
+_ASSETS = Path(__file__).parent / "assets"
 
 
 def init_auth_state():
@@ -25,25 +29,18 @@ def login_page():
     """Display a polished, branded login page."""
     apply_styles()
 
-    # Brand header
-    st.markdown("""
+    # EDS logo header
+    _logo_b64 = base64.b64encode((_ASSETS / "logo_wide.svg").read_bytes()).decode()
+    _logo_src = f"data:image/svg+xml;base64,{_logo_b64}"
+    st.markdown(f"""
     <div style="text-align: center; padding: 2.5rem 1rem 1.5rem;">
-        <div style="
-            width: 64px; height: 64px; border-radius: 18px;
-            background: #3A7F5F;
-            display: inline-flex; align-items: center; justify-content: center;
-            font-size: 2rem; margin-bottom: 0.75rem;
-            box-shadow: 0 8px 24px rgba(58,127,95,0.25);
-        ">🌊</div>
-        <h1 style="
-            font-size: 2rem !important; font-weight: 700 !important;
-            color: #3A7F5F !important; margin: 0 !important;
-            letter-spacing: -0.03em; line-height: 1.1 !important;
-        ">e-flow™</h1>
+        <img src="{_logo_src}"
+             alt="EDS — Environmental Data Services"
+             style="height:72px; display:inline-block; margin-bottom: 0.75rem;"/>
         <p style="
             font-size: 0.92rem !important; color: #6b7280 !important;
             margin: 0.3rem 0 0 0 !important;
-        ">by EDS — Professional hydrological monitoring</p>
+        ">Professional hydrological monitoring</p>
     </div>
     """, unsafe_allow_html=True)
 
