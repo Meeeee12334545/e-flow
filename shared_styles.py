@@ -757,6 +757,12 @@ _CSS = """
     .quality-badge.medium   { background: #FFF8E1; color: #b45309; border: 1px solid #ffe082; }
     .quality-badge.low      { background: #FDECEA; color: #c62828; border: 1px solid #ef9a9a; }
 
+    /* ── Hide Streamlit's auto-generated page navigation (duplicates explicit nav buttons) ── */
+    [data-testid="stSidebarNavItems"],
+    [data-testid="stSidebarNavSeparator"] {
+        display: none !important;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
         .block-container { padding: 1rem 1rem 2rem !important; }
