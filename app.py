@@ -123,12 +123,16 @@ def get_collection_stats(device_id):
         return {}
 
     df = pd.DataFrame(measurements)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+    df = df.dropna(subset=['timestamp'])
+    if df.empty:
+        return {}
 
+    span_secs = (df['timestamp'].max() - df['timestamp'].min()).total_seconds()
     return {
         'total_points': len(df),
-        'time_span': (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 3600,
-        'collection_rate': len(df) / max(1, (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 60),
+        'time_span': span_secs / 3600,
+        'collection_rate': len(df) / max(1, span_secs / 60),
     }
 
 
@@ -375,9 +379,7 @@ with st.sidebar:
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
         selected_device_id = None
 
-    st.divider()
-
-    # System stats
+    # System stats — the h2 CSS border-top acts as the visual divider
     st.markdown("## System")
     col1, col2 = st.columns(2)
     with col1:
@@ -390,11 +392,11 @@ with st.sidebar:
     if latest_rows:
         try:
             ts_raw = latest_rows[0]["timestamp"]
-            latest_ts = pd.to_datetime(ts_raw)
+            latest_ts = pd.to_datetime(ts_raw, errors='coerce')
+            if pd.isna(latest_ts):
+                raise ValueError("unparseable timestamp")
             if latest_ts.tzinfo is None:
                 latest_ts = latest_ts.tz_localize(pytz.utc)
-            else:
-                latest_ts = pd.Timestamp(latest_ts)
             local_ts = latest_ts.astimezone(pytz.timezone(DEFAULT_TZ))
             st.caption(f"Last record: {local_ts.strftime('%Y-%m-%d %H:%M %Z')}")
         except Exception:
@@ -434,7 +436,8 @@ if page_mode == 'Simplified View':
         measurements = get_cached_measurements(device_id=selected_device_id)
         if measurements:
             df = pd.DataFrame(measurements)
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            df = df.dropna(subset=['timestamp'])
             df.sort_values('timestamp', inplace=True)
             latest = df.iloc[-1]
             now_local = datetime.now(pytz.timezone(DEFAULT_TZ))
@@ -625,7 +628,12 @@ if selected_device_id:
 
     if measurements:
         df = pd.DataFrame(measurements)
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors='coerce')
+        df = df.dropna(subset=["timestamp"])
+
+        # Make timestamps tz-aware (UTC) so comparison with cutoff_time works
+        if not df.empty and df["timestamp"].dt.tz is None:
+            df["timestamp"] = df["timestamp"].dt.tz_localize(pytz.utc)
 
         # Filter by time range
         cutoff_time = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=time_range)

@@ -531,15 +531,19 @@ _CSS = """
     }
 
     section[data-testid="stSidebar"] > div {
-        padding-top: 1.5rem !important;
+        padding-top: 1rem !important;
     }
 
+    /* Section headers in sidebar — refined rule, applied after the first */
     section[data-testid="stSidebar"] h2 {
-        font-size: 1rem !important;
+        font-size: 0.7rem !important;
         font-weight: 700 !important;
-        color: var(--primary) !important;
-        letter-spacing: 0.04em;
+        color: var(--muted) !important;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
+        margin: 1.1rem 0 0.5rem 0 !important;
+        padding-top: 1rem !important;
+        border-top: 1px solid var(--border) !important;
     }
 
     /* ── Sidebar user card ── */
@@ -547,19 +551,22 @@ _CSS = """
         background: var(--primary-soft);
         border: 1px solid rgba(58,127,95,0.18);
         border-radius: var(--radius-sm);
-        padding: 14px 16px;
-        margin-bottom: 1rem;
+        padding: 12px 14px;
+        margin-bottom: 0.75rem;
     }
 
     .sidebar-user-name {
         font-weight: 700 !important;
-        font-size: 0.95rem !important;
+        font-size: 0.9rem !important;
         color: var(--primary) !important;
-        margin: 0 0 0.2rem 0 !important;
+        margin: 0 0 0.15rem 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
     .sidebar-user-role {
-        font-size: 0.8rem !important;
+        font-size: 0.75rem !important;
         color: var(--muted) !important;
         margin: 0 !important;
     }
@@ -602,18 +609,49 @@ _CSS = """
         max-width: 100% !important;
     }
 
-    /* Ensure expander header text never overlaps */
-    .stExpander summary {
+    /* ── Expander: fix the _arr...Label overlap ──────────────────────────────
+       The collapse/expand toggle icon lives inside <summary> alongside a <p>
+       with the label.  Applying white-space:nowrap + ellipsis to the <summary>
+       squashes both the icon and the text together, producing garbled output
+       like "_arr...SiteDetails".  Instead we constrain only the inner <p>. */
+    .stExpander summary,
+    [data-testid="stExpander"] summary {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
         overflow: hidden !important;
-        white-space: nowrap !important;
+        /* Do NOT set white-space or text-overflow here */
+    }
+
+    .stExpander summary p,
+    [data-testid="stExpander"] summary p,
+    .stExpander summary span.st-emotion-cache-1gulkj5,
+    .stExpander [data-testid="stExpanderToggleIcon"] ~ * {
+        overflow: hidden !important;
         text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Keep the toggle icon from shrinking */
+    .stExpander [data-testid="stExpanderToggleIcon"],
+    [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] {
+        flex-shrink: 0 !important;
     }
 
     /* Sidebar element spacing — prevents stacked elements from visually colliding */
     section[data-testid="stSidebar"] .stSelectbox,
     section[data-testid="stSidebar"] .stExpander,
     section[data-testid="stSidebar"] .stButton {
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0.45rem !important;
+    }
+
+    /* Text inputs & textareas in sidebar */
+    section[data-testid="stSidebar"] .stTextInput,
+    section[data-testid="stSidebar"] .stTextArea {
+        margin-bottom: 0.45rem !important;
     }
 
     /* Ensure code blocks in sidebar wrap cleanly */
