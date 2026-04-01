@@ -1,17 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 870 220" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 870 260" fill="none">
   <g stroke="#2A9D8F" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Circular C-arc: gap at right (2 o'clock to 4:30), 285° arc counterclockwise -->
+    <!-- Circular C-arc: gap at right (2 o'clock to 4:30), ~285° arc counterclockwise -->
     <path d="M 167 41 A 53 53 0 1 0 158 107" stroke-width="24"/>
-    <!-- S-wave: spans full mark width, centred at y=137 -->
-    <path d="M 14 137 C 14 113 118 113 118 137 C 118 161 222 161 222 137" stroke-width="24"/>
+    <!-- S-wave: two arc-based bumps for a pronounced circular wave appearance -->
+    <path d="M 14 137 A 52 52 0 1 0 118 137 A 52 52 0 1 1 222 137" stroke-width="24"/>
     <!-- Wave line 1 -->
-    <path d="M 8 178 Q 42 161 76 178 Q 110 195 144 178 Q 178 161 210 178" stroke-width="21"/>
+    <path d="M 8 211 Q 42 194 76 211 Q 110 228 144 211 Q 178 194 210 211" stroke-width="21"/>
     <!-- Wave line 2 -->
-    <path d="M 14 208 Q 45 191 76 208 Q 107 225 138 208 Q 169 191 205 208" stroke-width="18"/>
+    <path d="M 14 238 Q 45 228 76 238 Q 107 248 138 238 Q 169 228 205 238" stroke-width="18"/>
   </g>
   <!-- EDS wordmark -->
   <text
-    x="252" y="193"
+    x="252" y="205"
     font-family="'Arial Black', 'Arial Bold', Arial, Helvetica, sans-serif"
     font-weight="900"
     font-size="168"
@@ -19,7 +19,7 @@
     letter-spacing="-3">EDS</text>
   <!-- Environmental Data Services tagline -->
   <text
-    x="254" y="217"
+    x="254" y="245"
     font-family="Arial, Helvetica, sans-serif"
     font-style="italic"
     font-weight="300"

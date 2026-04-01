@@ -1,17 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 500" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 520" fill="none">
   <g stroke="#2A9D8F" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Circular C-arc: gap at right (2 o'clock to 4:30), 285° arc counterclockwise -->
+    <!-- Circular C-arc: gap at right (2 o'clock to 4:30), ~285° arc counterclockwise -->
     <path d="M 222 59 A 72 72 0 1 0 211 146" stroke-width="32"/>
-    <!-- S-wave: spans full mark width, centred at y=196 -->
-    <path d="M 18 196 C 18 161 160 161 160 196 C 160 231 302 231 302 196" stroke-width="32"/>
+    <!-- S-wave: two arc-based bumps for a pronounced circular wave appearance -->
+    <path d="M 18 196 A 71 71 0 1 0 160 196 A 71 71 0 1 1 302 196" stroke-width="32"/>
     <!-- Wave line 1 -->
-    <path d="M 10 254 Q 52 229 94 254 Q 136 279 178 254 Q 220 229 262 254" stroke-width="28"/>
+    <path d="M 10 290 Q 52 265 94 290 Q 136 315 178 290 Q 220 265 262 290" stroke-width="28"/>
     <!-- Wave line 2 -->
-    <path d="M 18 295 Q 60 270 102 295 Q 144 320 186 295 Q 228 270 270 295" stroke-width="26"/>
+    <path d="M 18 336 Q 60 316 102 336 Q 144 356 186 336 Q 228 316 270 336" stroke-width="26"/>
   </g>
   <!-- EDS wordmark -->
   <text
-    x="160" y="474"
+    x="160" y="490"
     font-family="'Arial Black', 'Arial Bold', Arial, Helvetica, sans-serif"
     font-weight="900"
     font-size="145"
