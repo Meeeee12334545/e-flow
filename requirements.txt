@@ -16,3 +16,5 @@ weasyprint>=60.0
 scipy>=1.11.0
 numpy>=1.26.0
 supervisor>=4.2.0
+folium>=0.17.0
+streamlit-folium>=0.22.0

@@ -160,6 +160,44 @@ class ContinuousMonitor:
         if self.scheduler.running:
             self.scheduler.shutdown(wait=False)
 
+    def refresh_rainfall_data(self):
+        """Fetch and cache rainfall data for all devices that have coordinates or a station assigned.
+
+        Runs as a background job every 30 minutes so the UI always has fresh data.
+        """
+        try:
+            from rainfall import get_rainfall_for_device
+        except ImportError:
+            logger.warning("rainfall module not available; skipping rainfall refresh")
+            return
+
+        devices = self.db.get_devices()
+        now = datetime.now(pytz.timezone(DEFAULT_TZ))
+        date_from = now - timedelta(hours=48)
+        date_to = now
+
+        refreshed = 0
+        for device in devices:
+            device_id = device["device_id"]
+            has_coords = device.get("latitude") and device.get("longitude")
+            has_station = self.db.get_device_rainfall_station(device_id) is not None
+
+            if not (has_coords or has_station):
+                continue
+
+            try:
+                df = get_rainfall_for_device(device_id, self.db, date_from, date_to)
+                if not df.empty:
+                    refreshed += 1
+                    logger.debug(
+                        "Rainfall refreshed for %s: %d records", device_id, len(df)
+                    )
+            except Exception as exc:
+                logger.warning("Rainfall refresh failed for %s: %s", device_id, exc)
+
+        if refreshed:
+            logger.info("🌧️ Rainfall data refreshed for %d device(s)", refreshed)
+
     async def check_for_updates_with_retry(self):
         """Check for updates with automatic retry logic."""
         for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
@@ -379,6 +417,15 @@ class ContinuousMonitor:
             id='monitor_job',
             name='Monitor USRIOT for updates',
             replace_existing=True
+        )
+
+        # Schedule the rainfall refresh job (every 30 minutes)
+        self.scheduler.add_job(
+            self.refresh_rainfall_data,
+            IntervalTrigger(minutes=30),
+            id='rainfall_refresh_job',
+            name='Refresh rainfall cache',
+            replace_existing=True,
         )
         
         try:
