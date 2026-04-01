@@ -261,32 +261,30 @@ class AuthDatabase:
             cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             try:
                 cur.execute(
-                    "SELECT user_id, username, email, role, active FROM users WHERE username = %s",
+                    "SELECT user_id, username, email, password_hash, role, active FROM users WHERE username = %s",
                     (username,)
                 )
                 row = cur.fetchone()
                 if not row:
                     return None
-                
-                user_info = dict(row)
-                
-                # Check password
-                cur.execute("SELECT password_hash FROM users WHERE username = %s", (username,))
-                result = cur.fetchone()
-                if not result or not self.verify_password(password, result[0]):
+
+                row_dict = dict(row)
+                password_hash = row_dict.pop('password_hash')
+
+                if not self.verify_password(password, password_hash):
                     return None
-                
-                if not user_info['active']:
+
+                if not row_dict['active']:
                     return None
-                
+
                 # Update last login
                 cur.execute(
                     "UPDATE users SET last_login = NOW() WHERE username = %s",
                     (username,)
                 )
                 conn.commit()
-                
-                return user_info
+
+                return row_dict
             finally:
                 cur.close()
                 conn.close()
@@ -376,6 +374,72 @@ class AuthDatabase:
                     "SELECT user_id, username, email, role, active, created_at, last_login FROM users ORDER BY created_at DESC"
                 )
                 return [dict(row) for row in cursor.fetchall()]
+            finally:
+                conn.close()
+
+    def list_users_with_devices(self) -> List[Dict]:
+        """List all users together with their assigned device IDs and names.
+
+        Returns a single query result (no N+1) where each entry contains the
+        standard user fields plus ``device_ids`` (list[str]) and
+        ``device_names`` (list[str]).
+        """
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                cur.execute(
+                    """
+                    SELECT u.user_id, u.username, u.email, u.role, u.active,
+                           u.created_at, u.last_login,
+                           COALESCE(
+                               array_agg(ud.device_id ORDER BY ud.assigned_at)
+                               FILTER (WHERE ud.device_id IS NOT NULL), '{}'
+                           ) AS device_ids,
+                           COALESCE(
+                               array_agg(d.device_name ORDER BY ud.assigned_at)
+                               FILTER (WHERE d.device_name IS NOT NULL), '{}'
+                           ) AS device_names
+                    FROM users u
+                    LEFT JOIN user_devices ud ON u.user_id = ud.user_id
+                    LEFT JOIN devices d ON ud.device_id = d.device_id
+                    GROUP BY u.user_id, u.username, u.email, u.role, u.active,
+                             u.created_at, u.last_login
+                    ORDER BY u.created_at DESC
+                    """
+                )
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    SELECT u.user_id, u.username, u.email, u.role, u.active,
+                           u.created_at, u.last_login,
+                           GROUP_CONCAT(ud.device_id) AS device_ids_str,
+                           GROUP_CONCAT(d.device_name) AS device_names_str
+                    FROM users u
+                    LEFT JOIN user_devices ud ON u.user_id = ud.user_id
+                    LEFT JOIN devices d ON ud.device_id = d.device_id
+                    GROUP BY u.user_id
+                    ORDER BY u.created_at DESC
+                    """
+                )
+                result = []
+                for row in cursor.fetchall():
+                    r = dict(row)
+                    ids_str = r.pop('device_ids_str') or ''
+                    names_str = r.pop('device_names_str') or ''
+                    r['device_ids'] = ids_str.split(',') if ids_str else []
+                    r['device_names'] = names_str.split(',') if names_str else []
+                    result.append(r)
+                return result
             finally:
                 conn.close()
 

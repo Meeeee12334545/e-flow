@@ -80,8 +80,11 @@ def render_admin_panel():
     # ── Assign Sites to Users ────────────────────────────────────────────────
     st.markdown('<p class="section-title">📍 Assign Sites to Users</p>', unsafe_allow_html=True)
 
-    users = auth_db.list_users()
+    # Single batch query: users + their assigned device IDs/names in one round-trip
+    users = auth_db.list_users_with_devices()
     devices = flow_db.get_devices()
+    # Build a lookup dict for O(1) device resolution by ID
+    device_map = {d['device_id']: d for d in devices}
 
     if not users:
         st.warning("⚠️ No users available. Create a user first.")
@@ -106,7 +109,8 @@ def render_admin_panel():
                 )
 
             if selected_user:
-                user_device_ids = auth_db.get_user_devices(selected_user['user_id'])
+                # Device IDs already fetched in the batch query — no extra DB call
+                user_device_ids = selected_user['device_ids']
 
                 with col_info:
                     st.markdown(f"""
@@ -148,9 +152,7 @@ def render_admin_panel():
                     )
                     if user_device_ids:
                         for device_id in user_device_ids:
-                            device = next(
-                                (d for d in devices if d['device_id'] == device_id), None
-                            )
+                            device = device_map.get(device_id)
                             if device:
                                 col_name, col_remove = st.columns([4, 1])
                                 with col_name:
@@ -183,16 +185,16 @@ def render_admin_panel():
     else:
         regular_users = [u for u in users if u['role'] == 'user']
         if regular_users:
-            summary = []
-            for user in regular_users:
-                uid = auth_db.get_user_devices(user['user_id'])
-                device_names = [d['device_name'] for d in devices if d['device_id'] in uid]
-                summary.append({
-                    'Username': user['username'],
-                    'Email': user['email'],
-                    'Sites Assigned': len(uid),
-                    'Sites': ', '.join(device_names) if device_names else '—',
-                })
+            # device_ids and device_names already available from the batch query
+            summary = [
+                {
+                    'Username': u['username'],
+                    'Email': u['email'],
+                    'Sites Assigned': len(u['device_ids']),
+                    'Sites': ', '.join(u['device_names']) if u['device_names'] else '—',
+                }
+                for u in regular_users
+            ]
             st.dataframe(
                 pd.DataFrame(summary),
                 use_container_width=True,
