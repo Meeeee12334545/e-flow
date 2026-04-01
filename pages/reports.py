@@ -332,7 +332,7 @@ if history:
                     ["generated_at", "report_type", "period_start", "period_end",
                      "quality_label", "confidence_score", "anomaly_count", "summary"]
                     if c in hist_df.columns]
-    st.dataframe(hist_df[display_cols], width="stretch", hide_index=True)
+    st.dataframe(hist_df[display_cols], use_container_width=True, hide_index=True)
 else:
     st.info("No reports generated yet for this device.")
 
@@ -348,7 +348,7 @@ with st.expander("View recent anomaly flags for this device", expanded=False):
                         ["measurement_timestamp", "column_name", "anomaly_type",
                          "severity", "description", "overridden", "override_note"]
                         if c in flags_df.columns]
-        st.dataframe(flags_df[display_cols], width="stretch", hide_index=True)
+        st.dataframe(flags_df[display_cols], use_container_width=True, hide_index=True)
 
         # Admin: override a flag
         if is_admin():

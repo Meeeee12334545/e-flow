@@ -29,6 +29,13 @@ from rainfall_analysis import (
 
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user, get_org_logo_data_uri, get_sidebar_logo_path
 
+# set_page_config MUST be the first Streamlit command in the script
+st.set_page_config(
+    page_title="e-flow | Hydrological Analytics",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # Initialize authentication state
 init_auth_state()
 
@@ -117,12 +124,6 @@ _monitor_proc = start_background_monitor()
 # Setup logging before anything else
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-st.set_page_config(
-    page_title="e-flow | Hydrological Analytics",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Apply shared professional design system (Inter font, blue palette, component overrides)
 apply_styles()
@@ -674,7 +675,7 @@ if page_mode == 'Simplified View':
             fig.update_xaxes(title_text='Time')
             fig.update_yaxes(title_text='Flow (L/s) / Depth (mm)', secondary_y=False)
             fig.update_yaxes(title_text='Velocity (m/s)', secondary_y=True)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
 
             if show_note:
                 st.info(
@@ -885,7 +886,7 @@ if selected_device_id:
                     yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
                     legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
                 )
-                st.plotly_chart(fig_main_flow, width="stretch")
+                st.plotly_chart(fig_main_flow, use_container_width=True)
 
                 col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                 with col_stat1:
@@ -929,7 +930,7 @@ if selected_device_id:
                 fig_depth.update_traces(line=dict(color="#3A7F5F", width=2.5), marker=dict(size=5))
                 fig_depth.update_layout(**_chart_layout)
                 fig_depth.update_yaxes(title_text="Depth (mm)")
-                st.plotly_chart(fig_depth, width="stretch")
+                st.plotly_chart(fig_depth, use_container_width=True)
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
                 col_s2.metric("Max", f"{df['depth_mm'].max():.1f} mm")
@@ -943,7 +944,7 @@ if selected_device_id:
                 fig_vel.update_traces(line=dict(color="#2A9D8F", width=2.5), marker=dict(size=5))
                 fig_vel.update_layout(**_chart_layout)
                 fig_vel.update_yaxes(title_text="Velocity (m/s)")
-                st.plotly_chart(fig_vel, width="stretch")
+                st.plotly_chart(fig_vel, use_container_width=True)
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
                 col_s2.metric("Max", f"{df['velocity_mps'].max():.3f} m/s")
@@ -957,7 +958,7 @@ if selected_device_id:
                 fig_flow.update_traces(line=dict(color="#1D4E89", width=2.5), marker=dict(size=5))
                 fig_flow.update_layout(**_chart_layout)
                 fig_flow.update_yaxes(title_text="Flow Rate (L/s)")
-                st.plotly_chart(fig_flow, width="stretch")
+                st.plotly_chart(fig_flow, use_container_width=True)
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
                 col_s2.metric("Max", f"{df['flow_lps'].max():.1f} L/s")
@@ -1093,7 +1094,7 @@ if selected_device_id:
                             title_text="Rainfall (mm/hr)", secondary_y=True,
                             autorange="reversed",
                         )
-                        st.plotly_chart(_fig_rain, width="stretch")
+                        st.plotly_chart(_fig_rain, use_container_width=True)
                     elif df.empty:
                         st.info("No flow data available for the selected window.")
                     else:
@@ -1116,7 +1117,7 @@ if selected_device_id:
                                 }
                                 for e in _response.rain_events
                             ])
-                            st.dataframe(_ev_df, width="stretch", hide_index=True)
+                            st.dataframe(_ev_df, use_container_width=True, hide_index=True)
 
                     # ── I/I flags table ────────────────────────────────────
                     if _response.ii_flags:
@@ -1174,7 +1175,7 @@ if selected_device_id:
                         font=dict(family='Inter, sans-serif', size=11),
                         xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
                     )
-                    st.plotly_chart(fig_hist_d, width="stretch")
+                    st.plotly_chart(fig_hist_d, use_container_width=True)
                 with dist_col2:
                     fig_hist_f = px.histogram(df, x="flow_lps", nbins=20,
                                               labels={"flow_lps": "Flow (L/s)"})
@@ -1185,7 +1186,7 @@ if selected_device_id:
                         font=dict(family='Inter, sans-serif', size=11),
                         xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
                     )
-                    st.plotly_chart(fig_hist_f, width="stretch")
+                    st.plotly_chart(fig_hist_f, use_container_width=True)
 
                 st.markdown("---")
                 st.markdown("#### Collection Summary")
@@ -1203,7 +1204,7 @@ if selected_device_id:
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
-            st.dataframe(display_df, width="stretch", hide_index=True)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
 
             col_dl1, col_dl2, _ = st.columns([1, 1, 2])
             with col_dl1:
