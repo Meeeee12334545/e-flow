@@ -82,6 +82,12 @@ class FlowDatabase:
                 ON measurements (device_id, timestamp DESC);
                 """
             )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_timestamp
+                ON measurements (timestamp DESC);
+                """
+            )
             cur.close()
             conn.close()
         else:
@@ -126,6 +132,13 @@ class FlowDatabase:
                 """
                 CREATE INDEX IF NOT EXISTS idx_device_timestamp 
                 ON measurements (device_id, timestamp DESC)
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_timestamp
+                ON measurements (timestamp DESC)
                 """
             )
 
@@ -200,6 +213,61 @@ class FlowDatabase:
                 )
                 conn.commit()
                 return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    def bulk_add_measurements(self, records: List[Dict]) -> int:
+        """Insert multiple measurement records in a single batch operation.
+
+        Each record dict must contain ``device_id``, ``timestamp``, and
+        optionally ``depth_mm``, ``velocity_mps``, ``flow_lps``.
+
+        Returns the number of rows actually inserted (duplicates are skipped).
+        Returns 0 immediately if *records* is empty.
+        """
+        if not records:
+            return 0
+        params = [
+            (
+                r['device_id'],
+                r['timestamp'],
+                r.get('depth_mm'),
+                r.get('velocity_mps'),
+                r.get('flow_lps'),
+            )
+            for r in records
+        ]
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.executemany(
+                    """
+                    INSERT INTO measurements (device_id, timestamp, depth_mm, velocity_mps, flow_lps)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (device_id, timestamp) DO NOTHING
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cur.rowcount
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.executemany(
+                    """
+                    INSERT OR IGNORE INTO measurements
+                    (device_id, timestamp, depth_mm, velocity_mps, flow_lps)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cursor.rowcount
             finally:
                 conn.close()
 

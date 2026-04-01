@@ -31,29 +31,28 @@ def import_csv(csv_file):
     
     db.add_device(device_id, device_info["name"], device_info.get("location", ""))
     
-    count = 0
     try:
         with open(csv_file, 'r') as f:
             reader = csv.DictReader(f)
+            batch = []
             for row in reader:
                 try:
                     timestamp = datetime.fromisoformat(row['timestamp'])
                     depth_mm = float(row['depth_mm']) if row.get('depth_mm') else None
                     velocity_mps = float(row['velocity_mps']) if row.get('velocity_mps') else None
                     flow_lps = float(row['flow_lps']) if row.get('flow_lps') else None
-                    
-                    db.add_measurement(
-                        device_id=device_id,
-                        timestamp=timestamp,
-                        depth_mm=depth_mm,
-                        velocity_mps=velocity_mps,
-                        flow_lps=flow_lps
-                    )
-                    count += 1
+                    batch.append({
+                        'device_id': device_id,
+                        'timestamp': timestamp,
+                        'depth_mm': depth_mm,
+                        'velocity_mps': velocity_mps,
+                        'flow_lps': flow_lps,
+                    })
                 except (ValueError, KeyError) as e:
                     print(f"⚠️  Skipping row: {e}")
                     continue
-        
+            count = db.bulk_add_measurements(batch)
+
         print(f"✅ Imported {count} records from {csv_file}")
         return True
         
@@ -75,34 +74,33 @@ def import_json(json_file):
         return False
     
     db.add_device(device_id, device_info["name"], device_info.get("location", ""))
-    
-    count = 0
+
     try:
         with open(json_file, 'r') as f:
             data = json.load(f)
-        
+
         # Handle both list and dict formats
         records = data if isinstance(data, list) else data.get('measurements', [])
-        
+
+        batch = []
         for record in records:
             try:
                 timestamp = datetime.fromisoformat(record['timestamp'])
                 depth_mm = float(record.get('depth_mm')) if record.get('depth_mm') else None
                 velocity_mps = float(record.get('velocity_mps')) if record.get('velocity_mps') else None
                 flow_lps = float(record.get('flow_lps')) if record.get('flow_lps') else None
-                
-                db.add_measurement(
-                    device_id=device_id,
-                    timestamp=timestamp,
-                    depth_mm=depth_mm,
-                    velocity_mps=velocity_mps,
-                    flow_lps=flow_lps
-                )
-                count += 1
+                batch.append({
+                    'device_id': device_id,
+                    'timestamp': timestamp,
+                    'depth_mm': depth_mm,
+                    'velocity_mps': velocity_mps,
+                    'flow_lps': flow_lps,
+                })
             except (ValueError, KeyError, TypeError) as e:
                 print(f"⚠️  Skipping record: {e}")
                 continue
-        
+        count = db.bulk_add_measurements(batch)
+
         print(f"✅ Imported {count} records from {json_file}")
         return True
         

@@ -98,16 +98,33 @@ def format_measurement(value, unit):
     return f"{value:.2f} {unit}"
 
 
+@st.cache_data(ttl=60)
+def get_cached_measurements(device_id: str = None, limit: int = 1000):
+    """Return measurements from the DB, cached for 60 seconds per device/limit."""
+    return db.get_measurements(device_id=device_id, limit=limit)
+
+
+@st.cache_data(ttl=30)
+def get_cached_device_count() -> int:
+    """Return device count cached for 30 seconds."""
+    return db.get_device_count()
+
+
+@st.cache_data(ttl=30)
+def get_cached_measurement_count() -> int:
+    """Return total measurement count cached for 30 seconds."""
+    return db.get_measurement_count()
+
+
 def get_collection_stats(device_id):
     """Calculate data collection statistics."""
-    # Get all measurements for the device
-    measurements = db.get_measurements(device_id, limit=2000)
+    measurements = get_cached_measurements(device_id, limit=2000)
     if not measurements:
         return {}
-    
+
     df = pd.DataFrame(measurements)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
+
     return {
         'total_points': len(df),
         'time_span': (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 3600,
@@ -334,6 +351,9 @@ with st.sidebar:
                             )
                             if stored:
                                 st.success("✅ Reading stored to database")
+                                # Invalidate caches so the new record is reflected immediately
+                                get_cached_measurements.clear()
+                                get_cached_measurement_count.clear()
                             else:
                                 st.info("ℹ️ No change detected — not stored")
                         except Exception as e:
@@ -351,12 +371,12 @@ with st.sidebar:
     st.markdown("## System")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Stations", db.get_device_count(), help="Connected field devices")
+        st.metric("Stations", get_cached_device_count(), help="Connected field devices")
     with col2:
-        total_measurements = db.get_measurement_count()
+        total_measurements = get_cached_measurement_count()
         st.metric("Records", total_measurements, help="Total stored measurements")
     # Last ingest indicator
-    latest_rows = db.get_measurements(limit=1)
+    latest_rows = get_cached_measurements(limit=1)
     if latest_rows:
         try:
             ts_raw = latest_rows[0]["timestamp"]
@@ -401,7 +421,7 @@ if page_mode == 'EDS Product Overview':
 
 if page_mode == 'Simplified View':
     if selected_device_id:
-        measurements = db.get_measurements(device_id=selected_device_id)
+        measurements = get_cached_measurements(device_id=selected_device_id)
         if measurements:
             df = pd.DataFrame(measurements)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -591,7 +611,7 @@ if selected_device_id:
         )
 
     # Get measurements for selected device
-    measurements = db.get_measurements(device_id=selected_device_id)
+    measurements = get_cached_measurements(device_id=selected_device_id)
 
     if measurements:
         df = pd.DataFrame(measurements)
