@@ -70,7 +70,7 @@ def render_admin_panel():
                 mime_type = uploaded_logo.type or "image/png"
                 branding_save_col, branding_preview_col = st.columns([1, 1])
                 with branding_preview_col:
-                    st.image(file_bytes, caption="Preview", width='stretch')
+                    st.image(file_bytes, caption="Preview", use_container_width=True)
                 with branding_save_col:
                     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
                     if st.button("Save Organisation Logo", type="primary", key="save_org_logo_btn"):
@@ -94,7 +94,7 @@ def render_admin_panel():
             st.image(
                 base64.b64decode(current_logo_b64),
                 caption=None,
-                width='stretch',
+                use_container_width=True,
             )
             if st.button("Remove Logo (restore default)", key="remove_org_logo_btn"):
                 auth_db.delete_setting('org_logo_b64')
