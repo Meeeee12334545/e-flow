@@ -17,7 +17,7 @@ from plotly.subplots import make_subplots
 
 from database import FlowDatabase
 from scraper import DataScraper
-from config import DEVICES, MONITOR_URL, MONITOR_ENABLED
+from config import DEVICES, MONITOR_URL, MONITOR_ENABLED, DEFAULT_SELECTORS
 from shared_styles import apply_styles
 
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user
@@ -132,7 +132,8 @@ def init_devices():
         db.add_device(
             device_id=device_id,
             device_name=device_info.get("name", device_id),
-            location=device_info.get("location", "")
+            location=device_info.get("location", ""),
+            dashboard_url=device_info.get("url", ""),
         )
     return True
 
@@ -196,7 +197,16 @@ def fetch_latest_reading(device_id: str):
     """
     device_config = DEVICES.get(device_id)
     if not device_config:
-        return False, "Device is not configured", None, None
+        # Device was added via admin panel — look up its URL from the database
+        all_devices = db.get_devices()
+        db_device = next((d for d in all_devices if d["device_id"] == device_id), None)
+        if db_device and db_device.get("dashboard_url"):
+            device_config = {
+                "url": db_device["dashboard_url"],
+                "selectors": DEFAULT_SELECTORS,
+            }
+        else:
+            return False, "Device is not configured", None, None
 
     scraper = DataScraper(db)
     # Force requests/API path to avoid Playwright overhead for speed
@@ -370,16 +380,15 @@ with st.sidebar:
             velocity = rtd.get('velocity_mps')
             flow = rtd.get('flow_lps')
             ts = rtd.get('timestamp')
-            
-            # Determine if we have valid data (green) or no data (red)
+
             has_data = depth is not None or velocity is not None or flow is not None
             bg_color = "linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%)" if has_data else "linear-gradient(135deg, #ffebee 0%, #ffffff 100%)"
             border_color = "#4caf50" if has_data else "#f44336"
             text_color = "#2e7d32" if has_data else "#c62828"
             status_icon = "🟢" if has_data else "🔴"
-            
+
             st.markdown(f"""
-            <div style="background: {bg_color}; 
+            <div style="background: {bg_color};
                         padding: 14px; border-radius: 10px; border: 2px solid {border_color};
                         margin-top: 0.75rem; margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -405,28 +414,6 @@ with st.sidebar:
                 </div>
             </div>
             """, unsafe_allow_html=True)
-
-            # Save button available to all authenticated users
-            if has_data:
-                if st.button("💾 Save reading to database", key="store_now_button", use_container_width=True):
-                    try:
-                        writer = DataScraper(db)
-                        stored = writer.store_measurement(
-                            device_id=selected_device_id,
-                            device_name=selected_device_name,
-                            depth_mm=depth,
-                            velocity_mps=velocity,
-                            flow_lps=flow,
-                            allow_storage=True
-                        )
-                        if stored:
-                            st.success("✅ Reading saved to database")
-                            get_cached_measurements.clear()
-                            get_cached_measurement_count.clear()
-                        else:
-                            st.info("ℹ️ No change detected — reading already stored")
-                    except Exception as e:
-                        st.error(f"❌ Failed to save reading: {e}")
     else:
         st.error("⚠️ No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
@@ -597,10 +584,11 @@ if page_mode == 'Simplified View':
                 secondary_y=True
             )
             fig.update_layout(
-                title=None,
+                title=dict(text=''),
                 legend=dict(
                     orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-                    font=dict(size=12)
+                    font=dict(size=12),
+                    title=dict(text=''),
                 ),
                 hovermode='x unified',
                 margin=dict(l=0, r=0, t=40, b=0),
@@ -611,6 +599,10 @@ if page_mode == 'Simplified View':
                 font=dict(family='Inter, -apple-system, sans-serif', color='#4A4A4A', size=12),
                 xaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
                 yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
+            )
+            # Hide any auto-generated unnamed traces (e.g. secondary-y anchors)
+            fig.for_each_trace(
+                lambda t: t.update(showlegend=False) if not t.name else None
             )
             fig.update_xaxes(title_text='Time')
             fig.update_yaxes(title_text='Flow (L/s) / Depth (mm)', secondary_y=False)
@@ -624,7 +616,12 @@ if page_mode == 'Simplified View':
 
             st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
             col_download1, col_download2, _ = st.columns([1, 1, 2])
-            csv_data = df.to_csv(index=False)
+            # Format timestamps as dd/mm/yyyy hh:mm:ss for export
+            df_export = df.copy()
+            if 'timestamp' in df_export.columns:
+                ts_col = pd.to_datetime(df_export['timestamp'], utc=True, errors='coerce')
+                df_export['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
+            csv_data = df_export.to_csv(index=False)
             json_data = df.to_json(orient='records', date_format='iso')
             with col_download1:
                 st.download_button('⬇ Download CSV', data=csv_data,

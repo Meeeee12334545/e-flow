@@ -30,12 +30,87 @@ def render_admin_panel():
     st.markdown("""
     <div class="page-header">
         <p class="page-header-title">⚙️ Admin Panel</p>
-        <p class="page-header-sub">Manage users and control which monitoring sites they can access.</p>
+        <p class="page-header-sub">Manage users, monitoring sites, and control which sites each user can access.</p>
     </div>
     """, unsafe_allow_html=True)
 
     auth_db = st.session_state.auth_db
     flow_db = FlowDatabase()
+
+    # ── Add New Monitoring Site ──────────────────────────────────────────────
+    st.markdown('<p class="section-title">🌐 Add New Monitoring Site</p>', unsafe_allow_html=True)
+
+    col_site_form, col_site_hint = st.columns([3, 2])
+
+    with col_site_form:
+        with st.form("add_site_form"):
+            new_site_name = st.text_input("Site Name", placeholder="e.g. Main Inflow Lismore STP")
+            new_site_id = st.text_input(
+                "Site ID / Code",
+                placeholder="e.g. FIT200",
+                help="Unique identifier used internally. Letters, numbers and underscores only.",
+            )
+            new_site_location = st.text_input("Location", placeholder="e.g. Lismore")
+            new_site_url = st.text_input(
+                "Dashboard URL",
+                placeholder="https://mp.usriot.com/draw/show.html?...",
+                help="Full URL to the USRIOT unit dashboard for this site. The data selectors are the same for all sites.",
+            )
+
+            if st.form_submit_button("Add Site →", use_container_width=True):
+                if not new_site_name or not new_site_id or not new_site_url:
+                    st.error("❌ Site Name, Site ID and Dashboard URL are required.")
+                elif not new_site_url.startswith("http"):
+                    st.error("❌ Dashboard URL must start with http:// or https://")
+                else:
+                    import re as _re
+                    # Normalise site ID — uppercase, spaces → underscores
+                    clean_id = new_site_id.strip().upper().replace(" ", "_")
+                    if not _re.match(r'^[A-Z0-9_]+$', clean_id):
+                        st.error("❌ Site ID may only contain letters, numbers and underscores.")
+                    else:
+                        existing = flow_db.get_devices()
+                        existing_ids = {d["device_id"] for d in existing}
+                        if clean_id in existing_ids:
+                            st.error(f"❌ A site with ID '{clean_id}' already exists.")
+                        else:
+                            flow_db.add_device(
+                                device_id=clean_id,
+                                device_name=new_site_name.strip(),
+                                location=new_site_location.strip() or None,
+                                dashboard_url=new_site_url.strip(),
+                            )
+                            st.success(f"✅ Site '{new_site_name.strip()}' (ID: {clean_id}) added successfully!")
+                            st.info("The monitor service will begin collecting data from this site on its next cycle.")
+                            st.rerun()
+
+    with col_site_hint:
+        st.markdown("""
+        <div class="info-box" style="margin-top: 0.25rem;">
+            <strong>About dashboard URLs</strong><br>
+            <span style="color: #6b7280;">
+                All USRIOT sites share the same data selectors — only the URL differs per site.<br><br>
+                After adding a site, assign it to users in the section below so they can view it.
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Current Sites Overview ───────────────────────────────────────────────
+    all_sites = flow_db.get_devices()
+    if all_sites:
+        with st.expander(f"📋 All Configured Sites ({len(all_sites)})", expanded=False):
+            for site in all_sites:
+                url_display = site.get("dashboard_url") or "—"
+                if len(url_display) > 60:
+                    url_display = url_display[:60] + "…"
+                st.markdown(
+                    f"**{site['device_name']}** &nbsp;·&nbsp; `{site['device_id']}` &nbsp;·&nbsp; "
+                    f"{site.get('location') or 'No location'} &nbsp;·&nbsp; "
+                    f"<span style='color:#6b7280;font-size:0.82rem;'>{url_display}</span>",
+                    unsafe_allow_html=True,
+                )
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── Create New User ──────────────────────────────────────────────────────
     st.markdown('<p class="section-title">➕ Create New User</p>', unsafe_allow_html=True)

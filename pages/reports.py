@@ -267,9 +267,9 @@ with col_prev:
             type="primary",
         )
     elif "last_report_html" in st.session_state and st.session_state["last_report_html"]:
+        # Ultimate fallback: HTML download (should rarely be reached)
         html_bytes = st.session_state["last_report_html"].encode("utf-8")
         fname = st.session_state.get("last_report_name", "eflow_report")
-        st.info("ℹ️ PDF export requires WeasyPrint. Downloading HTML report instead.")
         st.download_button(
             label="⬇️ Download HTML Report",
             data=html_bytes,
@@ -301,7 +301,11 @@ with col_prev:
             else:
                 df_export = df_dl
 
-            csv_data = df_export.to_csv(index=False).encode("utf-8")
+            csv_data = df_export.copy()
+            if 'timestamp' in csv_data.columns:
+                ts_col = pd.to_datetime(csv_data['timestamp'], utc=True, errors='coerce')
+                csv_data['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
+            csv_data = csv_data.to_csv(index=False).encode("utf-8")
             st.download_button(
                 label="⬇️ Download CSV",
                 data=csv_data,

@@ -67,7 +67,10 @@ _CSS = """
     }
 
     * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
+        /* No !important here — lets icon-font elements (Material Symbols used by
+           Streamlit's sidebar toggle, expander arrow, etc.) keep their own font.
+           The html/body rule above already seeds Inter for all text via inheritance. */
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
         box-sizing: border-box;
     }
 

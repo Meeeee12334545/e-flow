@@ -32,6 +32,14 @@ DEVICES = {
     }
 }
 
+# Default CSS selectors used by all USRIOT dashboards.
+# Every site shares the same layout — only the URL differs.
+DEFAULT_SELECTORS = {
+    "depth_mm": "#div_varvalue_10",
+    "velocity_mps": "#div_varvalue_6",
+    "flow_lps": "#div_varvalue_42",
+}
+
 # Database settings
 DATABASE_PATH = os.getenv("DATABASE_PATH", "flow_data.db")
 DATABASE_TIMEOUT = int(os.getenv("DATABASE_TIMEOUT", "30"))  # seconds

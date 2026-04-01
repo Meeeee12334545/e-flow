@@ -45,9 +45,14 @@ class FlowDatabase:
                     device_id TEXT PRIMARY KEY,
                     device_name TEXT NOT NULL,
                     location TEXT,
+                    dashboard_url TEXT,
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 )
                 """
+            )
+            # Migrate existing databases — add dashboard_url if absent
+            cur.execute(
+                "ALTER TABLE devices ADD COLUMN IF NOT EXISTS dashboard_url TEXT"
             )
             cur.execute(
                 """
@@ -150,10 +155,16 @@ class FlowDatabase:
                     device_id TEXT PRIMARY KEY,
                     device_name TEXT NOT NULL,
                     location TEXT,
+                    dashboard_url TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
+            # Migrate existing databases — add dashboard_url if absent
+            try:
+                cursor.execute("ALTER TABLE devices ADD COLUMN dashboard_url TEXT")
+            except Exception:
+                pass  # Column already exists
 
             # Create table for measurements
             cursor.execute(
@@ -237,19 +248,29 @@ class FlowDatabase:
             conn.commit()
             conn.close()
 
-    def add_device(self, device_id: str, device_name: str, location: str = None):
-        """Add a new device to the database."""
+    def add_device(self, device_id: str, device_name: str, location: str = None,
+                   dashboard_url: str = None):
+        """Add or update a device in the database.
+
+        Uses an upsert so that re-running ``init_devices`` refreshes the name,
+        location and URL for config-defined devices without touching the
+        ``created_at`` timestamp.  If ``dashboard_url`` is *None* the existing
+        URL is preserved for devices already in the database.
+        """
         if self.use_postgres:
             conn = psycopg2.connect(self.pg_dsn)
             cur = conn.cursor()
             try:
                 cur.execute(
                     """
-                    INSERT INTO devices (device_id, device_name, location)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (device_id) DO NOTHING
+                    INSERT INTO devices (device_id, device_name, location, dashboard_url)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (device_id) DO UPDATE SET
+                        device_name   = EXCLUDED.device_name,
+                        location      = EXCLUDED.location,
+                        dashboard_url = COALESCE(EXCLUDED.dashboard_url, devices.dashboard_url)
                     """,
-                    (device_id, device_name, location),
+                    (device_id, device_name, location, dashboard_url),
                 )
                 conn.commit()
             finally:
@@ -261,10 +282,14 @@ class FlowDatabase:
             try:
                 cursor.execute(
                     """
-                    INSERT OR IGNORE INTO devices (device_id, device_name, location)
-                    VALUES (?, ?, ?)
+                    INSERT INTO devices (device_id, device_name, location, dashboard_url)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(device_id) DO UPDATE SET
+                        device_name   = excluded.device_name,
+                        location      = excluded.location,
+                        dashboard_url = COALESCE(excluded.dashboard_url, devices.dashboard_url)
                     """,
-                    (device_id, device_name, location),
+                    (device_id, device_name, location, dashboard_url),
                 )
                 conn.commit()
             finally:
