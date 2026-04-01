@@ -43,7 +43,7 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - ./flow_data.db:/app/flow_data.db:ro
+      - ./flow_data.db:/app/flow_data.db
     depends_on:
       - monitor
     environment:
