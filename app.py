@@ -487,40 +487,13 @@ with st.sidebar:
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
         selected_device_id = None
 
-    # System stats — the h2 CSS border-top acts as the visual divider
-    st.markdown("## System")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Stations", get_cached_device_count(), help="Connected field devices")
-    with col2:
-        total_measurements = get_cached_measurement_count()
-        st.metric("Records", total_measurements, help="Total stored measurements")
-    # Last ingest indicator
-    latest_rows = get_cached_measurements(limit=1)
-    if latest_rows:
-        try:
-            ts_raw = latest_rows[0]["timestamp"]
-            latest_ts = pd.to_datetime(ts_raw, errors='coerce')
-            if pd.isna(latest_ts):
-                raise ValueError("unparseable timestamp")
-            if latest_ts.tzinfo is None:
-                latest_ts = latest_ts.tz_localize(pytz.utc)
-            local_ts = latest_ts.astimezone(pytz.timezone(DEFAULT_TZ))
-            st.caption(f"Last record: {local_ts.strftime('%Y-%m-%d %H:%M %Z')}")
-        except Exception:
-            st.caption(f"Last record: {latest_rows[0]['timestamp']}")
-
+    total_measurements = get_cached_measurement_count()
     if total_measurements == 0:
         st.warning("⚠️ No measurements yet.")
         if _monitor_proc is not None:
             st.info("⏳ Background monitor is running — first reading will arrive within 60 seconds. You can also click **Get Latest Data** above to fetch and save a reading right now.")
         else:
             st.info("Click **Get Latest Data** to fetch and save a live reading, or start monitor.py to collect data automatically.")
-
-    if selected_device_id:
-        stats = get_collection_stats(selected_device_id)
-        if stats:
-            st.metric("Collection Rate", f"{stats.get('collection_rate', 0):.1f}/min", help="Average points per minute")
 
 # Main content area
 page_mode = st.session_state.get('page_mode', 'Simplified View')
@@ -710,6 +683,28 @@ if page_mode == 'Simplified View':
             """, unsafe_allow_html=True)
     else:
         st.warning('No device selected. Choose a device in the sidebar.')
+
+    st.markdown("""
+    <div style="margin-top: 2.5rem; padding: 1.25rem 1.5rem; border-top: 1px solid #D9D9D9;
+                display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="20" cy="20" r="20" fill="#3A7F5F"/>
+                <text x="20" y="26" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="700" fill="#ffffff">EDS</text>
+            </svg>
+            <div>
+                <p style="margin:0; font-size:0.82rem; font-weight:600; color:#3A7F5F; line-height:1.2;">Environmental Data Solutions</p>
+                <p style="margin:0; font-size:0.75rem; color:#6b7280; line-height:1.2;">e-flow™ sewer monitoring platform</p>
+            </div>
+        </div>
+        <p style="margin:0; font-size:0.75rem; color:#9ca3af;">
+            <a href="https://www.e-d-s.com.au" target="_blank"
+               style="color:#3A7F5F; text-decoration:none; font-weight:500;">www.e-d-s.com.au</a>
+            &nbsp;·&nbsp; © 2024 EDS
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.stop()
 
 if selected_device_id:

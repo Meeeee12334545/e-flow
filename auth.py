@@ -147,6 +147,14 @@ class AuthDatabase:
                 cur.execute("ALTER TABLE users ADD COLUMN logo_mime TEXT")
             except Exception:
                 pass  # Column already exists
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN company_logo_b64 TEXT")
+            except Exception:
+                pass  # Column already exists
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN company_logo_mime TEXT")
+            except Exception:
+                pass  # Column already exists
 
             cur.close()
             conn.close()
@@ -214,7 +222,7 @@ class AuthDatabase:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id)")
 
             # Migrations: add logo columns to existing users table (safe no-op if present)
-            for _col in ("logo_b64", "logo_mime"):
+            for _col in ("logo_b64", "logo_mime", "company_logo_b64", "company_logo_mime"):
                 try:
                     cursor.execute(f"ALTER TABLE users ADD COLUMN {_col} TEXT")
                 except Exception:
@@ -830,6 +838,64 @@ class AuthDatabase:
             try:
                 cursor.execute(
                     "SELECT logo_b64, logo_mime FROM users WHERE user_id = ?",
+                    (user_id,),
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    return {"b64": row[0], "mime": row[1] or "image/png"}
+                return None
+            finally:
+                conn.close()
+
+    def save_user_company_logo(self, user_id: int, logo_b64: str, mime_type: str) -> None:
+        """Store a per-user company logo (overrides the org-wide logo for this user only)."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE users SET company_logo_b64 = %s, company_logo_mime = %s WHERE user_id = %s",
+                    (logo_b64, mime_type, user_id),
+                )
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE users SET company_logo_b64 = ?, company_logo_mime = ? WHERE user_id = ?",
+                    (logo_b64, mime_type, user_id),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def get_user_company_logo(self, user_id: int) -> Optional[Dict]:
+        """Return {'b64': ..., 'mime': ...} for user's personal company logo, or None if not set."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "SELECT company_logo_b64, company_logo_mime FROM users WHERE user_id = %s",
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    return {"b64": row[0], "mime": row[1] or "image/png"}
+                return None
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "SELECT company_logo_b64, company_logo_mime FROM users WHERE user_id = ?",
                     (user_id,),
                 )
                 row = cursor.fetchone()

@@ -27,10 +27,11 @@ def render_admin_panel():
 
     if not is_authenticated():
         st.error("❌ You must be logged in")
+        st.stop()
         return
 
     if not is_admin():
-        st.error("❌ Admin access required")
+        st.switch_page("app.py")
         return
 
     # ── Page header ─────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ from database import FlowDatabase
 from shared_styles import apply_styles
 from streamlit_auth import (
     init_auth_state, is_authenticated, is_admin, get_current_user,
-    get_sidebar_logo_path, get_user_avatar_data_uri,
+    get_sidebar_logo_path, get_user_avatar_data_uri, get_org_logo_data_uri,
 )
 
 _ASSETS = Path(__file__).parent.parent / "assets"
@@ -116,10 +116,77 @@ def render_profile_page():
                 except Exception as e:
                     st.error(f"Could not remove avatar: {e}")
 
+    # ── Company Logo ──────────────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Company Logo</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Upload your own company logo. It will appear in the sidebar and header <em>only for your account</em>. "
+        "If not set, the organisation logo configured by your administrator will be used.</p>",
+        unsafe_allow_html=True,
+    )
+
+    auth_db = st.session_state.auth_db
+    current_user_logo = auth_db.get_user_company_logo(user['user_id'])
+    org_logo_uri = get_org_logo_data_uri()
+
+    logo_col1, logo_col2 = st.columns([2, 1])
+    with logo_col1:
+        uploaded_logo = st.file_uploader(
+            "Upload company logo (PNG, JPG or SVG — max 2 MB)",
+            type=["png", "jpg", "jpeg", "svg"],
+            key="user_company_logo_uploader",
+            label_visibility="collapsed",
+        )
+        if uploaded_logo is not None:
+            file_bytes = uploaded_logo.read()
+            if len(file_bytes) > 2 * 1024 * 1024:
+                st.error("File is too large. Please upload an image under 2 MB.")
+            else:
+                logo_b64 = base64.b64encode(file_bytes).decode()
+                mime_type = uploaded_logo.type or "image/png"
+                st.image(file_bytes, caption="Preview", width=200)
+                if st.button("Save Company Logo", type="primary", key="save_user_company_logo_btn"):
+                    try:
+                        auth_db.save_user_company_logo(user['user_id'], logo_b64, mime_type)
+                        st.success("Company logo saved. It will appear on your next page load.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Could not save logo: {e}")
+
+    with logo_col2:
+        if current_user_logo:
+            st.markdown(
+                "<p style='font-size:0.82rem;color:#6b7280;margin-bottom:0.4rem;'>Your current logo</p>",
+                unsafe_allow_html=True,
+            )
+            st.image(
+                base64.b64decode(current_user_logo['b64']),
+                width=160,
+            )
+            if st.button("Remove (use org default)", key="remove_user_company_logo_btn"):
+                try:
+                    auth_db.save_user_company_logo(user['user_id'], "", "")
+                    st.success("Personal logo removed. Organisation logo will be used.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Could not remove logo: {e}")
+        elif org_logo_uri:
+            st.markdown(
+                "<p style='font-size:0.82rem;color:#6b7280;margin-bottom:0.4rem;'>"
+                "Using organisation logo (default)</p>",
+                unsafe_allow_html=True,
+            )
+            st.image(org_logo_uri, width=160)
+        else:
+            st.markdown(
+                "<p style='color:#9ca3af;font-size:0.88rem;margin:0;'>No custom logo set<br>"
+                "<span style='font-size:0.82rem;'>Default EDS branding will be used.</span></p>",
+                unsafe_allow_html=True,
+            )
+
     # ── Assigned Devices ─────────────────────────────────────────────────────
     st.markdown('<p class="section-title">Assigned Monitoring Sites</p>', unsafe_allow_html=True)
 
-    auth_db = st.session_state.auth_db
     flow_db = FlowDatabase()
 
     if is_admin():
