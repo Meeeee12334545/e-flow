@@ -168,7 +168,7 @@ with col_prev:
             df = pd.DataFrame(rows) if rows else pd.DataFrame()
 
             if not df.empty:
-                df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+                df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, format="ISO8601")
                 df.sort_values("timestamp", inplace=True)
                 # Normalise both the filter bounds and the df timestamps to UTC-naive
                 # for a timezone-agnostic comparison.
@@ -311,7 +311,7 @@ with col_prev:
 
             csv_data = df_export.copy()
             if 'timestamp' in csv_data.columns:
-                ts_col = pd.to_datetime(csv_data['timestamp'], utc=True, errors='coerce')
+                ts_col = pd.to_datetime(csv_data['timestamp'], utc=True, format="ISO8601", errors='coerce')
                 csv_data['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
             csv_data = csv_data.to_csv(index=False).encode("utf-8")
             st.download_button(

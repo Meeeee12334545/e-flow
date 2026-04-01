@@ -631,7 +631,7 @@ if page_mode == 'Simplified View':
             # Format timestamps as dd/mm/yyyy hh:mm:ss for export
             df_export = df.copy()
             if 'timestamp' in df_export.columns:
-                ts_col = pd.to_datetime(df_export['timestamp'], utc=True, errors='coerce')
+                ts_col = pd.to_datetime(df_export['timestamp'], utc=True, format="ISO8601", errors='coerce')
                 df_export['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
             csv_data = df_export.to_csv(index=False)
             json_data = df.to_json(orient='records', date_format='iso')
