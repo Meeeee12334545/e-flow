@@ -3,6 +3,19 @@ Shared styling module for the e-flow application.
 
 Provides a single design system (colors, typography, components) that is
 applied consistently across every Streamlit page.
+
+Colour specification: EDS official brand palette.
+  Primary Green:      #3A7F5F  (header, primary buttons, active nav)
+  Dark Green:         #2F6B50  (hover, secondary headers)
+  Light BG Grey:      #F4F5F4  (main page background)
+  Text Grey:          #4A4A4A  (body text)
+  Border Grey:        #D9D9D9  (dividers, card borders)
+  Good / Normal:      #4CAF50
+  Warning:            #F4B400
+  Critical / Alert:   #D93025
+  Chart – Depth:      #3A7F5F
+  Chart – Velocity:   #2A9D8F
+  Chart – Flow:       #1D4E89
 """
 
 import streamlit as st
@@ -13,29 +26,35 @@ _CSS = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
     :root {
-        --bg:             #f4f7fb;
+        /* ── EDS brand palette ── */
+        --bg:             #F4F5F4;
         --surface:        #ffffff;
-        --surface-soft:   #f8fbff;
-        --border:         #dfe7ef;
-        --text:           #233047;
+        --surface-soft:   #f9faf9;
+        --border:         #D9D9D9;
+        --text:           #4A4A4A;
         --muted:          #6b7280;
-        --primary:        #0f4c81;
-        --primary-light:  #1a6bb5;
-        --primary-soft:   #e7f0ff;
-        --accent:         #0b76ca;
-        --accent-soft:    #dbe9ff;
-        --success:        #047c3d;
-        --success-soft:   #daf9e6;
-        --warning:        #b45309;
-        --warning-soft:   #fef3c7;
-        --danger:         #b91c1c;
-        --danger-soft:    #fee2e2;
-        --radius-sm:      12px;
-        --radius-md:      18px;
-        --radius-lg:      22px;
-        --shadow-sm:      0 4px 12px rgba(15,76,129,0.06);
-        --shadow-md:      0 14px 32px rgba(15,76,129,0.08);
-        --shadow-lg:      0 24px 60px rgba(15,76,129,0.10);
+        --primary:        #3A7F5F;
+        --primary-light:  #2F6B50;
+        --primary-soft:   #E8F3EE;
+        --accent:         #2A9D8F;
+        --accent-soft:    #E2F5F2;
+        --success:        #4CAF50;
+        --success-soft:   #E8F5E9;
+        --warning:        #F4B400;
+        --warning-soft:   #FFF8E1;
+        --danger:         #D93025;
+        --danger-soft:    #FDECEA;
+        /* ── Chart parameter colours (fixed per sensor) ── */
+        --chart-depth:    #3A7F5F;
+        --chart-velocity: #2A9D8F;
+        --chart-flow:     #1D4E89;
+        /* ── Geometry ── */
+        --radius-sm:      8px;
+        --radius-md:      12px;
+        --radius-lg:      16px;
+        --shadow-sm:      0 2px 8px rgba(58,127,95,0.07);
+        --shadow-md:      0 6px 20px rgba(58,127,95,0.09);
+        --shadow-lg:      0 14px 40px rgba(58,127,95,0.11);
     }
 
     html, body, [data-testid="stAppViewContainer"] {
@@ -71,7 +90,7 @@ _CSS = """
 
     /* ── Hero Card ── */
     .hero-card {
-        background: linear-gradient(135deg, #0f4c81 0%, #1a6bb5 60%, #0b76ca 100%);
+        background: #3A7F5F;
         border-radius: var(--radius-lg);
         padding: 36px 40px;
         box-shadow: var(--shadow-lg);
@@ -124,7 +143,7 @@ _CSS = """
 
     /* ── Page header (sub-pages) ── */
     .page-header {
-        background: linear-gradient(135deg, #0f4c81 0%, #1a6bb5 60%, #0b76ca 100%);
+        background: #3A7F5F;
         border-radius: var(--radius-lg);
         padding: 28px 36px;
         margin-bottom: 1.75rem;
@@ -189,7 +208,7 @@ _CSS = """
         font-size: 1rem !important;
         letter-spacing: 0.06em;
         margin-bottom: 0.75rem;
-        border: 1px solid rgba(4,124,61,0.2);
+        border: 1px solid rgba(76,175,80,0.25);
     }
 
     .status-note {
@@ -293,7 +312,7 @@ _CSS = """
         width: 72px;
         height: 72px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #0f4c81 0%, #0b76ca 100%);
+        background: #3A7F5F;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -328,13 +347,13 @@ _CSS = """
     .profile-role-badge.admin {
         background: var(--primary-soft);
         color: var(--primary) !important;
-        border: 1px solid rgba(15,76,129,0.2);
+        border: 1px solid rgba(58,127,95,0.25);
     }
 
     .profile-role-badge.user {
         background: var(--accent-soft);
         color: var(--accent) !important;
-        border: 1px solid rgba(11,118,202,0.2);
+        border: 1px solid rgba(42,157,143,0.25);
     }
 
     .profile-meta {
@@ -411,13 +430,13 @@ _CSS = """
         width: 64px;
         height: 64px;
         border-radius: 18px;
-        background: linear-gradient(135deg, #0f4c81 0%, #0b76ca 100%);
+        background: #3A7F5F;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-size: 2rem;
         margin-bottom: 0.75rem;
-        box-shadow: 0 8px 24px rgba(15,76,129,0.25);
+        box-shadow: 0 8px 24px rgba(58,127,95,0.25);
     }
 
     .login-brand-name {
@@ -469,19 +488,19 @@ _CSS = """
     /* ── Buttons ── */
     .stButton > button {
         border-radius: var(--radius-sm) !important;
-        background: linear-gradient(135deg, #0f4c81 0%, #0a3c67 100%) !important;
+        background: #3A7F5F !important;
         color: #ffffff !important;
         border: none !important;
-        box-shadow: 0 6px 18px rgba(15,76,129,0.22) !important;
+        box-shadow: 0 3px 10px rgba(58,127,95,0.20) !important;
         padding: 0.6rem 1.4rem !important;
         font-weight: 600 !important;
         font-size: 0.9rem !important;
-        transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+        transition: background 0.15s ease, box-shadow 0.15s ease !important;
     }
 
     .stButton > button:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 10px 24px rgba(15,76,129,0.3) !important;
+        background: #2F6B50 !important;
+        box-shadow: 0 6px 16px rgba(58,127,95,0.28) !important;
     }
 
     .stButton > button[kind="secondary"] {
@@ -489,6 +508,10 @@ _CSS = """
         color: var(--primary) !important;
         border: 1.5px solid var(--primary) !important;
         box-shadow: none !important;
+    }
+
+    .stButton > button[kind="secondary"]:hover {
+        background: var(--primary-soft) !important;
     }
 
     /* Download buttons */
@@ -522,7 +545,7 @@ _CSS = """
     /* ── Sidebar user card ── */
     .sidebar-user-card {
         background: var(--primary-soft);
-        border: 1px solid rgba(15,76,129,0.15);
+        border: 1px solid rgba(58,127,95,0.18);
         border-radius: var(--radius-sm);
         padding: 14px 16px;
         margin-bottom: 1rem;

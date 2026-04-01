@@ -30,14 +30,14 @@ def login_page():
     <div style="text-align: center; padding: 2.5rem 1rem 1.5rem;">
         <div style="
             width: 64px; height: 64px; border-radius: 18px;
-            background: linear-gradient(135deg, #0f4c81 0%, #0b76ca 100%);
+            background: #3A7F5F;
             display: inline-flex; align-items: center; justify-content: center;
             font-size: 2rem; margin-bottom: 0.75rem;
-            box-shadow: 0 8px 24px rgba(15,76,129,0.25);
+            box-shadow: 0 8px 24px rgba(58,127,95,0.25);
         ">🌊</div>
         <h1 style="
             font-size: 2rem !important; font-weight: 700 !important;
-            color: #0f4c81 !important; margin: 0 !important;
+            color: #3A7F5F !important; margin: 0 !important;
             letter-spacing: -0.03em; line-height: 1.1 !important;
         ">e-flow™</h1>
         <p style="
@@ -52,9 +52,9 @@ def login_page():
     with col:
         st.markdown("""
         <div style="
-            background: #ffffff; border: 1px solid #dfe7ef;
-            border-radius: 22px; padding: 36px 40px;
-            box-shadow: 0 24px 60px rgba(15,76,129,0.10);
+            background: #ffffff; border: 1px solid #D9D9D9;
+            border-radius: 16px; padding: 36px 40px;
+            box-shadow: 0 6px 24px rgba(58,127,95,0.10);
         ">
         """, unsafe_allow_html=True)
 
@@ -62,7 +62,7 @@ def login_page():
 
         with tab1:
             st.markdown(
-                '<p style="font-size:1.1rem;font-weight:700;color:#233047;margin:0 0 1rem 0;">'
+                '<p style="font-size:1.1rem;font-weight:700;color:#4A4A4A;margin:0 0 1rem 0;">'
                 'Welcome back</p>',
                 unsafe_allow_html=True,
             )
@@ -86,7 +86,7 @@ def login_page():
 
         with tab2:
             st.markdown(
-                '<p style="font-size:1.1rem;font-weight:700;color:#233047;margin:0 0 1rem 0;">'
+                '<p style="font-size:1.1rem;font-weight:700;color:#4A4A4A;margin:0 0 1rem 0;">'
                 'Create an account</p>',
                 unsafe_allow_html=True,
             )
@@ -167,7 +167,7 @@ def render_auth_header():
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="
                         width: 38px; height: 38px; border-radius: 50%;
-                        background: linear-gradient(135deg, #0f4c81 0%, #0b76ca 100%);
+                        background: #3A7F5F;
                         display: flex; align-items: center; justify-content: center;
                         font-size: 1rem; font-weight: 700; color: #fff; flex-shrink: 0;
                     ">{initial}</div>
@@ -195,6 +195,8 @@ def render_auth_header():
             else:
                 if st.button("👤 My Profile", use_container_width=True, key="nav_profile_user"):
                     st.switch_page("pages/profile.py")
+            if st.button("📄 Reports", use_container_width=True, key="nav_reports"):
+                st.switch_page("pages/reports.py")
         else:
             st.markdown(
                 '<p style="font-size:0.85rem;color:#9ca3af;margin:0;">Not signed in</p>',

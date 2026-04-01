@@ -219,8 +219,8 @@ with st.sidebar:
     st.markdown("## Device")
 
     st.markdown("""
-    <div style="background: #f0f7ff; border-left: 3px solid #0f4c81; padding: 10px 12px; border-radius: 6px; margin-bottom: 1rem;">
-        <p style="font-size: 0.82rem; margin: 0; color: #233047; line-height: 1.6;">
+    <div style="background: #E8F3EE; border-left: 3px solid #3A7F5F; padding: 10px 12px; border-radius: 6px; margin-bottom: 1rem;">
+        <p style="font-size: 0.82rem; margin: 0; color: #4A4A4A; line-height: 1.6;">
             <strong>Status:</strong> Connected &amp; streaming<br>
             <span style="color: #6b7280;">• Interval: 60 s &nbsp;• WAL persistence: on</span>
         </p>
@@ -472,7 +472,7 @@ if page_mode == 'Simplified View':
             col_title, col_picker = st.columns([2, 1])
             with col_title:
                 st.markdown("""
-                <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #233047;">Performance trend</h2>
+                <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A;">Performance trend</h2>
                 <p style="margin: 0.25rem 0 0 0; color: #6b7280; font-size: 0.92rem;">Flow rate, depth and velocity over the selected window.</p>
                 """, unsafe_allow_html=True)
             with col_picker:
@@ -498,10 +498,10 @@ if page_mode == 'Simplified View':
                     y=df_window['flow_lps'],
                     mode='lines+markers',
                     name='Flow (L/s)',
-                    line=dict(color='#0f4c81', width=2.5),
+                    line=dict(color='#1D4E89', width=2.5),
                     marker=dict(size=5),
                     fill='tozeroy',
-                    fillcolor='rgba(15, 76, 129, 0.07)',
+                    fillcolor='rgba(29, 78, 137, 0.07)',
                 ),
                 secondary_y=False
             )
@@ -511,7 +511,7 @@ if page_mode == 'Simplified View':
                     y=df_window['depth_mm'],
                     mode='lines+markers',
                     name='Depth (mm)',
-                    line=dict(color='#047c3d', width=2, dash='dash'),
+                    line=dict(color='#3A7F5F', width=2, dash='dash'),
                     marker=dict(size=5)
                 ),
                 secondary_y=False
@@ -522,7 +522,7 @@ if page_mode == 'Simplified View':
                     y=df_window['velocity_mps'],
                     mode='lines+markers',
                     name='Velocity (m/s)',
-                    line=dict(color='#b45309', width=2, dash='dot'),
+                    line=dict(color='#2A9D8F', width=2, dash='dot'),
                     marker=dict(size=5)
                 ),
                 secondary_y=True
@@ -539,9 +539,9 @@ if page_mode == 'Simplified View':
                 height=440,
                 paper_bgcolor='#ffffff',
                 plot_bgcolor='#ffffff',
-                font=dict(family='Inter, -apple-system, sans-serif', color='#233047', size=12),
-                xaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
-                yaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
+                font=dict(family='Inter, -apple-system, sans-serif', color='#4A4A4A', size=12),
+                xaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
+                yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
             )
             fig.update_xaxes(title_text='Time')
             fig.update_yaxes(title_text='Flow (L/s) / Depth (mm)', secondary_y=False)
@@ -567,9 +567,9 @@ if page_mode == 'Simplified View':
                                    mime='application/json', use_container_width=True)
         else:
             st.markdown("""
-            <div style="background: #ffffff; border: 1px solid #dfe7ef; border-radius: 18px; padding: 40px; text-align: center; margin: 2rem 0;">
+            <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
                 <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
-                <h3 style="color: #233047; margin: 0 0 0.5rem;">Awaiting first reading</h3>
+                <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">Awaiting first reading</h3>
                 <p style="color: #6b7280; margin: 0 0 1.5rem;">No measurements have been stored yet for this device.</p>
                 <p style="color: #6b7280; font-size: 0.9rem;">Start the <code>monitor.py</code> service to begin collecting data automatically.</p>
             </div>
@@ -594,7 +594,7 @@ if selected_device_id:
     col_fd_title, col_fd_range = st.columns([2, 1])
     with col_fd_title:
         st.markdown(f"""
-        <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #233047;">
+        <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A;">
             Full Dashboard — {selected_device_name}
         </h2>
         <p style="margin: 0.25rem 0 1rem; color: #6b7280; font-size: 0.92rem;">
@@ -727,10 +727,10 @@ if selected_device_id:
                     y=df_graph["flow_lps"],
                     mode='lines+markers',
                     name='Flow Rate (L/s)',
-                    line=dict(color='#0f4c81', width=2.5),
-                    marker=dict(size=5, color='#0f4c81'),
+                    line=dict(color='#1D4E89', width=2.5),
+                    marker=dict(size=5, color='#1D4E89'),
                     fill='tozeroy',
-                    fillcolor='rgba(15, 76, 129, 0.07)',
+                    fillcolor='rgba(29, 78, 137, 0.07)',
                     hovertemplate='<b>%{x|%Y-%m-%d %H:%M}</b><br>Flow: %{y:.2f} L/s<extra></extra>'
                 ))
                 fig_main_flow.update_layout(
@@ -741,10 +741,10 @@ if selected_device_id:
                     template="plotly_white",
                     paper_bgcolor="#ffffff",
                     plot_bgcolor="#ffffff",
-                    font=dict(family='Inter, -apple-system, sans-serif', color='#233047', size=12),
+                    font=dict(family='Inter, -apple-system, sans-serif', color='#4A4A4A', size=12),
                     margin=dict(l=0, r=0, t=20, b=0),
-                    xaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
-                    yaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
+                    xaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
+                    yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
                     legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
                 )
                 st.plotly_chart(fig_main_flow, use_container_width=True)
@@ -776,10 +776,10 @@ if selected_device_id:
                 template="plotly_white",
                 paper_bgcolor="#ffffff",
                 plot_bgcolor="#ffffff",
-                font=dict(family='Inter, -apple-system, sans-serif', color='#233047', size=12),
+                font=dict(family='Inter, -apple-system, sans-serif', color='#4A4A4A', size=12),
                 margin=dict(l=0, r=0, t=20, b=0),
-                xaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef', title='Time'),
-                yaxis=dict(gridcolor='#f0f4f8', linecolor='#dfe7ef'),
+                xaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9', title='Time'),
+                yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
             )
 
             tab1, tab2, tab3, tab4 = st.tabs(["💧 Depth", "⚡ Velocity", "🌊 Flow", "📋 Statistics"])
@@ -788,7 +788,7 @@ if selected_device_id:
                 fig_depth = px.line(df, x="timestamp", y="depth_mm",
                                     labels={"depth_mm": "Depth (mm)", "timestamp": "Time"},
                                     markers=True)
-                fig_depth.update_traces(line=dict(color="#0f4c81", width=2.5), marker=dict(size=5))
+                fig_depth.update_traces(line=dict(color="#3A7F5F", width=2.5), marker=dict(size=5))
                 fig_depth.update_layout(**_chart_layout)
                 fig_depth.update_yaxes(title_text="Depth (mm)")
                 st.plotly_chart(fig_depth, use_container_width=True)
@@ -802,7 +802,7 @@ if selected_device_id:
                 fig_vel = px.line(df, x="timestamp", y="velocity_mps",
                                   labels={"velocity_mps": "Velocity (m/s)", "timestamp": "Time"},
                                   markers=True)
-                fig_vel.update_traces(line=dict(color="#047c3d", width=2.5), marker=dict(size=5))
+                fig_vel.update_traces(line=dict(color="#2A9D8F", width=2.5), marker=dict(size=5))
                 fig_vel.update_layout(**_chart_layout)
                 fig_vel.update_yaxes(title_text="Velocity (m/s)")
                 st.plotly_chart(fig_vel, use_container_width=True)
@@ -816,7 +816,7 @@ if selected_device_id:
                 fig_flow = px.line(df, x="timestamp", y="flow_lps",
                                    labels={"flow_lps": "Flow (L/s)", "timestamp": "Time"},
                                    markers=True)
-                fig_flow.update_traces(line=dict(color="#b45309", width=2.5), marker=dict(size=5))
+                fig_flow.update_traces(line=dict(color="#1D4E89", width=2.5), marker=dict(size=5))
                 fig_flow.update_layout(**_chart_layout)
                 fig_flow.update_yaxes(title_text="Flow Rate (L/s)")
                 st.plotly_chart(fig_flow, use_container_width=True)
@@ -851,23 +851,23 @@ if selected_device_id:
                 with dist_col1:
                     fig_hist_d = px.histogram(df, x="depth_mm", nbins=20,
                                               labels={"depth_mm": "Depth (mm)"})
-                    fig_hist_d.update_traces(marker_color="#0f4c81")
+                    fig_hist_d.update_traces(marker_color="#3A7F5F")
                     fig_hist_d.update_layout(
                         height=280, template="plotly_white", paper_bgcolor="#ffffff",
                         plot_bgcolor="#ffffff", margin=dict(l=0, r=0, t=10, b=0),
                         font=dict(family='Inter, sans-serif', size=11),
-                        xaxis=dict(gridcolor='#f0f4f8'), yaxis=dict(gridcolor='#f0f4f8')
+                        xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
                     )
                     st.plotly_chart(fig_hist_d, use_container_width=True)
                 with dist_col2:
                     fig_hist_f = px.histogram(df, x="flow_lps", nbins=20,
                                               labels={"flow_lps": "Flow (L/s)"})
-                    fig_hist_f.update_traces(marker_color="#b45309")
+                    fig_hist_f.update_traces(marker_color="#1D4E89")
                     fig_hist_f.update_layout(
                         height=280, template="plotly_white", paper_bgcolor="#ffffff",
                         plot_bgcolor="#ffffff", margin=dict(l=0, r=0, t=10, b=0),
                         font=dict(family='Inter, sans-serif', size=11),
-                        xaxis=dict(gridcolor='#f0f4f8'), yaxis=dict(gridcolor='#f0f4f8')
+                        xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
                     )
                     st.plotly_chart(fig_hist_f, use_container_width=True)
 
@@ -908,17 +908,17 @@ if selected_device_id:
                 )
         else:
             st.markdown("""
-            <div style="background: #ffffff; border: 1px solid #dfe7ef; border-radius: 18px; padding: 40px; text-align: center; margin: 2rem 0;">
+            <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
                 <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
-                <h3 style="color: #233047; margin: 0 0 0.5rem;">No data in selected window</h3>
+                <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">No data in selected window</h3>
                 <p style="color: #6b7280; margin: 0;">Try a wider time window, or start the <code>monitor.py</code> service to collect data.</p>
             </div>
             """, unsafe_allow_html=True)
     else:
         st.markdown("""
-        <div style="background: #ffffff; border: 1px solid #dfe7ef; border-radius: 18px; padding: 40px; text-align: center; margin: 2rem 0;">
+        <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
             <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
-            <h3 style="color: #233047; margin: 0 0 0.5rem;">Awaiting first reading</h3>
+            <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">Awaiting first reading</h3>
             <p style="color: #6b7280; margin: 0 0 1.5rem;">No measurements have been stored yet.</p>
             <p style="color: #6b7280; font-size: 0.9rem;">Run <code>python monitor.py</code> or <code>docker-compose up</code> to start collecting data automatically.</p>
         </div>

@@ -69,7 +69,7 @@ def render_admin_panel():
         <div class="info-box" style="margin-top: 0.25rem;">
             <strong>New user defaults</strong><br>
             <span style="color: #6b7280;">
-                Role: <strong style="color: #0f4c81;">User</strong> — can only view assigned sites.<br>
+                Role: <strong style="color: #3A7F5F;">User</strong> — can only view assigned sites.<br>
                 Sites: None — assign them in the section below.
             </span>
         </div>
@@ -124,7 +124,7 @@ def render_admin_panel():
 
                 with col_avail:
                     st.markdown(
-                        '<p style="font-weight:600;color:#233047;margin-bottom:0.5rem;">'
+                        '<p style="font-weight:600;color:#4A4A4A;margin-bottom:0.5rem;">'
                         '📭 Available Sites</p>',
                         unsafe_allow_html=True,
                     )
@@ -146,7 +146,7 @@ def render_admin_panel():
 
                 with col_assigned:
                     st.markdown(
-                        '<p style="font-weight:600;color:#233047;margin-bottom:0.5rem;">'
+                        '<p style="font-weight:600;color:#4A4A4A;margin-bottom:0.5rem;">'
                         '✅ Assigned Sites</p>',
                         unsafe_allow_html=True,
                     )

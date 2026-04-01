@@ -34,9 +34,9 @@ def render_profile_page():
 
     # ── Profile card ─────────────────────────────────────────────────────────
     active_badge = (
-        '<span style="color:#047c3d;font-weight:600;">● Active</span>'
+        '<span style="color:#4CAF50;font-weight:600;">● Active</span>'
         if user.get('active') else
-        '<span style="color:#b91c1c;font-weight:600;">● Inactive</span>'
+        '<span style="color:#D93025;font-weight:600;">● Inactive</span>'
     )
     role_badge_cls = "admin" if role == "admin" else "user"
 
