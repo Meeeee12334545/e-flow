@@ -406,7 +406,7 @@ with st.sidebar:
         st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
 
         # Manual refresh to pull the newest reading into the app (fast API path)
-        refresh_clicked = st.button("Get Latest Data", type="primary", key="refresh_button", use_container_width=True)
+        refresh_clicked = st.button("Get Latest Data", type="primary", key="refresh_button", width="stretch")
         
         if refresh_clicked:
             success, message, ts, payload = fetch_latest_reading(selected_device_id)
@@ -674,7 +674,7 @@ if page_mode == 'Simplified View':
             fig.update_xaxes(title_text='Time')
             fig.update_yaxes(title_text='Flow (L/s) / Depth (mm)', secondary_y=False)
             fig.update_yaxes(title_text='Velocity (m/s)', secondary_y=True)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             if show_note:
                 st.info(
@@ -693,11 +693,11 @@ if page_mode == 'Simplified View':
             with col_download1:
                 st.download_button('⬇ Download CSV', data=csv_data,
                                    file_name=f'{selected_device_id}_data.csv', mime='text/csv',
-                                   use_container_width=True)
+                                   width="stretch")
             with col_download2:
                 st.download_button('⬇ Download JSON', data=json_data,
                                    file_name=f'{selected_device_id}_data.json',
-                                   mime='application/json', use_container_width=True)
+                                   mime='application/json', width="stretch")
         else:
             st.markdown("""
             <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
@@ -885,7 +885,7 @@ if selected_device_id:
                     yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
                     legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
                 )
-                st.plotly_chart(fig_main_flow, use_container_width=True)
+                st.plotly_chart(fig_main_flow, width="stretch")
 
                 col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                 with col_stat1:
@@ -929,7 +929,7 @@ if selected_device_id:
                 fig_depth.update_traces(line=dict(color="#3A7F5F", width=2.5), marker=dict(size=5))
                 fig_depth.update_layout(**_chart_layout)
                 fig_depth.update_yaxes(title_text="Depth (mm)")
-                st.plotly_chart(fig_depth, use_container_width=True)
+                st.plotly_chart(fig_depth, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
                 col_s2.metric("Max", f"{df['depth_mm'].max():.1f} mm")
@@ -943,7 +943,7 @@ if selected_device_id:
                 fig_vel.update_traces(line=dict(color="#2A9D8F", width=2.5), marker=dict(size=5))
                 fig_vel.update_layout(**_chart_layout)
                 fig_vel.update_yaxes(title_text="Velocity (m/s)")
-                st.plotly_chart(fig_vel, use_container_width=True)
+                st.plotly_chart(fig_vel, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
                 col_s2.metric("Max", f"{df['velocity_mps'].max():.3f} m/s")
@@ -957,7 +957,7 @@ if selected_device_id:
                 fig_flow.update_traces(line=dict(color="#1D4E89", width=2.5), marker=dict(size=5))
                 fig_flow.update_layout(**_chart_layout)
                 fig_flow.update_yaxes(title_text="Flow Rate (L/s)")
-                st.plotly_chart(fig_flow, use_container_width=True)
+                st.plotly_chart(fig_flow, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
                 col_s2.metric("Max", f"{df['flow_lps'].max():.1f} L/s")
@@ -1093,7 +1093,7 @@ if selected_device_id:
                             title_text="Rainfall (mm/hr)", secondary_y=True,
                             autorange="reversed",
                         )
-                        st.plotly_chart(_fig_rain, use_container_width=True)
+                        st.plotly_chart(_fig_rain, width="stretch")
                     elif df.empty:
                         st.info("No flow data available for the selected window.")
                     else:
@@ -1116,7 +1116,7 @@ if selected_device_id:
                                 }
                                 for e in _response.rain_events
                             ])
-                            st.dataframe(_ev_df, use_container_width=True, hide_index=True)
+                            st.dataframe(_ev_df, width="stretch", hide_index=True)
 
                     # ── I/I flags table ────────────────────────────────────
                     if _response.ii_flags:
@@ -1174,7 +1174,7 @@ if selected_device_id:
                         font=dict(family='Inter, sans-serif', size=11),
                         xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
                     )
-                    st.plotly_chart(fig_hist_d, use_container_width=True)
+                    st.plotly_chart(fig_hist_d, width="stretch")
                 with dist_col2:
                     fig_hist_f = px.histogram(df, x="flow_lps", nbins=20,
                                               labels={"flow_lps": "Flow (L/s)"})
@@ -1185,7 +1185,7 @@ if selected_device_id:
                         font=dict(family='Inter, sans-serif', size=11),
                         xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
                     )
-                    st.plotly_chart(fig_hist_f, use_container_width=True)
+                    st.plotly_chart(fig_hist_f, width="stretch")
 
                 st.markdown("---")
                 st.markdown("#### Collection Summary")
@@ -1203,7 +1203,7 @@ if selected_device_id:
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.dataframe(display_df, width="stretch", hide_index=True)
 
             col_dl1, col_dl2, _ = st.columns([1, 1, 2])
             with col_dl1:
@@ -1212,7 +1212,7 @@ if selected_device_id:
                     data=display_df.to_csv(index=False),
                     file_name=f"flow_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    width="stretch"
                 )
             with col_dl2:
                 st.download_button(
@@ -1220,7 +1220,7 @@ if selected_device_id:
                     data=df.to_json(orient="records", date_format="iso"),
                     file_name=f"flow_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                     mime="application/json",
-                    use_container_width=True
+                    width="stretch"
                 )
         else:
             st.markdown("""

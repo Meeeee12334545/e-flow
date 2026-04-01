@@ -127,7 +127,7 @@ def login_page():
             password = st.text_input("Password", type="password", key="login_password",
                                      placeholder="••••••••")
 
-            if st.button("Login →", use_container_width=True, key="login_btn"):
+            if st.button("Login →", width="stretch", key="login_btn"):
                 if not username or not password:
                     st.error("Please enter your username and password.")
                 else:
@@ -156,7 +156,7 @@ def login_page():
             confirm_password = st.text_input("Confirm Password", type="password",
                                              key="signup_confirm", placeholder="Re-enter password")
 
-            if st.button("Create Account →", use_container_width=True, key="signup_btn"):
+            if st.button("Create Account →", width="stretch", key="signup_btn"):
                 if not new_username or not new_email or not new_password:
                     st.error("Please fill in all fields.")
                 elif new_password != confirm_password:
@@ -244,7 +244,7 @@ def render_auth_header():
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button("Sign Out", use_container_width=True, key="logout_btn"):
+            if st.button("Sign Out", width="stretch", key="logout_btn"):
                 logout()
 
             # Navigation links
@@ -252,15 +252,15 @@ def render_auth_header():
             if is_admin():
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("Admin", use_container_width=True, key="nav_admin"):
+                    if st.button("Admin", width="stretch", key="nav_admin"):
                         st.switch_page("pages/admin.py")
                 with col2:
-                    if st.button("Profile", use_container_width=True, key="nav_profile"):
+                    if st.button("Profile", width="stretch", key="nav_profile"):
                         st.switch_page("pages/profile.py")
             else:
-                if st.button("My Profile", use_container_width=True, key="nav_profile_user"):
+                if st.button("My Profile", width="stretch", key="nav_profile_user"):
                     st.switch_page("pages/profile.py")
-            if st.button("Reports", use_container_width=True, key="nav_reports"):
+            if st.button("Reports", width="stretch", key="nav_reports"):
                 st.switch_page("pages/reports.py")
         else:
             st.markdown(
