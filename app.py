@@ -72,13 +72,25 @@ def start_background_monitor():
         env.setdefault("MONITOR_INTERVAL", "60")
         env.setdefault("SCRAPER_FORCE_REQUESTS", "1")
         env.setdefault("STORE_ALL_READINGS", "false")
+        # Keep EXIT_ON_UNHEALTHY=false here: without a process manager to
+        # restart the subprocess on failure, letting it call sys.exit(1) would
+        # permanently kill background collection.  supervisord.conf sets this
+        # to true because supervisord will automatically restart the process.
         env.setdefault("EXIT_ON_UNHEALTHY", "false")
-        proc = subprocess.Popen(
-            [sys.executable, str(monitor_script)],
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
+        # Redirect stderr to monitor.log (append mode) so crash tracebacks are
+        # captured without the pipe-buffer deadlock that stderr=PIPE can cause.
+        # monitor.py already has a RotatingFileHandler on monitor.log, so all
+        # structured log output goes there via the logging framework regardless.
+        log_path = monitor_script.parent / "monitor.log"
+        # Use a 'with' block so the parent's file handle is always closed even
+        # if Popen() raises; the subprocess inherits the fd before we close.
+        with open(log_path, "ab") as log_fp:
+            proc = subprocess.Popen(
+                [sys.executable, str(monitor_script)],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=log_fp,
+            )
         # Ensure the monitor subprocess is terminated when Streamlit exits
         atexit.register(lambda: proc.terminate())
         return proc
