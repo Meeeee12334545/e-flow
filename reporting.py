@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import base64
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +11,8 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+
+from anomaly import AnomalyReport
 
 # For static image export of plotly charts
 # kaleido is optional; if unavailable, images will be skipped
@@ -34,6 +36,10 @@ class ReportSelections:
     calculations: List[str]  # e.g., ["mean","max","min","std","p50","p95","volume"]
     device_name: str
     time_window_hours: int
+    report_type: str = "custom"        # daily | weekly | monthly | custom
+    site_id: str = ""
+    location: str = ""
+    anomaly_report: Optional[AnomalyReport] = field(default=None)
 
 
 def compute_calculations(df: pd.DataFrame, selections: ReportSelections) -> Dict[str, Dict[str, float]]:
@@ -133,26 +139,82 @@ def build_html_report(device_name: str,
                       calculations: Dict[str, Dict[str, float]],
                       charts: Dict[str, go.Figure],
                       logo_path: Optional[str] = None) -> str:
-    """Generate an HTML report string with embedded charts, metrics, and optional logo."""
+    """Generate an HTML report string with embedded charts, metrics, AI insights, and optional logo."""
     # Header and metadata
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+    report_type_label = {
+        "daily": "Daily Summary",
+        "weekly": "Weekly Summary",
+        "monthly": "Monthly Summary",
+        "custom": "Custom Report",
+    }.get(selections.report_type, "Technical Report")
+
+    # Period label
+    if not df.empty:
+        ts = pd.to_datetime(df["timestamp"])
+        period_start = ts.min().strftime("%Y-%m-%d %H:%M")
+        period_end = ts.max().strftime("%Y-%m-%d %H:%M")
+        period_label = f"{period_start} → {period_end}"
+    else:
+        period_label = f"Last {selections.time_window_hours} hours"
+
     # Logo HTML (if provided)
     logo_html = ""
     if logo_path and Path(logo_path).exists():
-        # Convert logo to base64 for embedding
         try:
             with open(logo_path, "rb") as f:
                 logo_b64 = base64.b64encode(f.read()).decode()
                 logo_html = f"<img src='data:image/png;base64,{logo_b64}' style='height:60px;margin-bottom:20px;'/>"
         except Exception:
             pass
-    
+
+    # AI insights section
+    ar: Optional[AnomalyReport] = selections.anomaly_report
+    if ar is not None:
+        qual_color = {"High": "#047c3d", "Medium": "#b45309", "Low": "#b91c1c"}.get(ar.quality_label, "#333")
+        qual_bg = {"High": "#daf9e6", "Medium": "#fef3c7", "Low": "#fee2e2"}.get(ar.quality_label, "#f9fafb")
+        ai_html = f"""
+        <div class='section card' style='border-left: 4px solid {qual_color}; background: {qual_bg};'>
+          <h2>AI Insights &amp; Data Quality</h2>
+          <p><strong>Data Confidence Rating:</strong>
+             <span style='color:{qual_color}; font-weight:700; font-size:1.1em;'>{ar.quality_label}</span>
+             ({ar.confidence_score:.1f}/100)
+          </p>
+          <p><strong>Anomalies Detected:</strong> {len(ar.flags)}</p>
+          <p><strong>Summary:</strong> {ar.summary}</p>
+          <table>
+            <thead><tr><th>Anomaly Type</th><th>Count</th></tr></thead>
+            <tbody>
+              <tr><td>Flatline</td><td>{ar.flatline_count}</td></tr>
+              <tr><td>Spike</td><td>{ar.spike_count}</td></tr>
+              <tr><td>Data Gaps (Dropouts)</td><td>{ar.dropout_count}</td></tr>
+              <tr><td>Out-of-Range</td><td>{ar.out_of_range_count}</td></tr>
+              <tr><td>Velocity/Depth Inconsistency</td><td>{ar.velocity_depth_count}</td></tr>
+              <tr><td>Statistical Outlier (Z-score)</td><td>{ar.zscore_count}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class='section card'>
+          <h2>Data Quality Summary</h2>
+          <table>
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Valid Data</td><td>{ar.pct_valid:.1f}%</td></tr>
+              <tr><td>Flagged Data</td><td>{ar.pct_flagged:.1f}%</td></tr>
+              <tr><td>Total Data Points</td><td>{len(df)}</td></tr>
+              <tr><td>Anomaly Flags</td><td>{len(ar.flags)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        """
+    else:
+        ai_html = ""
+
     intro = f"""
     <html>
       <head>
         <meta charset='utf-8'/>
-        <title>e-flow Technical Report — {device_name}</title>
+        <title>e-flow {report_type_label} — {device_name}</title>
         <style>
           body {{ font-family: -apple-system, Segoe UI, Roboto, Inter, sans-serif; color: #222; margin: 40px; }}
           h1, h2 {{ font-weight: 600; }}
@@ -176,20 +238,23 @@ def build_html_report(device_name: str,
           <div class='header-left'>
             {logo_html}
             <div>
-              <h1>e-flow Technical Report</h1>
+              <h1>e-flow {report_type_label}</h1>
               <div class='small'>Generated: {generated_at}</div>
             </div>
           </div>
         </div>
 
         <div class='section card'>
-          <h2>Overview</h2>
+          <h2>Site Information</h2>
           <p><strong>Station:</strong> {device_name}</p>
-          <p><strong>Time Window:</strong> Last {selections.time_window_hours} hours</p>
+          {'<p><strong>Site ID:</strong> ' + selections.site_id + '</p>' if selections.site_id else ''}
+          {'<p><strong>Location:</strong> ' + selections.location + '</p>' if selections.location else ''}
+          <p><strong>Monitoring Period:</strong> {period_label}</p>
           <p><strong>Variables:</strong> {', '.join(selections.variables)}</p>
-          <p><strong>Calculations:</strong> {', '.join(selections.calculations)}</p>
           <p><strong>Data Points:</strong> {len(df)}</p>
         </div>
+
+        {ai_html}
 
         <div class='section card'>
           <h2>Metrics Glossary</h2>
@@ -211,7 +276,7 @@ def build_html_report(device_name: str,
     """
 
     # Metrics table
-    metrics_html = "<div class='section card'><h2>Calculated Metrics</h2>"
+    metrics_html = "<div class='section card'><h2>Summary Statistics</h2>"
     for var, stats in calculations.items():
         metrics_html += f"<h3>{var}</h3>"
         metrics_html += "<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>"
@@ -227,7 +292,6 @@ def build_html_report(device_name: str,
         if b64:
             charts_html += f"<h3>{var}</h3><img src='data:image/png;base64,{b64}' style='max-width:100%;height:auto;border:1px solid #eee;border-radius:6px;'/>"
         else:
-            # Fallback: embed interactive HTML (may not preserve on PDF export)
             charts_html += f"<h3>{var}</h3>" + fig.to_html(include_plotlyjs="cdn", full_html=False)
     charts_html += "</div>"
 
@@ -243,17 +307,14 @@ def build_pdf_report(device_name: str,
                      charts: Dict[str, go.Figure],
                      logo_path: Optional[str] = None) -> bytes:
     """Generate a PDF report from HTML with logo support.
-    
+
     Returns: PDF bytes, or empty bytes if weasyprint is unavailable.
     """
     if not _WEASYPRINT_AVAILABLE:
         return b""
-    
+
     try:
-        # Generate HTML report
         html_content = build_html_report(device_name, df, selections, calculations, charts, logo_path)
-        
-        # Convert HTML to PDF using weasyprint
         pdf_bytes = HTML(string=html_content).write_pdf()
         return pdf_bytes
     except Exception as e:
