@@ -32,6 +32,7 @@ from streamlit_auth import (
     render_auth_header,
     filter_devices_for_user,
     get_current_user,
+    get_sidebar_logo_path,
 )
 
 # ── Auth guard ─────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ apply_styles()
 
 # EDS brand logo in the sidebar header (wide) and collapsed icon
 _ASSETS = Path(__file__).parent.parent / "assets"
-st.logo(str(_ASSETS / "logo_wide.svg"), icon_image=str(_ASSETS / "logo_icon.svg"))
+st.logo(get_sidebar_logo_path(), icon_image=str(_ASSETS / "logo_icon.svg"))
 
 DEFAULT_TZ = "Australia/Brisbane"
 db = FlowDatabase()

@@ -27,7 +27,7 @@ from rainfall_analysis import (
     detect_inflow_infiltration,
 )
 
-from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user
+from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user, get_org_logo_data_uri, get_sidebar_logo_path
 
 # Initialize authentication state
 init_auth_state()
@@ -130,7 +130,7 @@ apply_styles()
 # EDS brand logo in the sidebar header (wide) and collapsed icon
 _ASSETS = Path(__file__).parent / "assets"
 st.logo(
-    str(_ASSETS / "logo_wide.svg"),
+    get_sidebar_logo_path(),
     icon_image=str(_ASSETS / "logo_icon.svg"),
 )
 
@@ -271,22 +271,31 @@ def fetch_latest_reading(device_id: str):
     return True, message, timestamp, payload
 
 
-# Page header — embed EDS logo (white-filtered) inside the green hero card
-_logo_wide_b64 = base64.b64encode((_ASSETS / "logo_wide.svg").read_bytes()).decode()
-_logo_wide_src = f"data:image/svg+xml;base64,{_logo_wide_b64}"
+# Page header — use custom org logo if set, otherwise fall back to EDS logo
+_org_logo_uri = get_org_logo_data_uri()
+if _org_logo_uri:
+    # Custom org logo — render on white/transparent background (no brightness invert)
+    _hero_logo_src = _org_logo_uri
+    _hero_logo_style = "max-height:52px; max-width:220px; margin-bottom: 0.8rem; display:block; object-fit: contain;"
+    _hero_logo_filter = ""
+else:
+    _logo_wide_b64 = base64.b64encode((_ASSETS / "logo_wide.svg").read_bytes()).decode()
+    _hero_logo_src = f"data:image/svg+xml;base64,{_logo_wide_b64}"
+    _hero_logo_style = "height:52px; margin-bottom: 0.8rem; display:block;"
+    _hero_logo_filter = "filter: brightness(0) invert(1);"
 
 col1, col2 = st.columns([3, 1])
 with col1:
     st.markdown(f"""
     <div class="hero-card">
-        <img src="{_logo_wide_src}"
-             alt="EDS — Environmental Data Services"
-             style="height:52px; filter: brightness(0) invert(1); margin-bottom: 0.8rem; display:block;"/>
-        <p class="hero-subtitle">Professional sewer flow monitoring, analytics and reporting for depth, velocity and flow performance.</p>
+        <img src="{_hero_logo_src}"
+             alt="Organisation Logo"
+             style="{_hero_logo_style} {_hero_logo_filter}"/>
+        <p class="hero-subtitle">Real-time sewer flow monitoring &nbsp;·&nbsp; Depth, velocity and volumetric flow measurement &nbsp;·&nbsp; Data export and analytics</p>
         <div style="display:flex; flex-wrap: wrap; gap: 8px;">
-            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">📡 Live data overview</span>
-            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">📈 Historical analytics</span>
-            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">⚙️ Operational insights</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Live Data</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Historical Analytics</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Operational Insights</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -558,21 +567,21 @@ if page_mode == 'Simplified View':
 
             st.markdown(f"""
             <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 1.75rem;">
-                <div class="metric-card">
-                    <p class="metric-label">💧 Water Depth</p>
+                <div class="metric-card depth">
+                    <p class="metric-label">Water Depth</p>
                     <p class="metric-value">{latest_depth}<span class="metric-unit">mm</span></p>
                 </div>
-                <div class="metric-card">
-                    <p class="metric-label">⚡ Flow Velocity</p>
+                <div class="metric-card velocity">
+                    <p class="metric-label">Flow Velocity</p>
                     <p class="metric-value green">{latest_velocity}<span class="metric-unit">m/s</span></p>
                 </div>
-                <div class="metric-card">
-                    <p class="metric-label">🌊 Flow Rate</p>
+                <div class="metric-card flow">
+                    <p class="metric-label">Flow Rate</p>
                     <p class="metric-value amber">{latest_flow}<span class="metric-unit">L/s</span></p>
                 </div>
             </div>
             <p style="font-size: 0.82rem; color: #6b7280; margin: -0.75rem 0 1.5rem 4px;">
-                ✓ Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
+                Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
             </p>
             """, unsafe_allow_html=True)
 
