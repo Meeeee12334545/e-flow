@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import os
 import sys
 import subprocess
@@ -120,6 +121,13 @@ st.set_page_config(
 # Apply shared professional design system (Inter font, blue palette, component overrides)
 apply_styles()
 
+# EDS brand logo in the sidebar header (wide) and collapsed icon
+_ASSETS = Path(__file__).parent / "assets"
+st.logo(
+    str(_ASSETS / "logo_wide.svg"),
+    icon_image=str(_ASSETS / "logo_icon.svg"),
+)
+
 
 # Initialize database only (scraper runs separately as monitor.py)
 db = FlowDatabase()
@@ -240,13 +248,17 @@ def fetch_latest_reading(device_id: str):
     return True, message, timestamp, payload
 
 
-# Page header
+# Page header — embed EDS logo (white-filtered) inside the green hero card
+_logo_wide_b64 = base64.b64encode((_ASSETS / "logo_wide.svg").read_bytes()).decode()
+_logo_wide_src = f"data:image/svg+xml;base64,{_logo_wide_b64}"
+
 col1, col2 = st.columns([3, 1])
 with col1:
-    st.markdown("""
+    st.markdown(f"""
     <div class="hero-card">
-        <span class="hero-pill">🌊 Hydrological Intelligence</span>
-        <h1 class="hero-title">e-flow™ by EDS</h1>
+        <img src="{_logo_wide_src}"
+             alt="EDS — Environmental Data Services"
+             style="height:52px; filter: brightness(0) invert(1); margin-bottom: 0.8rem; display:block;"/>
         <p class="hero-subtitle">Professional sewer flow monitoring, analytics and reporting for depth, velocity and flow performance.</p>
         <div style="display:flex; flex-wrap: wrap; gap: 8px;">
             <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">📡 Live data overview</span>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 500" fill="none">
+  <g stroke="#2A9D8F" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Circular C-arc: gap at right (2 o'clock to 4:30), 285° arc counterclockwise -->
+    <path d="M 222 59 A 72 72 0 1 0 211 146" stroke-width="32"/>
+    <!-- S-wave: spans full mark width, centred at y=196 -->
+    <path d="M 18 196 C 18 161 160 161 160 196 C 160 231 302 231 302 196" stroke-width="32"/>
+    <!-- Wave line 1 -->
+    <path d="M 10 254 Q 52 229 94 254 Q 136 279 178 254 Q 220 229 262 254" stroke-width="28"/>
+    <!-- Wave line 2 -->
+    <path d="M 18 295 Q 60 270 102 295 Q 144 320 186 295 Q 228 270 270 295" stroke-width="26"/>
+  </g>
+  <!-- EDS wordmark -->
+  <text
+    x="160" y="474"
+    font-family="'Arial Black', 'Arial Bold', Arial, Helvetica, sans-serif"
+    font-weight="900"
+    font-size="145"
+    text-anchor="middle"
+    fill="#2A9D8F">EDS</text>
+</svg>

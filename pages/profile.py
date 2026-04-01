@@ -5,14 +5,18 @@ Streamlit page for users to view their profile and assigned devices.
 """
 
 import streamlit as st
+from pathlib import Path
 from database import FlowDatabase
 from shared_styles import apply_styles
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, get_current_user
+
+_ASSETS = Path(__file__).parent.parent / "assets"
 
 
 def render_profile_page():
     """Render user profile page."""
     apply_styles()
+    st.logo(str(_ASSETS / "logo_wide.svg"), icon_image=str(_ASSETS / "logo_icon.svg"))
 
     if not is_authenticated():
         st.error("❌ You must be logged in")

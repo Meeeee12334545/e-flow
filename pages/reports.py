@@ -47,6 +47,10 @@ st.set_page_config(
 )
 apply_styles()
 
+# EDS brand logo in the sidebar header (wide) and collapsed icon
+_ASSETS = Path(__file__).parent.parent / "assets"
+st.logo(str(_ASSETS / "logo_wide.svg"), icon_image=str(_ASSETS / "logo_icon.svg"))
+
 DEFAULT_TZ = "Australia/Brisbane"
 db = FlowDatabase()
 
@@ -200,11 +204,14 @@ with col_prev:
             calcs = compute_calculations(df_window, selections)
             charts = create_charts(df_window, selections)
 
+            _logo_path = str(_ASSETS / "logo_wide.svg")
             html_content = build_html_report(
-                selected_device_name, df_window, selections, calcs, charts
+                selected_device_name, df_window, selections, calcs, charts,
+                logo_path=_logo_path,
             )
             pdf_bytes = build_pdf_report(
-                selected_device_name, df_window, selections, calcs, charts
+                selected_device_name, df_window, selections, calcs, charts,
+                logo_path=_logo_path,
             )
 
             # ── Save report record to DB ───────────────────────────────────
