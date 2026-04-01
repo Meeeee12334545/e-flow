@@ -28,11 +28,21 @@ def init_auth_state():
 # ── Logo helpers ─────────────────────────────────────────────────────────────
 
 def get_org_logo_data_uri() -> str | None:
-    """Return the organisation logo as a data URI, or None if not configured."""
+    """Return the logo as a data URI for the current user, or None if not configured.
+
+    Priority: user's personal company logo → org-wide logo → None.
+    """
     auth_db = st.session_state.get('auth_db')
     if not auth_db:
         return None
     try:
+        # Per-user company logo takes priority
+        user = st.session_state.get('user')
+        if user:
+            user_logo = auth_db.get_user_company_logo(user['user_id'])
+            if user_logo:
+                return f"data:{user_logo['mime']};base64,{user_logo['b64']}"
+        # Fall back to org-wide logo
         logo_b64 = auth_db.get_setting('org_logo_b64')
         logo_mime = auth_db.get_setting('org_logo_mime') or 'image/png'
         if logo_b64:
@@ -43,13 +53,24 @@ def get_org_logo_data_uri() -> str | None:
 
 
 def get_sidebar_logo_path() -> str:
-    """Return a file path suitable for st.logo(). Uses the custom org logo if set,
-    writing it to /tmp (keyed by content hash) for the current session; otherwise
-    returns the EDS default."""
+    """Return a file path suitable for st.logo(). Uses the current user's company logo if set,
+    then falls back to the org-wide logo, then the EDS default."""
     import hashlib
     auth_db = st.session_state.get('auth_db')
     if auth_db:
         try:
+            # Per-user company logo takes priority
+            user = st.session_state.get('user')
+            if user:
+                user_logo = auth_db.get_user_company_logo(user['user_id'])
+                if user_logo:
+                    ext = 'svg' if 'svg' in user_logo['mime'] else ('jpg' if 'jpeg' in user_logo['mime'] else 'png')
+                    content_hash = hashlib.sha256(user_logo['b64'].encode()).hexdigest()[:16]
+                    tmp_path = Path('/tmp') / f'eflow_user_logo_{user["user_id"]}_{content_hash}.{ext}'
+                    if not tmp_path.exists():
+                        tmp_path.write_bytes(base64.b64decode(user_logo['b64']))
+                    return str(tmp_path)
+            # Fall back to org-wide logo
             logo_b64 = auth_db.get_setting('org_logo_b64')
             logo_mime = auth_db.get_setting('org_logo_mime') or 'image/png'
             if logo_b64:
