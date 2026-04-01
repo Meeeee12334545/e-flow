@@ -593,6 +593,37 @@ _CSS = """
         background: var(--surface) !important;
     }
 
+    /* Prevent selectbox label from overlapping adjacent elements */
+    .stSelectbox label {
+        display: block !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+        max-width: 100% !important;
+    }
+
+    /* Ensure expander header text never overlaps */
+    .stExpander summary {
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* Sidebar element spacing — prevents stacked elements from visually colliding */
+    section[data-testid="stSidebar"] .stSelectbox,
+    section[data-testid="stSidebar"] .stExpander,
+    section[data-testid="stSidebar"] .stButton {
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Ensure code blocks in sidebar wrap cleanly */
+    section[data-testid="stSidebar"] code {
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        white-space: pre-wrap !important;
+        display: block !important;
+    }
+
     /* ── Code ── */
     code {
         background: #f1f5f9 !important;
