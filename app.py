@@ -20,6 +20,12 @@ from database import FlowDatabase
 from scraper import DataScraper
 from config import DEVICES, MONITOR_URL, MONITOR_ENABLED, DEFAULT_SELECTORS
 from shared_styles import apply_styles
+from rainfall import get_rainfall_for_device
+from rainfall_analysis import (
+    compute_dry_weather_baseline,
+    detect_rain_events,
+    detect_inflow_infiltration,
+)
 
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user
 
@@ -174,6 +180,23 @@ def get_cached_device_count() -> int:
 def get_cached_measurement_count() -> int:
     """Return total measurement count cached for 30 seconds."""
     return db.get_measurement_count()
+
+
+@st.cache_data(ttl=3600)
+def get_cached_rainfall(device_id: str, date_from_iso: str, date_to_iso: str):
+    """Fetch & cache rainfall data for *device_id* over the requested period (1-hr TTL)."""
+    from datetime import datetime as _dt
+    df = get_rainfall_for_device(
+        device_id,
+        db,
+        _dt.fromisoformat(date_from_iso),
+        _dt.fromisoformat(date_to_iso),
+    )
+    # Return as JSON-serialisable list so Streamlit can cache it
+    if df.empty:
+        return []
+    df["timestamp"] = df["timestamp"].astype(str)
+    return df.to_dict("records")
 
 
 def get_collection_stats(device_id):
@@ -337,16 +360,39 @@ with st.sidebar:
     device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
     if device_info:
         with st.expander("📋 Station Details", expanded=False):
+            _lat = device_info.get("latitude")
+            _lon = device_info.get("longitude")
+            _loc_str = f"{_lat:.4f}, {_lon:.4f}" if (_lat and _lon) else "Not set"
             st.markdown(f"""
             <div style="line-height: 1.7; word-break: break-word; overflow-wrap: break-word;">
                 <p style="margin: 0 0 0.5rem 0;"><strong>Station ID</strong><br>
                     <code style="display: block; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap;">{device_info['device_id']}</code></p>
                 <p style="margin: 0 0 0.5rem 0;"><strong>Location</strong><br>
                     <span>{device_info['location'] or 'Not specified'}</span></p>
+                <p style="margin: 0 0 0.5rem 0;"><strong>Coordinates</strong><br>
+                    <span>{_loc_str}</span></p>
                 <p style="margin: 0;"><strong>Initialized</strong><br>
                     <code style="display: block; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap;">{device_info['created_at']}</code></p>
             </div>
             """, unsafe_allow_html=True)
+
+        # Rain gauge info
+        _rain_assignment = db.get_device_rainfall_station(selected_device_id)
+        if _rain_assignment:
+            _st_name = _rain_assignment.get("station_name") or _rain_assignment["station_id"]
+            _st_state = _rain_assignment.get("state") or ""
+            with st.expander("🌧️ Rain Gauge", expanded=False):
+                st.markdown(
+                    f"<div style='font-size:0.85rem;line-height:1.6;'>"
+                    f"<strong>{_st_name}</strong><br>"
+                    f"<span style='color:#6b7280;'>{_rain_assignment['station_id']}"
+                    f"{' — ' + _st_state if _st_state else ''}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+        elif device_info.get("latitude") and device_info.get("longitude"):
+            with st.expander("🌧️ Rain Gauge", expanded=False):
+                st.caption("Using Open-Meteo grid data (coordinates-based). Assign a BOM station in the Admin panel for higher accuracy.")
 
         st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
 
@@ -865,7 +911,7 @@ if selected_device_id:
                 yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
             )
 
-            tab1, tab2, tab3, tab4 = st.tabs(["💧 Depth", "⚡ Velocity", "🌊 Flow", "📋 Statistics"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["💧 Depth", "⚡ Velocity", "🌊 Flow", "🌧️ Rainfall & I/I", "📋 Statistics"])
 
             with tab1:
                 fig_depth = px.line(df, x="timestamp", y="depth_mm",
@@ -910,6 +956,184 @@ if selected_device_id:
                 col_s4.metric("Std Dev", f"{df['flow_lps'].std():.1f} L/s")
 
             with tab4:
+                # ── Rainfall & I/I tab ─────────────────────────────────────
+                _dev_info_r = next((d for d in db.get_devices() if d["device_id"] == selected_device_id), None)
+                _has_loc = _dev_info_r and _dev_info_r.get("latitude") and _dev_info_r.get("longitude")
+                _has_rain_station = db.get_device_rainfall_station(selected_device_id) is not None
+
+                if not _has_loc and not _has_rain_station:
+                    st.info(
+                        "ℹ️ **No location set for this device.**\n\n"
+                        "Go to ⚙️ Admin Panel → **Map Location & Rain Gauge** to set GPS coordinates "
+                        "and optionally assign a BOM station. Rainfall data will then be fetched automatically."
+                    )
+                else:
+                    # Fetch rainfall data for the current view window
+                    _rain_date_from = graph_start if 'graph_start' in dir() else (datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=168))
+                    _rain_date_to = graph_end if 'graph_end' in dir() else datetime.now(pytz.timezone(DEFAULT_TZ))
+
+                    with st.spinner("Loading rainfall data…"):
+                        try:
+                            _rain_records = get_cached_rainfall(
+                                selected_device_id,
+                                _rain_date_from.isoformat(),
+                                _rain_date_to.isoformat(),
+                            )
+                            df_rain = pd.DataFrame(_rain_records) if _rain_records else pd.DataFrame(columns=["timestamp", "rainfall_mm"])
+                            if not df_rain.empty:
+                                df_rain["timestamp"] = pd.to_datetime(df_rain["timestamp"])
+                        except Exception as _re:
+                            df_rain = pd.DataFrame(columns=["timestamp", "rainfall_mm"])
+                            st.warning(f"⚠️ Could not load rainfall data: {_re}")
+
+                    # ── Analysis ──────────────────────────────────────────
+                    _df_flow_r = df.copy() if not df.empty else pd.DataFrame(columns=["timestamp", "flow_lps"])
+                    _baseline = compute_dry_weather_baseline(_df_flow_r, df_rain)
+                    _response = detect_inflow_infiltration(_df_flow_r, df_rain, _baseline)
+
+                    # ── Summary cards ─────────────────────────────────────
+                    _sev_color = {
+                        "High": "#3A7F5F", "Medium": "#F4B400",
+                        "Critical": "#D93025", "Low": "#4CAF50",
+                    }
+                    _ql = _response.quality_label
+                    _badge_color = _sev_color.get(_ql, "#6b7280")
+
+                    r_col1, r_col2, r_col3, r_col4 = st.columns(4)
+                    r_col1.metric("Dry-Weather Baseline", f"{_baseline:.1f} L/s",
+                                  help="Median flow during dry periods over the last 7 days")
+                    r_col2.metric("Rain Events", len(_response.rain_events),
+                                  help="Number of discrete rainfall events detected")
+                    r_col3.metric("I/I Flags", len(_response.ii_flags),
+                                  help="Flow responses that exceeded 1.5× baseline")
+                    r_col4.metric("Confidence", f"{_response.confidence_score:.0f}%",
+                                  help="Statistical confidence in the analysis")
+
+                    st.markdown(
+                        f"<div style='display:inline-block;background:{_badge_color};color:#fff;"
+                        f"padding:4px 12px;border-radius:20px;font-size:0.82rem;"
+                        f"font-weight:600;margin-bottom:1rem;'>"
+                        f"I/I Risk: {_ql}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    # ── Combined chart ─────────────────────────────────────
+                    if not df_rain.empty and not df.empty:
+                        _fig_rain = make_subplots(
+                            specs=[[{"secondary_y": True}]],
+                            shared_xaxes=True,
+                        )
+                        # Rainfall bars (secondary y)
+                        _fig_rain.add_trace(
+                            go.Bar(
+                                x=df_rain["timestamp"],
+                                y=df_rain["rainfall_mm"],
+                                name="Rainfall (mm/hr)",
+                                marker_color="rgba(41, 182, 246, 0.6)",
+                                hovertemplate="%{y:.1f} mm<extra>Rainfall</extra>",
+                            ),
+                            secondary_y=True,
+                        )
+                        # Flow line (primary y)
+                        _fig_rain.add_trace(
+                            go.Scatter(
+                                x=df["timestamp"],
+                                y=df["flow_lps"],
+                                name="Flow (L/s)",
+                                line=dict(color="#1D4E89", width=2.5),
+                                fill="tozeroy",
+                                fillcolor="rgba(29,78,137,0.07)",
+                                hovertemplate="%{y:.2f} L/s<extra>Flow</extra>",
+                            ),
+                            secondary_y=False,
+                        )
+                        # Dry-weather baseline band
+                        _fig_rain.add_hline(
+                            y=_baseline,
+                            line_dash="dash",
+                            line_color="#3A7F5F",
+                            annotation_text=f"Baseline {_baseline:.1f} L/s",
+                            annotation_font_color="#3A7F5F",
+                            secondary_y=False,
+                        )
+                        # Shade I/I event windows
+                        for _flag in _response.ii_flags:
+                            _fig_rain.add_vrect(
+                                x0=_flag.rain_event.start,
+                                x1=_flag.rain_event.end,
+                                fillcolor="rgba(217,48,37,0.08)",
+                                line_color="rgba(217,48,37,0.3)",
+                                annotation_text=f"⚠ I/I ({_flag.severity})",
+                                annotation_font_size=10,
+                                annotation_font_color="#D93025",
+                            )
+                        _fig_rain.update_layout(
+                            height=460,
+                            template="plotly_white",
+                            paper_bgcolor="#ffffff",
+                            plot_bgcolor="#ffffff",
+                            font=dict(family="Inter, sans-serif", color="#4A4A4A", size=12),
+                            margin=dict(l=0, r=0, t=30, b=0),
+                            hovermode="x unified",
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                            xaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9", title="Time"),
+                            yaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9"),
+                        )
+                        _fig_rain.update_yaxes(title_text="Flow Rate (L/s)", secondary_y=False)
+                        _fig_rain.update_yaxes(
+                            title_text="Rainfall (mm/hr)", secondary_y=True,
+                            autorange="reversed",
+                        )
+                        st.plotly_chart(_fig_rain, use_container_width=True)
+                    elif df.empty:
+                        st.info("No flow data available for the selected window.")
+                    else:
+                        st.info(
+                            "No rainfall data available for this period. "
+                            "The system will attempt to fetch data from BOM or Open-Meteo. "
+                            "Try refreshing or widen the time window."
+                        )
+
+                    # ── Rain events table ──────────────────────────────────
+                    if _response.rain_events:
+                        with st.expander(f"🌧️ Rain Events ({len(_response.rain_events)})", expanded=False):
+                            _ev_df = pd.DataFrame([
+                                {
+                                    "Start": e.start.strftime("%d/%m %H:%M") if hasattr(e.start, "strftime") else str(e.start),
+                                    "End": e.end.strftime("%d/%m %H:%M") if hasattr(e.end, "strftime") else str(e.end),
+                                    "Duration (h)": f"{e.duration_hours:.1f}",
+                                    "Total (mm)": f"{e.total_mm:.1f}",
+                                    "Peak (mm/hr)": f"{e.peak_mm_per_hour:.1f}",
+                                }
+                                for e in _response.rain_events
+                            ])
+                            st.dataframe(_ev_df, use_container_width=True, hide_index=True)
+
+                    # ── I/I flags table ────────────────────────────────────
+                    if _response.ii_flags:
+                        _sev_badge = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵"}
+                        with st.expander(f"⚠️ I/I Flags ({len(_response.ii_flags)})", expanded=True):
+                            for _flag in _response.ii_flags:
+                                _icon = _sev_badge.get(_flag.severity, "⚪")
+                                st.markdown(
+                                    f"{_icon} **{_flag.severity.upper()}** — "
+                                    f"{_flag.description}  \n"
+                                    f"<span style='font-size:0.8rem;color:#6b7280;'>"
+                                    f"Peak: {_flag.peak_flow_lps:.1f} L/s &nbsp;·&nbsp; "
+                                    f"Ratio: {_flag.response_ratio:.1f}× &nbsp;·&nbsp; "
+                                    f"Lag: {_flag.lag_hours:.1f} h &nbsp;·&nbsp; "
+                                    f"Confidence: {_flag.confidence:.0f}%</span>",
+                                    unsafe_allow_html=True,
+                                )
+                                st.markdown("<div style='height:0.25rem'></div>", unsafe_allow_html=True)
+
+                    # ── Recommendations ────────────────────────────────────
+                    if _response.recommendations:
+                        st.markdown("#### 💡 Recommendations")
+                        for _rec in _response.recommendations:
+                            st.markdown(_rec)
+
+            with tab5:
                 st.markdown("#### Aggregate Statistics")
                 col_sum1, col_sum2, col_sum3 = st.columns(3)
                 with col_sum1:

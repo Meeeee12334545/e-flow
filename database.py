@@ -138,6 +138,55 @@ class FlowDatabase:
                 )
                 """
             )
+            # Migrate devices table — add lat/lon and dashboard_url if absent
+            cur.execute(
+                "ALTER TABLE devices ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION"
+            )
+            cur.execute(
+                "ALTER TABLE devices ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION"
+            )
+            # Rainfall stations cache
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rainfall_stations (
+                    station_id TEXT PRIMARY KEY,
+                    station_name TEXT NOT NULL,
+                    latitude DOUBLE PRECISION NOT NULL,
+                    longitude DOUBLE PRECISION NOT NULL,
+                    state TEXT,
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            )
+            # Rainfall observations cache
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rainfall_data (
+                    id SERIAL PRIMARY KEY,
+                    station_id TEXT NOT NULL,
+                    timestamp TIMESTAMPTZ NOT NULL,
+                    rainfall_mm DOUBLE PRECISION,
+                    UNIQUE(station_id, timestamp)
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_rainfall_station_ts
+                ON rainfall_data (station_id, timestamp DESC);
+                """
+            )
+            # Device → rainfall station assignment
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS device_rainfall_stations (
+                    device_id TEXT PRIMARY KEY,
+                    station_id TEXT NOT NULL,
+                    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+                    CONSTRAINT fk_drs_device FOREIGN KEY (device_id) REFERENCES devices (device_id)
+                )
+                """
+            )
             cur.close()
             conn.close()
         else:
@@ -165,6 +214,15 @@ class FlowDatabase:
                 cursor.execute("ALTER TABLE devices ADD COLUMN dashboard_url TEXT")
             except Exception:
                 pass  # Column already exists
+            # Add lat/lon columns for map location feature
+            try:
+                cursor.execute("ALTER TABLE devices ADD COLUMN latitude REAL")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE devices ADD COLUMN longitude REAL")
+            except Exception:
+                pass
 
             # Create table for measurements
             cursor.execute(
@@ -241,6 +299,51 @@ class FlowDatabase:
                     confidence_score REAL DEFAULT 100.0,
                     quality_label TEXT DEFAULT 'High',
                     summary TEXT
+                )
+                """
+            )
+
+            # Rainfall stations cache
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rainfall_stations (
+                    station_id TEXT PRIMARY KEY,
+                    station_name TEXT NOT NULL,
+                    latitude REAL NOT NULL,
+                    longitude REAL NOT NULL,
+                    state TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
+            # Rainfall observations cache
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rainfall_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    station_id TEXT NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
+                    rainfall_mm REAL,
+                    UNIQUE(station_id, timestamp)
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_rainfall_station_ts
+                ON rainfall_data (station_id, timestamp DESC)
+                """
+            )
+
+            # Device → rainfall station assignment
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS device_rainfall_stations (
+                    device_id TEXT PRIMARY KEY,
+                    station_id TEXT NOT NULL,
+                    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (device_id) REFERENCES devices (device_id)
                 )
                 """
             )
@@ -817,6 +920,322 @@ class FlowDatabase:
                 cursor.execute(
                     "SELECT * FROM scheduled_reports ORDER BY generated_at DESC LIMIT ?",
                     (limit,),
+                )
+            results = [dict(r) for r in cursor.fetchall()]
+            conn.close()
+            return results
+
+    # ── Rainfall / location methods ────────────────────────────────────────
+
+    def update_device_location(self, device_id: str, latitude: float, longitude: float) -> bool:
+        """Persist lat/lon coordinates for a device. Returns True on success."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE devices SET latitude = %s, longitude = %s WHERE device_id = %s",
+                    (latitude, longitude, device_id),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE devices SET latitude = ?, longitude = ? WHERE device_id = ?",
+                    (latitude, longitude, device_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    def save_rainfall_stations(self, stations: List[Dict]) -> int:
+        """Upsert a list of rainfall station records.
+
+        Each dict must have: station_id, station_name, latitude, longitude.
+        Optionally: state.
+        Returns number of rows inserted/updated.
+        """
+        if not stations:
+            return 0
+        params = [
+            (
+                s["station_id"],
+                s["station_name"],
+                s["latitude"],
+                s["longitude"],
+                s.get("state"),
+            )
+            for s in stations
+        ]
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.executemany(
+                    """
+                    INSERT INTO rainfall_stations (station_id, station_name, latitude, longitude, state, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (station_id) DO UPDATE SET
+                        station_name = EXCLUDED.station_name,
+                        latitude     = EXCLUDED.latitude,
+                        longitude    = EXCLUDED.longitude,
+                        state        = EXCLUDED.state,
+                        updated_at   = NOW()
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cur.rowcount
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.executemany(
+                    """
+                    INSERT INTO rainfall_stations (station_id, station_name, latitude, longitude, state)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(station_id) DO UPDATE SET
+                        station_name = excluded.station_name,
+                        latitude     = excluded.latitude,
+                        longitude    = excluded.longitude,
+                        state        = excluded.state,
+                        updated_at   = CURRENT_TIMESTAMP
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cursor.rowcount
+            finally:
+                conn.close()
+
+    def get_nearest_stations(self, latitude: float, longitude: float, limit: int = 10) -> List[Dict]:
+        """Return up to *limit* cached rainfall stations ordered by distance from (lat, lon).
+
+        Distance is computed in-Python via Haversine after fetching all cached stations.
+        """
+        import math
+
+        def _haversine(lat1, lon1, lat2, lon2):
+            R = 6371.0
+            dlat = math.radians(lat2 - lat1)
+            dlon = math.radians(lon2 - lon1)
+            a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+            return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                cur.execute("SELECT * FROM rainfall_stations")
+                rows = [dict(r) for r in cur.fetchall()]
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM rainfall_stations")
+            rows = [dict(r) for r in cursor.fetchall()]
+            conn.close()
+
+        for row in rows:
+            row["distance_km"] = _haversine(latitude, longitude, row["latitude"], row["longitude"])
+        rows.sort(key=lambda r: r["distance_km"])
+        return rows[:limit]
+
+    def set_device_rainfall_station(self, device_id: str, station_id: str) -> bool:
+        """Assign a rainfall station to a device (upsert). Returns True on success."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO device_rainfall_stations (device_id, station_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT (device_id) DO UPDATE SET
+                        station_id  = EXCLUDED.station_id,
+                        assigned_at = NOW()
+                    """,
+                    (device_id, station_id),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO device_rainfall_stations (device_id, station_id)
+                    VALUES (?, ?)
+                    ON CONFLICT(device_id) DO UPDATE SET
+                        station_id  = excluded.station_id,
+                        assigned_at = CURRENT_TIMESTAMP
+                    """,
+                    (device_id, station_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    def get_device_rainfall_station(self, device_id: str) -> Optional[Dict]:
+        """Return the rainfall station assigned to *device_id*, or None."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                cur.execute(
+                    """
+                    SELECT drs.*, rs.station_name, rs.latitude AS st_lat, rs.longitude AS st_lon, rs.state
+                    FROM device_rainfall_stations drs
+                    LEFT JOIN rainfall_stations rs ON drs.station_id = rs.station_id
+                    WHERE drs.device_id = %s
+                    """,
+                    (device_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT drs.*, rs.station_name, rs.latitude AS st_lat, rs.longitude AS st_lon, rs.state
+                FROM device_rainfall_stations drs
+                LEFT JOIN rainfall_stations rs ON drs.station_id = rs.station_id
+                WHERE drs.device_id = ?
+                """,
+                (device_id,),
+            )
+            row = cursor.fetchone()
+            conn.close()
+            return dict(row) if row else None
+
+    def save_rainfall_data(self, station_id: str, records: List[Dict]) -> int:
+        """Insert rainfall observations for a station. Skips duplicates.
+
+        Each record dict must have: timestamp, rainfall_mm.
+        Returns number of rows inserted.
+        """
+        if not records:
+            return 0
+        params = [(station_id, r["timestamp"], r.get("rainfall_mm")) for r in records]
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.executemany(
+                    """
+                    INSERT INTO rainfall_data (station_id, timestamp, rainfall_mm)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (station_id, timestamp) DO NOTHING
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cur.rowcount
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.executemany(
+                    """
+                    INSERT OR IGNORE INTO rainfall_data (station_id, timestamp, rainfall_mm)
+                    VALUES (?, ?, ?)
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cursor.rowcount
+            finally:
+                conn.close()
+
+    def get_rainfall_data(
+        self,
+        station_id: str,
+        date_from: datetime = None,
+        date_to: datetime = None,
+        limit: int = 5000,
+    ) -> List[Dict]:
+        """Retrieve cached rainfall observations for *station_id*.
+
+        Optionally filtered by *date_from* / *date_to* (inclusive).
+        """
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                if date_from and date_to:
+                    cur.execute(
+                        """
+                        SELECT * FROM rainfall_data
+                        WHERE station_id = %s AND timestamp >= %s AND timestamp <= %s
+                        ORDER BY timestamp ASC LIMIT %s
+                        """,
+                        (station_id, date_from, date_to, limit),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT * FROM rainfall_data
+                        WHERE station_id = %s
+                        ORDER BY timestamp DESC LIMIT %s
+                        """,
+                        (station_id, limit),
+                    )
+                return [dict(r) for r in cur.fetchall()]
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            if date_from and date_to:
+                cursor.execute(
+                    """
+                    SELECT * FROM rainfall_data
+                    WHERE station_id = ? AND timestamp >= ? AND timestamp <= ?
+                    ORDER BY timestamp ASC LIMIT ?
+                    """,
+                    (
+                        station_id,
+                        date_from.isoformat() if isinstance(date_from, datetime) else date_from,
+                        date_to.isoformat() if isinstance(date_to, datetime) else date_to,
+                        limit,
+                    ),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT * FROM rainfall_data
+                    WHERE station_id = ?
+                    ORDER BY timestamp DESC LIMIT ?
+                    """,
+                    (station_id, limit),
                 )
             results = [dict(r) for r in cursor.fetchall()]
             conn.close()

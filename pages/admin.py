@@ -4,6 +4,8 @@ Admin Panel for User & Device Management
 Streamlit page for administrators to:
 1. Create new users
 2. Select which sites (devices) users can see
+3. Set GPS location for each device via interactive map
+4. Assign the nearest BOM rain gauge to each device
 """
 
 import streamlit as st
@@ -107,12 +109,203 @@ def render_admin_panel():
                 url_display = site.get("dashboard_url") or "—"
                 if len(url_display) > 60:
                     url_display = url_display[:60] + "…"
+                lat = site.get("latitude")
+                lon = site.get("longitude")
+                loc_str = f"{lat:.4f}, {lon:.4f}" if (lat and lon) else "No coordinates"
                 st.markdown(
                     f"**{site['device_name']}** &nbsp;·&nbsp; `{site['device_id']}` &nbsp;·&nbsp; "
                     f"{site.get('location') or 'No location'} &nbsp;·&nbsp; "
+                    f"📍 {loc_str} &nbsp;·&nbsp; "
                     f"<span style='color:#6b7280;font-size:0.82rem;'>{url_display}</span>",
                     unsafe_allow_html=True,
                 )
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+
+    # ── Map Location & Rain Gauge ────────────────────────────────────────────
+    st.markdown('<p class="section-title">📍 Map Location & Rain Gauge</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Set the GPS location for each flow meter and assign the nearest BOM rain gauge. "
+        "Location is required to enable the Rainfall &amp; I/I analysis tab.</p>",
+        unsafe_allow_html=True,
+    )
+
+    if not all_sites:
+        st.warning("⚠️ No sites configured yet. Add a site first.")
+    else:
+        _site_map = {s["device_name"]: s for s in all_sites}
+        _site_sel = st.selectbox(
+            "Select site to configure:",
+            options=list(_site_map.keys()),
+            key="map_site_selector",
+        )
+        _site = _site_map[_site_sel]
+        _device_id = _site["device_id"]
+        _cur_lat = _site.get("latitude")
+        _cur_lon = _site.get("longitude")
+
+        # Default map centre — Australia if no coordinates set
+        _map_lat = _cur_lat if _cur_lat else -25.0
+        _map_lon = _cur_lon if _cur_lon else 133.0
+        _zoom = 12 if _cur_lat else 4
+
+        with st.expander("📍 Set Map Location", expanded=(_cur_lat is None)):
+            st.markdown(
+                "**Click on the map** to place a marker at the flow meter's location. "
+                "Then press **Save Location** to store the coordinates.",
+                unsafe_allow_html=False,
+            )
+
+            try:
+                import folium
+                from streamlit_folium import st_folium
+
+                _m = folium.Map(location=[_map_lat, _map_lon], zoom_start=_zoom)
+                if _cur_lat and _cur_lon:
+                    folium.Marker(
+                        location=[_cur_lat, _cur_lon],
+                        tooltip=f"{_site['device_name']} (current location)",
+                        icon=folium.Icon(color="green", icon="tint", prefix="fa"),
+                    ).add_to(_m)
+
+                _map_result = st_folium(_m, height=420, use_container_width=True, key=f"map_{_device_id}")
+
+                _clicked_lat = None
+                _clicked_lon = None
+                if _map_result and _map_result.get("last_clicked"):
+                    _clicked_lat = _map_result["last_clicked"]["lat"]
+                    _clicked_lon = _map_result["last_clicked"]["lng"]
+
+                _col_coords, _col_save = st.columns([3, 1])
+                with _col_coords:
+                    if _clicked_lat is not None:
+                        st.info(
+                            f"📍 Clicked: **{_clicked_lat:.5f}, {_clicked_lon:.5f}** "
+                            "— press Save to confirm."
+                        )
+                    elif _cur_lat and _cur_lon:
+                        st.success(
+                            f"✅ Current location: **{_cur_lat:.5f}, {_cur_lon:.5f}**"
+                        )
+                    else:
+                        st.caption("Click on the map above to select a location.")
+
+                with _col_save:
+                    if _clicked_lat is not None:
+                        if st.button("💾 Save Location", type="primary", use_container_width=True):
+                            ok = flow_db.update_device_location(_device_id, _clicked_lat, _clicked_lon)
+                            if ok:
+                                st.success("✅ Location saved!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to save location.")
+
+            except ImportError:
+                st.warning(
+                    "⚠️ Map component not available. Install `folium` and `streamlit-folium` to enable this feature."
+                )
+                # Fallback: manual coordinate entry
+                with st.form("manual_coords_form"):
+                    _m_lat = st.number_input("Latitude", value=float(_cur_lat or -28.0), format="%.5f")
+                    _m_lon = st.number_input("Longitude", value=float(_cur_lon or 153.0), format="%.5f")
+                    if st.form_submit_button("💾 Save Location"):
+                        ok = flow_db.update_device_location(_device_id, _m_lat, _m_lon)
+                        if ok:
+                            st.success("✅ Location saved!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to save location.")
+
+        # Rain gauge assignment — only enabled once coordinates are set
+        _site_refreshed = next((s for s in flow_db.get_devices() if s["device_id"] == _device_id), _site)
+        _has_coords = bool(_site_refreshed.get("latitude") and _site_refreshed.get("longitude"))
+
+        with st.expander("🌧️ Assign Rain Gauge", expanded=False):
+            if not _has_coords:
+                st.info("ℹ️ Set a map location above before assigning a rain gauge.")
+            else:
+                _assigned = flow_db.get_device_rainfall_station(_device_id)
+                if _assigned:
+                    st.success(
+                        f"✅ Currently assigned: **{_assigned.get('station_name', _assigned['station_id'])}** "
+                        f"({_assigned['station_id']}) — "
+                        f"{_assigned.get('state', '')} &nbsp;·&nbsp; "
+                        f"{_site_refreshed['latitude']:.3f}, {_site_refreshed['longitude']:.3f}"
+                    )
+
+                if st.button("🔍 Find Nearest BOM Stations", key=f"find_stations_{_device_id}"):
+                    with st.spinner("Searching BOM station catalogue…"):
+                        from rainfall import search_bom_stations
+                        _stations = search_bom_stations(
+                            _site_refreshed["latitude"],
+                            _site_refreshed["longitude"],
+                            radius_km=150,
+                            limit=8,
+                        )
+                        if _stations:
+                            flow_db.save_rainfall_stations(_stations)
+                        st.session_state[f"bom_stations_{_device_id}"] = _stations
+
+                _found_stations = st.session_state.get(f"bom_stations_{_device_id}", [])
+
+                if not _found_stations:
+                    # Show cached stations from DB as fallback
+                    _found_stations = flow_db.get_nearest_stations(
+                        _site_refreshed["latitude"],
+                        _site_refreshed["longitude"],
+                        limit=8,
+                    )
+
+                if _found_stations:
+                    st.markdown("**Select a station:**")
+                    _station_labels = [
+                        f"{s['station_name']} ({s['station_id']}) — {s.get('state', '')} — {s.get('distance_km', '?'):.1f} km away"
+                        for s in _found_stations
+                    ]
+                    _sel_idx = st.radio(
+                        "Nearest stations:",
+                        options=range(len(_station_labels)),
+                        format_func=lambda i: _station_labels[i],
+                        key=f"station_radio_{_device_id}",
+                        label_visibility="collapsed",
+                    )
+                    if st.button("💾 Assign Station", type="primary", key=f"assign_station_{_device_id}"):
+                        _chosen = _found_stations[_sel_idx]
+                        flow_db.save_rainfall_stations([_chosen])
+                        ok = flow_db.set_device_rainfall_station(_device_id, _chosen["station_id"])
+                        if ok:
+                            st.success(
+                                f"✅ Assigned **{_chosen['station_name']}** ({_chosen['station_id']}) "
+                                f"to {_site['device_name']}."
+                            )
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to assign station.")
+                else:
+                    st.info(
+                        "No cached BOM stations found. Click **Find Nearest BOM Stations** to search, "
+                        "or the system will use Open-Meteo coordinates-based data automatically."
+                    )
+
+                # Option to clear assignment
+                if _assigned:
+                    with st.expander("Remove current assignment", expanded=False):
+                        if st.button("🗑️ Remove rain gauge assignment", key=f"remove_station_{_device_id}"):
+                            # Delete the assignment row
+                            try:
+                                import sqlite3 as _sl
+                                _conn = _sl.connect(flow_db.db_path, timeout=30)
+                                _conn.execute(
+                                    "DELETE FROM device_rainfall_stations WHERE device_id = ?",
+                                    (_device_id,),
+                                )
+                                _conn.commit()
+                                _conn.close()
+                                st.success("✅ Assignment removed.")
+                                st.rerun()
+                            except Exception as _e:
+                                st.error(f"❌ Could not remove: {_e}")
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
