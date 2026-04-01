@@ -25,18 +25,78 @@ def init_auth_state():
         st.session_state.session_id = None
 
 
+# ── Logo helpers ─────────────────────────────────────────────────────────────
+
+def get_org_logo_data_uri() -> str | None:
+    """Return the organisation logo as a data URI, or None if not configured."""
+    auth_db = st.session_state.get('auth_db')
+    if not auth_db:
+        return None
+    try:
+        logo_b64 = auth_db.get_setting('org_logo_b64')
+        logo_mime = auth_db.get_setting('org_logo_mime') or 'image/png'
+        if logo_b64:
+            return f"data:{logo_mime};base64,{logo_b64}"
+    except Exception:
+        pass
+    return None
+
+
+def get_sidebar_logo_path() -> str:
+    """Return a file path suitable for st.logo(). Uses the custom org logo if set,
+    writing it to /tmp (keyed by content hash) for the current session; otherwise
+    returns the EDS default."""
+    import hashlib
+    auth_db = st.session_state.get('auth_db')
+    if auth_db:
+        try:
+            logo_b64 = auth_db.get_setting('org_logo_b64')
+            logo_mime = auth_db.get_setting('org_logo_mime') or 'image/png'
+            if logo_b64:
+                ext = 'svg' if 'svg' in logo_mime else ('jpg' if 'jpeg' in logo_mime else 'png')
+                content_hash = hashlib.sha256(logo_b64.encode()).hexdigest()[:16]
+                tmp_path = Path('/tmp') / f'eflow_org_logo_{content_hash}.{ext}'
+                if not tmp_path.exists():
+                    tmp_path.write_bytes(base64.b64decode(logo_b64))
+                return str(tmp_path)
+        except Exception:
+            pass
+    return str(_ASSETS / "logo_wide.svg")
+
+
+def get_user_avatar_data_uri(user_id: int) -> str | None:
+    """Return the user's avatar as a data URI, or None if not set."""
+    auth_db = st.session_state.get('auth_db')
+    if not auth_db:
+        return None
+    try:
+        logo = auth_db.get_user_logo(user_id)
+        if logo:
+            return f"data:{logo['mime']};base64,{logo['b64']}"
+    except Exception:
+        pass
+    return None
+
+
 def login_page():
     """Display a polished, branded login page."""
     apply_styles()
 
-    # EDS logo header
-    _logo_b64 = base64.b64encode((_ASSETS / "logo_wide.svg").read_bytes()).decode()
-    _logo_src = f"data:image/svg+xml;base64,{_logo_b64}"
+    # Org logo (custom if set, else EDS default)
+    org_logo_uri = get_org_logo_data_uri()
+    if org_logo_uri:
+        _logo_img_src = org_logo_uri
+        _logo_style = "max-height:72px; max-width:280px; display:inline-block; margin-bottom: 0.75rem; object-fit: contain;"
+    else:
+        _logo_b64 = base64.b64encode((_ASSETS / "logo_wide.svg").read_bytes()).decode()
+        _logo_img_src = f"data:image/svg+xml;base64,{_logo_b64}"
+        _logo_style = "height:72px; display:inline-block; margin-bottom: 0.75rem;"
+
     st.markdown(f"""
     <div style="text-align: center; padding: 2.5rem 1rem 1.5rem;">
-        <img src="{_logo_src}"
-             alt="EDS — Environmental Data Services"
-             style="height:72px; display:inline-block; margin-bottom: 0.75rem;"/>
+        <img src="{_logo_img_src}"
+             alt="Organisation Logo"
+             style="{_logo_style}"/>
         <p style="
             font-size: 0.92rem !important; color: #6b7280 !important;
             margin: 0.3rem 0 0 0 !important;
@@ -55,7 +115,7 @@ def login_page():
         ">
         """, unsafe_allow_html=True)
 
-        tab1, tab2 = st.tabs(["🔓 Login", "📝 Sign Up"])
+        tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
         with tab1:
             st.markdown(
@@ -155,28 +215,36 @@ def render_auth_header():
         if is_authenticated():
             user = get_current_user()
             role = user.get('role', 'user')
-            role_icon = "👨‍💼" if role == "admin" else "👤"
             role_label = "Administrator" if role == "admin" else "User"
             initial = user['username'][0].upper() if user.get('username') else "?"
+
+            # Show avatar if uploaded, otherwise show initial letter
+            avatar_uri = get_user_avatar_data_uri(user.get('user_id', 0))
+            if avatar_uri:
+                avatar_html = (
+                    f'<img src="{avatar_uri}" alt="avatar" '
+                    f'style="width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;" />'
+                )
+            else:
+                avatar_html = (
+                    f'<div style="width:38px;height:38px;border-radius:50%;background:#3A7F5F;'
+                    f'display:flex;align-items:center;justify-content:center;'
+                    f'font-size:1rem;font-weight:700;color:#fff;flex-shrink:0;">{initial}</div>'
+                )
 
             st.markdown(f"""
             <div class="sidebar-user-card">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="
-                        width: 38px; height: 38px; border-radius: 50%;
-                        background: #3A7F5F;
-                        display: flex; align-items: center; justify-content: center;
-                        font-size: 1rem; font-weight: 700; color: #fff; flex-shrink: 0;
-                    ">{initial}</div>
+                    {avatar_html}
                     <div>
                         <p class="sidebar-user-name">{user['username']}</p>
-                        <p class="sidebar-user-role">{role_icon} {role_label}</p>
+                        <p class="sidebar-user-role">{role_label}</p>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button("🚪 Sign Out", use_container_width=True, key="logout_btn"):
+            if st.button("Sign Out", use_container_width=True, key="logout_btn"):
                 logout()
 
             # Navigation links
@@ -184,15 +252,15 @@ def render_auth_header():
             if is_admin():
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("⚙️ Admin", use_container_width=True, key="nav_admin"):
+                    if st.button("Admin", use_container_width=True, key="nav_admin"):
                         st.switch_page("pages/admin.py")
                 with col2:
-                    if st.button("👤 Profile", use_container_width=True, key="nav_profile"):
+                    if st.button("Profile", use_container_width=True, key="nav_profile"):
                         st.switch_page("pages/profile.py")
             else:
-                if st.button("👤 My Profile", use_container_width=True, key="nav_profile_user"):
+                if st.button("My Profile", use_container_width=True, key="nav_profile_user"):
                     st.switch_page("pages/profile.py")
-            if st.button("📄 Reports", use_container_width=True, key="nav_reports"):
+            if st.button("Reports", use_container_width=True, key="nav_reports"):
                 st.switch_page("pages/reports.py")
         else:
             st.markdown(

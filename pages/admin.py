@@ -8,13 +8,14 @@ Streamlit page for administrators to:
 4. Assign the nearest BOM rain gauge to each device
 """
 
+import base64
 import streamlit as st
 import pandas as pd
 from pathlib import Path
 from auth import AuthDatabase
 from database import FlowDatabase
 from shared_styles import apply_styles
-from streamlit_auth import init_auth_state, is_authenticated, is_admin, get_current_user
+from streamlit_auth import init_auth_state, is_authenticated, is_admin, get_current_user, get_sidebar_logo_path
 
 _ASSETS = Path(__file__).parent.parent / "assets"
 
@@ -22,7 +23,7 @@ _ASSETS = Path(__file__).parent.parent / "assets"
 def render_admin_panel():
     """Render the admin management panel."""
     apply_styles()
-    st.logo(str(_ASSETS / "logo_wide.svg"), icon_image=str(_ASSETS / "logo_icon.svg"))
+    st.logo(get_sidebar_logo_path(), icon_image=str(_ASSETS / "logo_icon.svg"))
 
     if not is_authenticated():
         st.error("❌ You must be logged in")
@@ -35,13 +36,82 @@ def render_admin_panel():
     # ── Page header ─────────────────────────────────────────────────────────
     st.markdown("""
     <div class="page-header">
-        <p class="page-header-title">⚙️ Admin Panel</p>
+        <p class="page-header-title">Admin Panel</p>
         <p class="page-header-sub">Manage users, monitoring sites, and control which sites each user can access.</p>
     </div>
     """, unsafe_allow_html=True)
 
     auth_db = st.session_state.auth_db
     flow_db = FlowDatabase()
+
+    # ── Organisation Branding ────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Organisation Branding</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Upload your organisation's logo. It replaces the default EDS logo in the application "
+        "header, login page, sidebar and PDF reports.</p>",
+        unsafe_allow_html=True,
+    )
+
+    branding_col1, branding_col2 = st.columns([2, 1])
+
+    with branding_col1:
+        uploaded_logo = st.file_uploader(
+            "Upload organisation logo (PNG, JPG or SVG — max 2 MB)",
+            type=["png", "jpg", "jpeg", "svg"],
+            key="org_logo_uploader",
+        )
+        if uploaded_logo is not None:
+            file_bytes = uploaded_logo.read()
+            if len(file_bytes) > 2 * 1024 * 1024:
+                st.error("File is too large. Please upload an image under 2 MB.")
+            else:
+                org_logo_b64 = base64.b64encode(file_bytes).decode()
+                mime_type = uploaded_logo.type or "image/png"
+                branding_save_col, branding_preview_col = st.columns([1, 1])
+                with branding_preview_col:
+                    st.image(file_bytes, caption="Preview", use_container_width=True)
+                with branding_save_col:
+                    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+                    if st.button("Save Organisation Logo", type="primary", key="save_org_logo_btn"):
+                        try:
+                            auth_db.save_setting('org_logo_b64', org_logo_b64)
+                            auth_db.save_setting('org_logo_mime', mime_type)
+                            st.success("Organisation logo saved. It will appear on the next page load.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Could not save logo: {e}")
+
+    with branding_col2:
+        current_logo_b64 = auth_db.get_setting('org_logo_b64')
+        current_logo_mime = auth_db.get_setting('org_logo_mime') or 'image/png'
+        if current_logo_b64:
+            st.markdown(
+                "<p style='font-size:0.82rem;font-weight:600;color:#6b7280;margin-bottom:0.5rem;'>"
+                "CURRENT LOGO</p>",
+                unsafe_allow_html=True,
+            )
+            st.image(
+                base64.b64decode(current_logo_b64),
+                caption=None,
+                use_container_width=True,
+            )
+            if st.button("Remove Logo (restore default)", key="remove_org_logo_btn"):
+                auth_db.delete_setting('org_logo_b64')
+                auth_db.delete_setting('org_logo_mime')
+                st.success("Logo removed. Default EDS branding restored.")
+                st.rerun()
+        else:
+            st.markdown(
+                "<div style='background:#f9faf9;border:1px dashed #D9D9D9;border-radius:8px;"
+                "padding:24px;text-align:center;'>"
+                "<p style='color:#9ca3af;font-size:0.88rem;margin:0;'>No custom logo set<br>"
+                "<span style='font-size:0.8rem;'>Default EDS branding is active</span></p>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── Add New Monitoring Site ──────────────────────────────────────────────
     st.markdown('<p class="section-title">🌐 Add New Monitoring Site</p>', unsafe_allow_html=True)

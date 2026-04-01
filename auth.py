@@ -127,7 +127,27 @@ class AuthDatabase:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_username ON users (username)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_user_devices ON user_devices (user_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id)")
-            
+
+            # System-wide key-value settings (e.g. org logo)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+                """
+            )
+
+            # Migrations: add logo columns to existing users table
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN logo_b64 TEXT")
+            except Exception:
+                pass  # Column already exists
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN logo_mime TEXT")
+            except Exception:
+                pass  # Column already exists
+
             cur.close()
             conn.close()
         else:
@@ -177,12 +197,29 @@ class AuthDatabase:
                 )
                 """
             )
-            
+
+            # System-wide key-value settings (e.g. org logo)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+                """
+            )
+
             # Create indices
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_username ON users (username)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_devices ON user_devices (user_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id)")
-            
+
+            # Migrations: add logo columns to existing users table (safe no-op if present)
+            for _col in ("logo_b64", "logo_mime"):
+                try:
+                    cursor.execute(f"ALTER TABLE users ADD COLUMN {_col} TEXT")
+                except Exception:
+                    pass  # Column already exists
+
             conn.commit()
             conn.close()
 
@@ -668,5 +705,136 @@ class AuthDatabase:
                 cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
                 conn.commit()
                 return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    # ── Settings (key-value store for system-wide config) ────────────────────
+
+    def get_setting(self, key: str) -> Optional[str]:
+        """Retrieve a system setting by key. Returns None if not set."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
+                row = cur.fetchone()
+                return row[0] if row else None
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+            finally:
+                conn.close()
+
+    def save_setting(self, key: str, value: str) -> None:
+        """Upsert a system setting."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "INSERT INTO settings (key, value) VALUES (%s, %s) "
+                    "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                    (key, value),
+                )
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    (key, value),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def delete_setting(self, key: str) -> None:
+        """Delete a system setting."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute("DELETE FROM settings WHERE key = %s", (key,))
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("DELETE FROM settings WHERE key = ?", (key,))
+                conn.commit()
+            finally:
+                conn.close()
+
+    # ── User logo / avatar ───────────────────────────────────────────────────
+
+    def save_user_logo(self, user_id: int, logo_b64: str, mime_type: str) -> None:
+        """Store a base64-encoded logo for the given user."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE users SET logo_b64 = %s, logo_mime = %s WHERE user_id = %s",
+                    (logo_b64, mime_type, user_id),
+                )
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE users SET logo_b64 = ?, logo_mime = ? WHERE user_id = ?",
+                    (logo_b64, mime_type, user_id),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def get_user_logo(self, user_id: int) -> Optional[Dict]:
+        """Return {'b64': ..., 'mime': ...} for user's logo, or None if not set."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "SELECT logo_b64, logo_mime FROM users WHERE user_id = %s",
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if row and row[0]:
+                    return {"b64": row[0], "mime": row[1] or "image/png"}
+                return None
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "SELECT logo_b64, logo_mime FROM users WHERE user_id = ?",
+                    (user_id,),
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    return {"b64": row[0], "mime": row[1] or "image/png"}
+                return None
             finally:
                 conn.close()
