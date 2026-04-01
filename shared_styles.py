@@ -23,7 +23,7 @@ import streamlit as st
 # ── Design tokens ──────────────────────────────────────────────────────────
 _CSS = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
     :root {
         /* ── EDS brand palette ── */
@@ -93,11 +93,12 @@ _CSS = """
 
     /* ── Hero Card ── */
     .hero-card {
-        background: #3A7F5F;
+        background: linear-gradient(135deg, #2A6347 0%, #3A7F5F 60%, #2F6B50 100%);
         border-radius: var(--radius-lg);
-        padding: 36px 40px;
+        padding: 32px 40px;
         box-shadow: var(--shadow-lg);
         color: #ffffff;
+        border: 1px solid rgba(255,255,255,0.08);
     }
 
     .hero-title {
@@ -110,11 +111,12 @@ _CSS = """
     }
 
     .hero-subtitle {
-        margin: 0.75rem 0 1.5rem 0 !important;
-        font-size: 1.05rem !important;
-        color: rgba(255,255,255,0.85) !important;
-        max-width: 560px;
+        margin: 0.5rem 0 1.25rem 0 !important;
+        font-size: 0.95rem !important;
+        color: rgba(255,255,255,0.78) !important;
+        max-width: 600px;
         line-height: 1.6 !important;
+        letter-spacing: 0.01em;
     }
 
     .hero-pill {
@@ -136,10 +138,12 @@ _CSS = """
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
-        padding: 0.55rem 1.1rem;
-        border-radius: 999px;
+        padding: 0.4rem 1rem;
+        border-radius: 4px;
         font-weight: 600 !important;
-        font-size: 0.88rem !important;
+        font-size: 0.78rem !important;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
         margin-right: 0.5rem;
         margin-bottom: 0.5rem;
     }
@@ -173,9 +177,10 @@ _CSS = """
     .status-card {
         background: var(--surface);
         border: 1px solid var(--border);
+        border-left: 4px solid var(--success);
         border-radius: var(--radius-md);
-        padding: 28px 20px;
-        box-shadow: var(--shadow-md);
+        padding: 24px 20px;
+        box-shadow: var(--shadow-sm);
         text-align: center;
         height: 100%;
         display: flex;
@@ -185,79 +190,87 @@ _CSS = """
     }
 
     .status-live-dot {
-        width: 12px;
-        height: 12px;
+        width: 9px;
+        height: 9px;
         border-radius: 50%;
         background: var(--success);
         display: inline-block;
         margin-right: 6px;
-        animation: pulse 2s infinite;
+        animation: pulse 2.5s ease-in-out infinite;
     }
 
     @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50%       { opacity: 0.6; transform: scale(0.9); }
+        50%       { opacity: 0.5; transform: scale(0.85); }
     }
 
     .status-pill {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.6rem 1.4rem;
-        border-radius: 999px;
+        padding: 0.45rem 1.2rem;
+        border-radius: 4px;
         background: var(--success-soft);
-        color: var(--success) !important;
+        color: #2e7d32 !important;
         font-weight: 700 !important;
-        font-size: 1rem !important;
-        letter-spacing: 0.06em;
+        font-size: 0.82rem !important;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
         margin-bottom: 0.75rem;
-        border: 1px solid rgba(76,175,80,0.25);
+        border: 1px solid rgba(76,175,80,0.3);
     }
 
     .status-note {
-        font-size: 0.88rem !important;
+        font-size: 0.82rem !important;
         color: var(--muted) !important;
-        line-height: 1.5 !important;
+        line-height: 1.55 !important;
     }
 
     /* ── Metric Cards ── */
     .metric-card {
         background: var(--surface);
         border: 1px solid var(--border);
+        border-top: 3px solid var(--primary);
         border-radius: var(--radius-md);
-        padding: 24px;
-        box-shadow: var(--shadow-md);
+        padding: 20px 24px;
+        box-shadow: var(--shadow-sm);
         transition: box-shadow 0.2s ease, transform 0.2s ease;
     }
 
     .metric-card:hover {
-        box-shadow: var(--shadow-lg);
-        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
     }
 
+    .metric-card.depth    { border-top-color: var(--chart-depth); }
+    .metric-card.velocity { border-top-color: var(--chart-velocity); }
+    .metric-card.flow     { border-top-color: var(--chart-flow); }
+
     .metric-label {
-        font-size: 0.8rem !important;
-        font-weight: 600 !important;
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
         color: var(--muted) !important;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin: 0 0 0.6rem 0 !important;
+        letter-spacing: 0.1em;
+        margin: 0 0 0.5rem 0 !important;
     }
 
     .metric-value {
         font-size: 2.4rem !important;
         font-weight: 700 !important;
-        color: var(--primary) !important;
+        color: var(--text) !important;
         margin: 0 !important;
         line-height: 1.1 !important;
         letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
     }
 
-    .metric-value.green { color: var(--success) !important; }
-    .metric-value.amber { color: var(--warning) !important; }
+    .metric-value.green { color: #2e7d32 !important; }
+    .metric-value.amber { color: #b45309 !important; }
 
     .metric-unit {
-        font-size: 1rem !important;
+        font-size: 0.95rem !important;
         font-weight: 400 !important;
         color: var(--muted) !important;
         margin-left: 4px;
@@ -274,11 +287,14 @@ _CSS = """
     }
 
     .section-title {
-        font-size: 1.35rem !important;
+        font-size: 1.05rem !important;
         font-weight: 700 !important;
-        color: var(--primary) !important;
+        color: var(--text) !important;
         margin: 0 0 0.75rem 0 !important;
-        letter-spacing: -0.01em;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        border-left: 3px solid var(--primary);
+        padding-left: 10px;
     }
 
     .section-subtitle {
@@ -470,6 +486,7 @@ _CSS = """
     div[data-testid="metric-container"] {
         background: var(--surface) !important;
         border: 1px solid var(--border) !important;
+        border-top: 3px solid var(--primary) !important;
         border-radius: var(--radius-md) !important;
         padding: 1rem 1.25rem !important;
         box-shadow: var(--shadow-sm) !important;
@@ -477,15 +494,17 @@ _CSS = """
 
     div[data-testid="metric-container"] label {
         color: var(--muted) !important;
-        font-size: 0.82rem !important;
-        font-weight: 600 !important;
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
         text-transform: uppercase;
-        letter-spacing: 0.07em;
+        letter-spacing: 0.1em;
     }
 
     div[data-testid="metric-container"] [data-testid="stMetricValue"] {
-        color: var(--primary) !important;
+        color: var(--text) !important;
         font-weight: 700 !important;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
     }
 
     /* ── Buttons ── */
@@ -576,16 +595,20 @@ _CSS = """
 
     /* ── Tabs ── */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px !important;
-        background: var(--primary-soft) !important;
-        border-radius: var(--radius-sm) !important;
-        padding: 5px !important;
+        gap: 2px !important;
+        background: #f0f2f1 !important;
+        border-radius: 6px !important;
+        padding: 4px !important;
+        border: 1px solid var(--border) !important;
     }
 
     .stTabs [data-baseweb="tab"] {
-        border-radius: 9px !important;
-        padding: 0.5rem 1.2rem !important;
-        font-weight: 500 !important;
+        border-radius: 4px !important;
+        padding: 0.45rem 1.1rem !important;
+        font-weight: 600 !important;
+        font-size: 0.82rem !important;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
         color: var(--muted) !important;
     }
 
@@ -593,7 +616,8 @@ _CSS = """
         background: var(--surface) !important;
         color: var(--primary) !important;
         font-weight: 700 !important;
-        box-shadow: var(--shadow-sm) !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
+        border: 1px solid var(--border) !important;
     }
 
     /* ── Selectbox & inputs ── */
@@ -696,6 +720,42 @@ _CSS = """
         font-size: 0.82rem !important;
         color: var(--muted) !important;
     }
+
+    /* ── Dataframe / Data tables ── */
+    [data-testid="stDataFrame"] table {
+        font-size: 0.84rem !important;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
+    }
+
+    [data-testid="stDataFrame"] thead th {
+        background: #f0f4f2 !important;
+        color: var(--text) !important;
+        font-weight: 700 !important;
+        font-size: 0.74rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        border-bottom: 2px solid var(--border) !important;
+    }
+
+    [data-testid="stDataFrame"] tbody tr:hover td {
+        background: var(--primary-soft) !important;
+    }
+
+    /* ── Quality / status text badges ── */
+    .quality-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .quality-badge.high     { background: #E8F5E9; color: #2e7d32; border: 1px solid #a5d6a7; }
+    .quality-badge.medium   { background: #FFF8E1; color: #b45309; border: 1px solid #ffe082; }
+    .quality-badge.low      { background: #FDECEA; color: #c62828; border: 1px solid #ef9a9a; }
 
     /* ── Responsive ── */
     @media (max-width: 768px) {

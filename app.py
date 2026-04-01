@@ -284,9 +284,9 @@ with col1:
              style="height:52px; filter: brightness(0) invert(1); margin-bottom: 0.8rem; display:block;"/>
         <p class="hero-subtitle">Professional sewer flow monitoring, analytics and reporting for depth, velocity and flow performance.</p>
         <div style="display:flex; flex-wrap: wrap; gap: 8px;">
-            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">📡 Live data overview</span>
-            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">📈 Historical analytics</span>
-            <span class="hero-badge" style="background: rgba(255,255,255,0.18); color: #ffffff; border: 1px solid rgba(255,255,255,0.3);">⚙️ Operational insights</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Live Data</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Historical Analytics</span>
+            <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Operational Insights</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -558,21 +558,21 @@ if page_mode == 'Simplified View':
 
             st.markdown(f"""
             <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 1.75rem;">
-                <div class="metric-card">
-                    <p class="metric-label">💧 Water Depth</p>
+                <div class="metric-card depth">
+                    <p class="metric-label">Water Depth</p>
                     <p class="metric-value">{latest_depth}<span class="metric-unit">mm</span></p>
                 </div>
-                <div class="metric-card">
-                    <p class="metric-label">⚡ Flow Velocity</p>
+                <div class="metric-card velocity">
+                    <p class="metric-label">Flow Velocity</p>
                     <p class="metric-value green">{latest_velocity}<span class="metric-unit">m/s</span></p>
                 </div>
-                <div class="metric-card">
-                    <p class="metric-label">🌊 Flow Rate</p>
+                <div class="metric-card flow">
+                    <p class="metric-label">Flow Rate</p>
                     <p class="metric-value amber">{latest_flow}<span class="metric-unit">L/s</span></p>
                 </div>
             </div>
             <p style="font-size: 0.82rem; color: #6b7280; margin: -0.75rem 0 1.5rem 4px;">
-                ✓ Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
+                Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
             </p>
             """, unsafe_allow_html=True)
 
