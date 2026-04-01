@@ -159,7 +159,8 @@ def detect_spikes(df: pd.DataFrame, columns: List[str]) -> List[AnomalyFlag]:
         return flags
 
     dfx = df.sort_values("timestamp").copy()
-    ts_seconds = pd.to_datetime(dfx["timestamp"]).astype("int64") / 1e9
+    # Convert nanosecond epoch integers to whole seconds via integer division
+    ts_seconds = pd.to_datetime(dfx["timestamp"]).astype("int64") // 10**9
 
     for col in columns:
         if col not in dfx.columns or col not in SPIKE_RATE_LIMITS:

@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from pathlib import Path
 
@@ -657,7 +657,7 @@ class FlowDatabase:
         overridden_by: str,
     ) -> bool:
         """Mark an anomaly flag as overridden by an admin."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if self.use_postgres:
             conn = psycopg2.connect(self.pg_dsn)
             cur = conn.cursor()

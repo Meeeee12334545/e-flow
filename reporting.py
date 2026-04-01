@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import io
 import base64
 from dataclasses import dataclass, field
@@ -171,8 +172,8 @@ def build_html_report(device_name: str,
     # AI insights section
     ar: Optional[AnomalyReport] = selections.anomaly_report
     if ar is not None:
-        qual_color = {"High": "#047c3d", "Medium": "#b45309", "Low": "#b91c1c"}.get(ar.quality_label, "#333")
-        qual_bg = {"High": "#daf9e6", "Medium": "#fef3c7", "Low": "#fee2e2"}.get(ar.quality_label, "#f9fafb")
+        qual_color = {"High": "#4CAF50", "Medium": "#F4B400", "Low": "#D93025"}.get(ar.quality_label, "#333")
+        qual_bg = {"High": "#E8F5E9", "Medium": "#FFF8E1", "Low": "#FDECEA"}.get(ar.quality_label, "#f9fafb")
         ai_html = f"""
         <div class='section card' style='border-left: 4px solid {qual_color}; background: {qual_bg};'>
           <h2>AI Insights &amp; Data Quality</h2>
@@ -216,21 +217,22 @@ def build_html_report(device_name: str,
         <meta charset='utf-8'/>
         <title>e-flow {report_type_label} — {device_name}</title>
         <style>
-          body {{ font-family: -apple-system, Segoe UI, Roboto, Inter, sans-serif; color: #222; margin: 40px; }}
-          h1, h2 {{ font-weight: 600; }}
-          h1 {{ margin-top: 0; }}
-          .header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; }}
+          body {{ font-family: -apple-system, Segoe UI, Roboto, Inter, sans-serif; color: #4A4A4A; margin: 40px; background: #F4F5F4; }}
+          h1, h2 {{ font-weight: 600; color: #4A4A4A; }}
+          h1 {{ margin-top: 0; color: #3A7F5F; }}
+          h2 {{ color: #2F6B50; }}
+          .header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-bottom: 3px solid #3A7F5F; padding-bottom: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(58,127,95,0.08); }}
           .header-left {{ display: flex; align-items: center; gap: 20px; }}
           .section {{ margin: 24px 0; }}
-          .card {{ border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px; background: #f9fafb; }}
+          .card {{ border: 1px solid #D9D9D9; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #ffffff; box-shadow: 0 1px 4px rgba(58,127,95,0.05); }}
           table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
-          th, td {{ border: 1px solid #e5e7eb; padding: 10px; text-align: right; }}
-          th {{ background: #f0f4f8; text-align: left; font-weight: 600; }}
-          .small {{ color: #666; font-size: 12px; margin-top: 8px; }}
+          th, td {{ border: 1px solid #D9D9D9; padding: 10px; text-align: right; }}
+          th {{ background: #E8F3EE; text-align: left; font-weight: 600; color: #2F6B50; }}
+          .small {{ color: #6b7280; font-size: 12px; margin-top: 8px; }}
           .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }}
-          .metric-box {{ border: 1px solid #e5e7eb; padding: 12px; border-radius: 8px; background: white; }}
-          .metric-label {{ color: #666; font-size: 12px; font-weight: 500; text-transform: uppercase; }}
-          .metric-value {{ font-size: 18px; font-weight: 600; color: #0066cc; margin-top: 4px; }}
+          .metric-box {{ border: 1px solid #D9D9D9; padding: 12px; border-radius: 8px; background: white; }}
+          .metric-label {{ color: #6b7280; font-size: 12px; font-weight: 500; text-transform: uppercase; }}
+          .metric-value {{ font-size: 18px; font-weight: 600; color: #3A7F5F; margin-top: 4px; }}
         </style>
       </head>
       <body>
@@ -246,11 +248,11 @@ def build_html_report(device_name: str,
 
         <div class='section card'>
           <h2>Site Information</h2>
-          <p><strong>Station:</strong> {device_name}</p>
-          {'<p><strong>Site ID:</strong> ' + selections.site_id + '</p>' if selections.site_id else ''}
-          {'<p><strong>Location:</strong> ' + selections.location + '</p>' if selections.location else ''}
-          <p><strong>Monitoring Period:</strong> {period_label}</p>
-          <p><strong>Variables:</strong> {', '.join(selections.variables)}</p>
+          <p><strong>Station:</strong> {html.escape(device_name)}</p>
+          {'<p><strong>Site ID:</strong> ' + html.escape(selections.site_id) + '</p>' if selections.site_id else ''}
+          {'<p><strong>Location:</strong> ' + html.escape(selections.location) + '</p>' if selections.location else ''}
+          <p><strong>Monitoring Period:</strong> {html.escape(period_label)}</p>
+          <p><strong>Variables:</strong> {html.escape(', '.join(selections.variables))}</p>
           <p><strong>Data Points:</strong> {len(df)}</p>
         </div>
 

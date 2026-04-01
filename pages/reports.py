@@ -74,10 +74,10 @@ with st.sidebar:
 # ── Page header ────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="page-header">
-    <h1 style="margin:0; font-size:1.9rem; font-weight:700; color:#233047;">
+    <h1 style="margin:0; font-size:1.9rem; font-weight:700; color:#ffffff;">
         📄 Report Generation
     </h1>
-    <p style="margin:0.3rem 0 0; color:#6b7280; font-size:0.95rem;">
+    <p style="margin:0.3rem 0 0; color:rgba(255,255,255,0.85); font-size:0.95rem;">
         Generate on-demand PDF reports with AI data quality insights.
     </p>
 </div>
@@ -99,20 +99,22 @@ with col_cfg:
     )
 
     now_local = datetime.now(pytz.timezone(DEFAULT_TZ))
+    # Strip timezone for naive datetime arithmetic; values represent local time
+    now_naive = now_local.astimezone(pytz.utc).replace(tzinfo=None)
 
     if report_type == "Daily Summary":
-        date_from = (now_local - timedelta(hours=24)).replace(tzinfo=None)
-        date_to = now_local.replace(tzinfo=None)
+        date_from = now_naive - timedelta(hours=24)
+        date_to = now_naive
         hours = 24
         report_type_key = "daily"
     elif report_type == "Weekly Summary":
-        date_from = (now_local - timedelta(days=7)).replace(tzinfo=None)
-        date_to = now_local.replace(tzinfo=None)
+        date_from = now_naive - timedelta(days=7)
+        date_to = now_naive
         hours = 168
         report_type_key = "weekly"
     elif report_type == "Monthly Summary":
-        date_from = (now_local - timedelta(days=30)).replace(tzinfo=None)
-        date_to = now_local.replace(tzinfo=None)
+        date_from = now_naive - timedelta(days=30)
+        date_to = now_naive
         hours = 720
         report_type_key = "monthly"
     else:
@@ -163,16 +165,13 @@ with col_prev:
             if not df.empty:
                 df["timestamp"] = pd.to_datetime(df["timestamp"])
                 df.sort_values("timestamp", inplace=True)
-                # Filter to the requested window
-                ts_from = pd.Timestamp(date_from)
-                ts_to = pd.Timestamp(date_to)
-                if ts_from.tzinfo is None:
-                    ts_from = ts_from.tz_localize(None)
-                if ts_to.tzinfo is None:
-                    ts_to = ts_to.tz_localize(None)
-                # Normalise df timestamps for comparison
+                # Normalise both the filter bounds and the df timestamps to UTC-naive
+                # for a timezone-agnostic comparison.
+                ts_from = pd.Timestamp(date_from)  # already naive (UTC) from date_from
+                ts_to = pd.Timestamp(date_to)       # already naive (UTC) from date_to
                 if df["timestamp"].dt.tz is not None:
-                    df_ts_cmp = df["timestamp"].dt.tz_localize(None)
+                    # Convert tz-aware timestamps to UTC then strip tz for comparison
+                    df_ts_cmp = df["timestamp"].dt.tz_convert("UTC").dt.tz_localize(None)
                 else:
                     df_ts_cmp = df["timestamp"]
                 mask = (df_ts_cmp >= ts_from) & (df_ts_cmp <= ts_to)
@@ -238,8 +237,8 @@ with col_prev:
     # ── Show data quality badge ────────────────────────────────────────────
     if "last_anomaly_rep" in st.session_state and st.session_state["last_anomaly_rep"] is not None:
         ar = st.session_state["last_anomaly_rep"]
-        qual_color = {"High": "#047c3d", "Medium": "#b45309", "Low": "#b91c1c"}.get(ar.quality_label, "#333")
-        qual_bg = {"High": "#daf9e6", "Medium": "#fef3c7", "Low": "#fee2e2"}.get(ar.quality_label, "#f9fafb")
+        qual_color = {"High": "#4CAF50", "Medium": "#F4B400", "Low": "#D93025"}.get(ar.quality_label, "#333")
+        qual_bg = {"High": "#E8F5E9", "Medium": "#FFF8E1", "Low": "#FDECEA"}.get(ar.quality_label, "#f9fafb")
         qual_icon = {"High": "🟢", "Medium": "🟡", "Low": "🔴"}.get(ar.quality_label, "⚪")
         st.markdown(f"""
         <div style="background:{qual_bg}; border: 2px solid {qual_color}; border-radius:10px;
