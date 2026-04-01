@@ -152,7 +152,7 @@ def render_profile_page():
             with col_action:
                 st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
                 if st.button("View →", key=f"view_{device['device_id']}",
-                             use_container_width=True):
+                             width="stretch"):
                     st.session_state.selected_device = device['device_id']
                     st.switch_page("app.py")
     else:

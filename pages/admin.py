@@ -70,7 +70,7 @@ def render_admin_panel():
                 mime_type = uploaded_logo.type or "image/png"
                 branding_save_col, branding_preview_col = st.columns([1, 1])
                 with branding_preview_col:
-                    st.image(file_bytes, caption="Preview", use_container_width=True)
+                    st.image(file_bytes, caption="Preview", width='stretch')
                 with branding_save_col:
                     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
                     if st.button("Save Organisation Logo", type="primary", key="save_org_logo_btn"):
@@ -94,7 +94,7 @@ def render_admin_panel():
             st.image(
                 base64.b64decode(current_logo_b64),
                 caption=None,
-                use_container_width=True,
+                width='stretch',
             )
             if st.button("Remove Logo (restore default)", key="remove_org_logo_btn"):
                 auth_db.delete_setting('org_logo_b64')
@@ -133,7 +133,7 @@ def render_admin_panel():
                 help="Full URL to the USRIOT unit dashboard for this site. The data selectors are the same for all sites.",
             )
 
-            if st.form_submit_button("Add Site →", use_container_width=True):
+            if st.form_submit_button("Add Site →", width='stretch'):
                 if not new_site_name or not new_site_id or not new_site_url:
                     st.error("❌ Site Name, Site ID and Dashboard URL are required.")
                 elif not new_site_url.startswith("http"):
@@ -263,7 +263,7 @@ def render_admin_panel():
 
                 with _col_save:
                     if _clicked_lat is not None:
-                        if st.button("💾 Save Location", type="primary", use_container_width=True):
+                        if st.button("💾 Save Location", type="primary", width='stretch'):
                             ok = flow_db.update_device_location(_device_id, _clicked_lat, _clicked_lon)
                             if ok:
                                 st.success("✅ Location saved!")
@@ -391,7 +391,7 @@ def render_admin_panel():
             new_password = st.text_input("Password", type="password",
                                          help="Minimum 8 characters")
 
-            if st.form_submit_button("Create User →", use_container_width=True):
+            if st.form_submit_button("Create User →", width='stretch'):
                 if not new_username or not new_email or not new_password:
                     st.error("❌ Please fill in all fields.")
                 elif len(new_password) < 8:
@@ -476,7 +476,7 @@ def render_admin_panel():
                             if st.button(
                                 f"＋ {device['device_name']}",
                                 key=f"add_{selected_user['user_id']}_{device['device_id']}",
-                                use_container_width=True,
+                                width='stretch',
                             ):
                                 auth_db.assign_device_to_user(
                                     selected_user['user_id'], device['device_id']
@@ -539,7 +539,7 @@ def render_admin_panel():
             ]
             st.dataframe(
                 pd.DataFrame(summary),
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
             )
         else:
