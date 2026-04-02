@@ -139,6 +139,11 @@ class ContinuousMonitor:
     def __init__(self):
         self.db = FlowDatabase()
         self.scraper = DataScraper(self.db)
+        # Clear persisted change-detection state so the very first poll after
+        # every start/restart always stores a reading, regardless of what was
+        # saved the last time the process ran.
+        self.scraper.last_data = {}
+        self.scraper._save_state()
         self.scheduler = BlockingScheduler()
         self.check_count = 0
         self.update_count = 0
