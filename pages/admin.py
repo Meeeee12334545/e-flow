@@ -26,7 +26,7 @@ def render_admin_panel():
     st.logo(get_sidebar_logo_path(), icon_image=str(_ASSETS / "logo_icon.svg"))
 
     if not is_authenticated():
-        st.error("❌ You must be logged in")
+        st.error("You must be logged in")
         st.stop()
         return
 
@@ -115,7 +115,7 @@ def render_admin_panel():
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── Add New Monitoring Site ──────────────────────────────────────────────
-    st.markdown('<p class="section-title">🌐 Add New Monitoring Site</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Add New Monitoring Site</p>', unsafe_allow_html=True)
 
     col_site_form, col_site_hint = st.columns([3, 2])
 
@@ -136,20 +136,20 @@ def render_admin_panel():
 
             if st.form_submit_button("Add Site →", width='stretch'):
                 if not new_site_name or not new_site_id or not new_site_url:
-                    st.error("❌ Site Name, Site ID and Dashboard URL are required.")
+                    st.error("Site Name, Site ID and Dashboard URL are required.")
                 elif not new_site_url.startswith("http"):
-                    st.error("❌ Dashboard URL must start with http:// or https://")
+                    st.error("Dashboard URL must start with http:// or https://")
                 else:
                     import re as _re
                     # Normalise site ID — uppercase, spaces → underscores
                     clean_id = new_site_id.strip().upper().replace(" ", "_")
                     if not _re.match(r'^[A-Z0-9_]+$', clean_id):
-                        st.error("❌ Site ID may only contain letters, numbers and underscores.")
+                        st.error("Site ID may only contain letters, numbers and underscores.")
                     else:
                         existing = flow_db.get_devices()
                         existing_ids = {d["device_id"] for d in existing}
                         if clean_id in existing_ids:
-                            st.error(f"❌ A site with ID '{clean_id}' already exists.")
+                            st.error(f"A site with ID '{clean_id}' already exists.")
                         else:
                             flow_db.add_device(
                                 device_id=clean_id,
@@ -157,7 +157,7 @@ def render_admin_panel():
                                 location=new_site_location.strip() or None,
                                 dashboard_url=new_site_url.strip(),
                             )
-                            st.success(f"✅ Site '{new_site_name.strip()}' (ID: {clean_id}) added successfully!")
+                            st.success(f"Site '{new_site_name.strip()}' (ID: {clean_id}) added successfully!")
                             st.info("The monitor service will begin collecting data from this site on its next cycle.")
                             st.rerun()
 
@@ -175,7 +175,7 @@ def render_admin_panel():
     # ── Current Sites Overview ───────────────────────────────────────────────
     all_sites = flow_db.get_devices()
     if all_sites:
-        with st.expander(f"📋 All Configured Sites ({len(all_sites)})", expanded=False):
+        with st.expander(f"All Configured Sites ({len(all_sites)})", expanded=False):
             for site in all_sites:
                 url_display = site.get("dashboard_url") or "—"
                 if len(url_display) > 60:
@@ -186,7 +186,7 @@ def render_admin_panel():
                 st.markdown(
                     f"**{site['device_name']}** &nbsp;·&nbsp; `{site['device_id']}` &nbsp;·&nbsp; "
                     f"{site.get('location') or 'No location'} &nbsp;·&nbsp; "
-                    f"📍 {loc_str} &nbsp;·&nbsp; "
+                    f"{loc_str} &nbsp;·&nbsp; "
                     f"<span style='color:#6b7280;font-size:0.82rem;'>{url_display}</span>",
                     unsafe_allow_html=True,
                 )
@@ -194,7 +194,7 @@ def render_admin_panel():
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── Map Location & Rain Gauge ────────────────────────────────────────────
-    st.markdown('<p class="section-title">📍 Map Location & Rain Gauge</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Map Location & Rain Gauge</p>', unsafe_allow_html=True)
     st.markdown(
         "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
         "Set the GPS location for each flow meter and assign the nearest BOM rain gauge. "
@@ -203,7 +203,7 @@ def render_admin_panel():
     )
 
     if not all_sites:
-        st.warning("⚠️ No sites configured yet. Add a site first.")
+        st.warning("No sites configured yet. Add a site first.")
     else:
         _site_map = {s["device_name"]: s for s in all_sites}
         _site_sel = st.selectbox(
@@ -221,7 +221,7 @@ def render_admin_panel():
         _map_lon = _cur_lon if _cur_lon else 133.0
         _zoom = 12 if _cur_lat else 4
 
-        with st.expander("📍 Set Map Location", expanded=(_cur_lat is None)):
+        with st.expander("Set Map Location", expanded=(_cur_lat is None)):
             st.markdown(
                 "**Click on the map** to place a marker at the flow meter's location. "
                 "Then press **Save Location** to store the coordinates.",
@@ -252,54 +252,54 @@ def render_admin_panel():
                 with _col_coords:
                     if _clicked_lat is not None:
                         st.info(
-                            f"📍 Clicked: **{_clicked_lat:.5f}, {_clicked_lon:.5f}** "
+                            f"Clicked: **{_clicked_lat:.5f}, {_clicked_lon:.5f}** "
                             "— press Save to confirm."
                         )
                     elif _cur_lat and _cur_lon:
                         st.success(
-                            f"✅ Current location: **{_cur_lat:.5f}, {_cur_lon:.5f}**"
+                            f"Current location: **{_cur_lat:.5f}, {_cur_lon:.5f}**"
                         )
                     else:
                         st.caption("Click on the map above to select a location.")
 
                 with _col_save:
                     if _clicked_lat is not None:
-                        if st.button("💾 Save Location", type="primary", width='stretch'):
+                        if st.button("Save Location", type="primary", width='stretch'):
                             ok = flow_db.update_device_location(_device_id, _clicked_lat, _clicked_lon)
                             if ok:
-                                st.success("✅ Location saved!")
+                                st.success("Location saved!")
                                 st.rerun()
                             else:
-                                st.error("❌ Failed to save location.")
+                                st.error("Failed to save location.")
 
             except ImportError:
                 st.warning(
-                    "⚠️ Map component not available. Install `folium` and `streamlit-folium` to enable this feature."
+                    "Map component not available. Install `folium` and `streamlit-folium` to enable this feature."
                 )
                 # Fallback: manual coordinate entry
                 with st.form("manual_coords_form"):
                     _m_lat = st.number_input("Latitude", value=float(_cur_lat or -28.0), format="%.5f")
                     _m_lon = st.number_input("Longitude", value=float(_cur_lon or 153.0), format="%.5f")
-                    if st.form_submit_button("💾 Save Location"):
+                    if st.form_submit_button("Save Location"):
                         ok = flow_db.update_device_location(_device_id, _m_lat, _m_lon)
                         if ok:
-                            st.success("✅ Location saved!")
+                            st.success("Location saved!")
                             st.rerun()
                         else:
-                            st.error("❌ Failed to save location.")
+                            st.error("Failed to save location.")
 
         # Rain gauge assignment — only enabled once coordinates are set
         _site_refreshed = next((s for s in flow_db.get_devices() if s["device_id"] == _device_id), _site)
         _has_coords = bool(_site_refreshed.get("latitude") and _site_refreshed.get("longitude"))
 
-        with st.expander("🌧️ Assign Rain Gauge", expanded=False):
+        with st.expander("Assign Rain Gauge", expanded=False):
             if not _has_coords:
-                st.info("ℹ️ Set a map location above before assigning a rain gauge.")
+                st.info("Set a map location above before assigning a rain gauge.")
             else:
                 _assigned = flow_db.get_device_rainfall_station(_device_id)
                 if _assigned:
                     st.success(
-                        f"✅ Currently assigned: **{_assigned.get('station_name', _assigned['station_id'])}** "
+                        f"Currently assigned: **{_assigned.get('station_name', _assigned['station_id'])}** "
                         f"({_assigned['station_id']}) — "
                         f"{_assigned.get('state', '')} &nbsp;·&nbsp; "
                         f"{_site_refreshed['latitude']:.3f}, {_site_refreshed['longitude']:.3f}"
@@ -341,18 +341,18 @@ def render_admin_panel():
                         key=f"station_radio_{_device_id}",
                         label_visibility="collapsed",
                     )
-                    if st.button("💾 Assign Station", type="primary", key=f"assign_station_{_device_id}"):
+                    if st.button("Assign Station", type="primary", key=f"assign_station_{_device_id}"):
                         _chosen = _found_stations[_sel_idx]
                         flow_db.save_rainfall_stations([_chosen])
                         ok = flow_db.set_device_rainfall_station(_device_id, _chosen["station_id"])
                         if ok:
                             st.success(
-                                f"✅ Assigned **{_chosen['station_name']}** ({_chosen['station_id']}) "
+                                f"Assigned **{_chosen['station_name']}** ({_chosen['station_id']}) "
                                 f"to {_site['device_name']}."
                             )
                             st.rerun()
                         else:
-                            st.error("❌ Failed to assign station.")
+                            st.error("Failed to assign station.")
                 else:
                     st.info(
                         "No cached BOM stations found. Click **Find Nearest BOM Stations** to search, "
@@ -373,10 +373,10 @@ def render_admin_panel():
                                 )
                                 _conn.commit()
                                 _conn.close()
-                                st.success("✅ Assignment removed.")
+                                st.success("Assignment removed.")
                                 st.rerun()
                             except Exception as _e:
-                                st.error(f"❌ Could not remove: {_e}")
+                                st.error(f"Could not remove: {_e}")
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
@@ -394,18 +394,18 @@ def render_admin_panel():
 
             if st.form_submit_button("Create User →", width='stretch'):
                 if not new_username or not new_email or not new_password:
-                    st.error("❌ Please fill in all fields.")
+                    st.error("Please fill in all fields.")
                 elif len(new_password) < 8:
-                    st.error("❌ Password must be at least 8 characters.")
+                    st.error("Password must be at least 8 characters.")
                 else:
                     success = auth_db.create_user(new_username, new_email, new_password,
                                                   role="user")
                     if success:
-                        st.success(f"✅ User '{new_username}' created successfully!")
+                        st.success(f"User '{new_username}' created successfully!")
                         st.balloons()
                         st.rerun()
                     else:
-                        st.error("❌ Failed to create user (username or email already exists).")
+                        st.error("Failed to create user (username or email already exists).")
 
     with col_hint:
         st.markdown("""
@@ -421,7 +421,7 @@ def render_admin_panel():
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── Assign Sites to Users ────────────────────────────────────────────────
-    st.markdown('<p class="section-title">📍 Assign Sites to Users</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Assign Sites to Users</p>', unsafe_allow_html=True)
 
     # Single batch query: users + their assigned device IDs/names in one round-trip
     users = auth_db.list_users_with_devices()
@@ -430,14 +430,14 @@ def render_admin_panel():
     device_map = {d['device_id']: d for d in devices}
 
     if not users:
-        st.warning("⚠️ No users available. Create a user first.")
+        st.warning("No users available. Create a user first.")
     elif not devices:
-        st.warning("⚠️ No devices / sites available.")
+        st.warning("No devices / sites available.")
     else:
         regular_users = [u for u in users if u['role'] == 'user']
 
         if not regular_users:
-            st.info("ℹ️ All users are admins. Create a regular user to assign sites.")
+            st.info("All users are admins. Create a regular user to assign sites.")
         else:
             col_picker, col_info = st.columns([2, 1])
 
@@ -482,15 +482,15 @@ def render_admin_panel():
                                 auth_db.assign_device_to_user(
                                     selected_user['user_id'], device['device_id']
                                 )
-                                st.success(f"✅ Added {device['device_name']}")
+                                st.success(f"Added {device['device_name']}")
                                 st.rerun()
                     else:
-                        st.info("✅ All sites already assigned.")
+                        st.info("All sites already assigned.")
 
                 with col_assigned:
                     st.markdown(
                         '<p style="font-weight:600;color:#4A4A4A;margin-bottom:0.5rem;">'
-                        '✅ Assigned Sites</p>',
+                        'Assigned Sites</p>',
                         unsafe_allow_html=True,
                     )
                     if user_device_ids:
@@ -501,7 +501,7 @@ def render_admin_panel():
                                 with col_name:
                                     st.markdown(
                                         f'<p style="margin:0.45rem 0;font-size:0.9rem;">'
-                                        f'📍 {device["device_name"]}</p>',
+                                        f'{device["device_name"]}</p>',
                                         unsafe_allow_html=True,
                                     )
                                 with col_remove:
@@ -521,7 +521,7 @@ def render_admin_panel():
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── All Users Overview ───────────────────────────────────────────────────
-    st.markdown('<p class="section-title">📋 All Users Overview</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">All Users Overview</p>', unsafe_allow_html=True)
 
     if not users:
         st.info("No users to display.")
