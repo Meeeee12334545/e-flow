@@ -10,6 +10,12 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/e-flow
 Environment="PATH=/opt/e-flow/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="SCRAPER_FORCE_REQUESTS=1"
+Environment="MONITOR_ENABLED=true"
+Environment="MONITOR_INTERVAL=60"
+Environment="STORE_ALL_READINGS=false"
+Environment="EXIT_ON_UNHEALTHY=true"
+Environment="TIMEZONE=Australia/Brisbane"
 ExecStart=/opt/e-flow/.venv/bin/python monitor.py
 
 # Automatic restart configuration
@@ -18,11 +24,12 @@ RestartSec=30s
 StartLimitInterval=300
 StartLimitBurst=10
 
-# Resource limits
-MemoryLimit=512M
+# Resource limits (MemoryMax is the modern replacement for MemoryLimit)
+MemoryMax=512M
 CPUQuota=50%
 
-# Logging
+# Logging — forward stdout/stderr to the systemd journal so
+# `journalctl -u e-flow-monitor -f` shows live output.
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=e-flow-monitor
@@ -33,9 +40,6 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/opt/e-flow
-
-# Health monitoring
-WatchdogSec=300s
 
 [Install]
 WantedBy=multi-user.target

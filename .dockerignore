@@ -1,0 +1,69 @@
+# Version control
+.git
+.gitignore
+
+# Python byte-code / caches
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.mypy_cache
+
+# Virtual environments
+.venv
+venv
+env
+
+# Local data files (mounted as volumes at runtime)
+flow_data.db
+*.db-shm
+*.db-wal
+
+# Log files (written at runtime)
+*.log
+monitor.log
+supervisord.log
+
+# Development / IDE
+.devcontainer
+.vscode
+*.swp
+*.swo
+
+# Generated reports (written at runtime)
+reports/*.pdf
+reports/*.html
+
+# Documentation (not needed in image)
+*.md
+ARCHITECTURE.md
+AUTHENTICATION_IMPLEMENTATION.md
+AUTH_GUIDE.md
+CHANGES_SUMMARY.txt
+DEVELOPMENT.md
+FILES.md
+FIXES_APPLIED.md
+IMPLEMENTATION_COMPLETE.md
+MONITORING.md
+MONITOR_QUICK_START.md
+PRODUCTION_DEPLOYMENT.md
+PRODUCTION_READY.md
+PROFESSIONAL_ENHANCEMENTS.md
+PROJECT_SUMMARY.md
+QUICKSTART.md
+QUICK_START_AUTH.md
+README.md
+README_STYLING_COMPLETE.md
+RUNNING.md
+START_HERE.md
+STYLING_ENHANCEMENTS.md
+STYLING_IMPLEMENTATION_COMPLETE.md
+STYLING_INDEX.md
+STYLING_QUICK_REFERENCE.md
+STYLING_VISUAL_DEMO.md
+SYSTEM_OVERVIEW.md
+VISUAL_IMPROVEMENTS.md
+
+# Misc
+.DS_Store
+Thumbs.db
