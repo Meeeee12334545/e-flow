@@ -121,7 +121,7 @@ def login_page():
         <p style="
             font-size: 0.92rem !important; color: #6b7280 !important;
             margin: 0.3rem 0 0 0 !important;
-        ">Professional hydrological monitoring</p>
+        ">EDS HydroSense — See what your network is really doing.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -136,7 +136,7 @@ def login_page():
         ">
         """, unsafe_allow_html=True)
 
-        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        tab1, = st.tabs(["Login"])
 
         with tab1:
             st.markdown(
@@ -161,37 +161,6 @@ def login_page():
                         st.rerun()
                     else:
                         st.error("❌ Invalid username or password.")
-
-        with tab2:
-            st.markdown(
-                '<p style="font-size:1.1rem;font-weight:700;color:#4A4A4A;margin:0 0 1rem 0;">'
-                'Create an account</p>',
-                unsafe_allow_html=True,
-            )
-            new_username = st.text_input("Username", key="signup_username",
-                                         placeholder="john_operator")
-            new_email = st.text_input("Email", key="signup_email",
-                                      placeholder="john@example.com")
-            new_password = st.text_input("Password", type="password", key="signup_password",
-                                         placeholder="Min 8 characters")
-            confirm_password = st.text_input("Confirm Password", type="password",
-                                             key="signup_confirm", placeholder="Re-enter password")
-
-            if st.button("Create Account →", width="stretch", key="signup_btn"):
-                if not new_username or not new_email or not new_password:
-                    st.error("Please fill in all fields.")
-                elif new_password != confirm_password:
-                    st.error("Passwords do not match.")
-                elif len(new_password) < 8:
-                    st.error("Password must be at least 8 characters.")
-                else:
-                    success = st.session_state.auth_db.create_user(
-                        new_username, new_email, new_password, role="user"
-                    )
-                    if success:
-                        st.success("✅ Account created! Please log in.")
-                    else:
-                        st.error("❌ Username or email already exists.")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
