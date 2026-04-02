@@ -702,7 +702,7 @@ if page_mode == 'Simplified View':
         <p style="margin:0; font-size:0.75rem; color:#9ca3af;">
             <a href="https://www.e-d-s.com.au" target="_blank"
                style="color:#3A7F5F; text-decoration:none; font-weight:500;">www.e-d-s.com.au</a>
-            &nbsp;·&nbsp; © 2024 EDS
+            &nbsp;·&nbsp; © 2026 EDS
         </p>
     </div>
     """, unsafe_allow_html=True)
