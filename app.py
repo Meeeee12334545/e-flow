@@ -292,7 +292,7 @@ with col1:
         <img src="{_hero_logo_src}"
              alt="Organisation Logo"
              style="{_hero_logo_style} {_hero_logo_filter}"/>
-        <p class="hero-subtitle">Real-time sewer flow monitoring &nbsp;·&nbsp; Depth, velocity and volumetric flow measurement &nbsp;·&nbsp; Data export and analytics</p>
+        <p class="hero-subtitle">Real-time sewer flow monitoring &nbsp;·&nbsp; Precision depth, velocity &amp; flow measurement &nbsp;·&nbsp; Advanced data analytics &amp; export</p>
         <div style="display:flex; flex-wrap: wrap; gap: 8px;">
             <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Live Data</span>
             <span class="hero-badge" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.28);">Historical Analytics</span>
