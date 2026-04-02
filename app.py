@@ -320,9 +320,9 @@ with st.sidebar:
 
     page_mode = st.selectbox(
         "View mode",
-        options=["Simplified View", "Full Dashboard", "EDS Product Overview"],
+        options=["Simplified View", "Full Dashboard"],
         index=0,
-        help="Simplified View for standard users, Full Dashboard for power users, EDS Product Overview for sales demos."
+        help="Simplified View for standard users, Full Dashboard for power users."
     )
     st.session_state['page_mode'] = page_mode
 
@@ -500,23 +500,6 @@ with st.sidebar:
 
 # Main content area
 page_mode = st.session_state.get('page_mode', 'Simplified View')
-
-if page_mode == 'EDS Product Overview':
-    st.markdown('''
-        <div style="background: linear-gradient(135deg, #002f6c 0%, #003f8f 90%); color: #fff; padding: 25px; border-radius: 14px;">
-            <h2 style="margin-bottom: 0.4rem;">e-flow™ by EDS</h2>
-            <p style="margin-bottom: 1.2rem; color: #f8f8f8; font-size: 1.1rem;">A premium sewer flow monitoring solution for depth, velocity, and flow data visualization, export, and reporting.</p>
-            <ul style="margin: 0 0 1rem 1.2rem;">
-                <li>Professional UI for water utilities</li>
-                <li>Real-time metrics and configurable dashboards</li>
-                <li>Data export (CSV/JSON/PDF) included</li>
-                <li>Team roles + admin controls</li>
-                <li>Deployable via Docker &amp; Streamlit</li>
-            </ul>
-            <p style="margin-bottom:0;">Learn more at <a href='https://www.e-d-s.com.au' style='color:#ffc20e; font-weight:700;' target='_blank'>www.e-d-s.com.au</a></p>
-        </div>
-    ''', unsafe_allow_html=True)
-    st.stop()
 
 if page_mode == 'Simplified View':
     if selected_device_id:

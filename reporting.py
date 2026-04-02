@@ -100,16 +100,15 @@ def compute_calculations(df: pd.DataFrame, selections: ReportSelections) -> Dict
         if "count" in selections.calculations:
             stats["count"] = float(series.shape[0])
 
-        # Volume integration only applies to flow_lps
+        # Volume calculation only applies to flow_lps
         if var == "flow_lps" and "volume" in selections.calculations:
-            # Integrate flow (L/s) over time using trapezoidal rule on irregular sampling
-            t = dfx["timestamp"].astype("int64") / 1e9  # seconds since epoch
-            f = pd.to_numeric(dfx["flow_lps"], errors="coerce").fillna(0.0)
-            if t.shape[0] > 1:
-                # Compute time differences and trapezoids
-                dt = np.diff(t.values)  # seconds
-                f_mid = (f.values[:-1] + f.values[1:]) / 2.0  # L/s
-                liters = float(np.sum(f_mid * dt))  # L
+            # Average flow rate (L/s) × elapsed seconds in the period = total volume (L)
+            f = pd.to_numeric(dfx["flow_lps"], errors="coerce").dropna()
+            t = pd.to_datetime(dfx["timestamp"], utc=True)
+            if f.shape[0] > 1:
+                avg_flow_lps = float(f.mean())
+                elapsed_seconds = (t.max() - t.min()).total_seconds()
+                liters = avg_flow_lps * elapsed_seconds
                 m3 = liters / 1000.0
                 stats["volume_liters"] = liters
                 stats["volume_m3"] = m3
