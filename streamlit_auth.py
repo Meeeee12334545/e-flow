@@ -198,7 +198,7 @@ def login_page():
     # Footer
     st.markdown("""
     <p style="text-align:center; font-size:0.8rem; color:#9ca3af; margin-top:2rem;">
-        © EDS — Environmental Data Solutions &nbsp;·&nbsp; Secure, role-based access
+        © EDS — Environmental Data Services &nbsp;·&nbsp; Secure, role-based access
     </p>
     """, unsafe_allow_html=True)
 

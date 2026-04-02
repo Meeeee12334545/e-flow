@@ -61,7 +61,7 @@ devices = filter_devices_for_user(devices)
 device_names = {d["device_name"]: d["device_id"] for d in devices}
 
 if not device_names:
-    st.warning("⚠️ No devices assigned to your account.")
+    st.warning("No devices assigned to your account.")
     st.stop()
 
 # ── Sidebar ────────────────────────────────────────────────────────────────
@@ -241,19 +241,18 @@ with col_prev:
             st.session_state["last_anomaly_rep"] = anomaly_rep
             st.session_state["last_report_df"] = df_window
 
-        st.success("✅ Report generated successfully")
+        st.success("Report generated successfully")
 
     # ── Show data quality badge ────────────────────────────────────────────
     if "last_anomaly_rep" in st.session_state and st.session_state["last_anomaly_rep"] is not None:
         ar = st.session_state["last_anomaly_rep"]
         qual_color = {"High": "#4CAF50", "Medium": "#F4B400", "Low": "#D93025"}.get(ar.quality_label, "#333")
         qual_bg = {"High": "#E8F5E9", "Medium": "#FFF8E1", "Low": "#FDECEA"}.get(ar.quality_label, "#f9fafb")
-        qual_icon = {"High": "🟢", "Medium": "🟡", "Low": "🔴"}.get(ar.quality_label, "⚪")
         st.markdown(f"""
         <div style="background:{qual_bg}; border: 2px solid {qual_color}; border-radius:10px;
                     padding:14px 18px; margin-bottom:1rem;">
             <div style="font-size:1.1rem; font-weight:700; color:{qual_color};">
-                {qual_icon} Data Quality: {ar.quality_label}
+                Data Quality: {ar.quality_label}
             </div>
             <div style="font-size:0.88rem; color:#555; margin-top:4px;">
                 Confidence Score: <strong>{ar.confidence_score:.1f}/100</strong> &nbsp;·&nbsp;

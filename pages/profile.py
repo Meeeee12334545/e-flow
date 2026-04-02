@@ -23,13 +23,13 @@ def render_profile_page():
     st.logo(get_sidebar_logo_path(), icon_image=str(_ASSETS / "logo_icon.svg"))
 
     if not is_authenticated():
-        st.error("❌ You must be logged in")
+        st.error("You must be logged in")
         return
 
     user = get_current_user()
     role = user.get('role', 'user')
     role_label = "Administrator" if role == "admin" else "User"
-    role_icon = "👨‍💼" if role == "admin" else "👤"
+    role_icon = "Admin" if role == "admin" else "User"
     initial = user['username'][0].upper() if user.get('username') else "?"
 
     # ── Page header ──────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ def render_profile_page():
         st.markdown(f"""
         <div style="font-size:0.88rem;line-height:1.8;color:#374151;">
             <strong>User ID:</strong> <code>{user['user_id']}</code><br>
-            <strong>Session token:</strong> <code>{st.session_state.session_id[:20]}…</code>
+            <strong>Session token:</strong> <code>{(st.session_state.session_id or '')[:20]}…</code>
         </div>
         """, unsafe_allow_html=True)
 

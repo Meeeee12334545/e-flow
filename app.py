@@ -339,11 +339,11 @@ with st.sidebar:
 
     # Monitor status
     if _monitor_proc is not None:
-        st.success("✔ Monitor service: running (auto-collecting data)")
+        st.success("Monitor service: running (auto-collecting data)")
     elif MONITOR_ENABLED:
-        st.success("✔ Monitor service: active")
+        st.success("Monitor service: active")
     else:
-        st.info("ℹ️ Monitor service: not running. Start monitor.py to collect data.")
+        st.info("Monitor service: not running. Start monitor.py to collect data.")
 
     # Build device mapping from database
     devices = db.get_devices()
@@ -354,7 +354,7 @@ with st.sidebar:
     device_names = {d['device_name']: d['device_id'] for d in devices}
     
     if not device_names:
-        st.warning("⚠️ No devices assigned to your account")
+        st.warning("No devices assigned to your account")
         if is_admin():
             st.info("As an admin, go to the Admin Panel to manage device assignments")
         st.stop()
@@ -369,7 +369,7 @@ with st.sidebar:
     # Get selected device info
     device_info = next((d for d in devices if d["device_id"] == selected_device_id), None)
     if device_info:
-        with st.expander("📋 Station Details", expanded=False):
+        with st.expander("Station Details", expanded=False):
             _lat = device_info.get("latitude")
             _lon = device_info.get("longitude")
             _loc_str = f"{_lat:.4f}, {_lon:.4f}" if (_lat and _lon) else "Not set"
@@ -391,7 +391,7 @@ with st.sidebar:
         if _rain_assignment:
             _st_name = _rain_assignment.get("station_name") or _rain_assignment["station_id"]
             _st_state = _rain_assignment.get("state") or ""
-            with st.expander("🌧️ Rain Gauge", expanded=False):
+            with st.expander("Rain Gauge", expanded=False):
                 st.markdown(
                     f"<div style='font-size:0.85rem;line-height:1.6;'>"
                     f"<strong>{_st_name}</strong><br>"
@@ -401,7 +401,7 @@ with st.sidebar:
                     unsafe_allow_html=True,
                 )
         elif device_info.get("latitude") and device_info.get("longitude"):
-            with st.expander("🌧️ Rain Gauge", expanded=False):
+            with st.expander("Rain Gauge", expanded=False):
                 st.caption("Using Open-Meteo grid data (coordinates-based). Assign a BOM station in the Admin panel for higher accuracy.")
 
         st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
@@ -453,14 +453,17 @@ with st.sidebar:
             bg_color = "linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%)" if has_data else "linear-gradient(135deg, #ffebee 0%, #ffffff 100%)"
             border_color = "#4caf50" if has_data else "#f44336"
             text_color = "#2e7d32" if has_data else "#c62828"
-            status_icon = "🟢" if has_data else "🔴"
+            status_dot_color = "#4caf50" if has_data else "#f44336"
 
             st.markdown(f"""
             <div style="background: {bg_color};
                         padding: 14px; border-radius: 10px; border: 2px solid {border_color};
                         margin-top: 0.75rem; margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-size: 0.82rem; color: {text_color}; font-weight: 600;">{status_icon} LIVE DATA</span>
+                    <span style="font-size: 0.82rem; color: {text_color}; font-weight: 600; display:inline-flex; align-items:center; gap:5px;">
+                        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{status_dot_color};flex-shrink:0;"></span>
+                        LIVE DATA
+                    </span>
                     <span style="font-size: 0.72rem; color: #666;">{ts.strftime('%H:%M:%S') if ts else 'N/A'}</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center;">
@@ -483,13 +486,13 @@ with st.sidebar:
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.error("⚠️ No devices configured")
+        st.error("No devices configured")
         st.info("Expected devices: " + ", ".join(DEVICES.keys()))
         selected_device_id = None
 
     total_measurements = get_cached_measurement_count()
     if total_measurements == 0:
-        st.warning("⚠️ No measurements yet.")
+        st.warning("No measurements yet.")
         if _monitor_proc is not None:
             st.info("⏳ Background monitor is running — first reading will arrive within 60 seconds. You can also click **Get Latest Data** above to fetch and save a reading right now.")
         else:
@@ -504,11 +507,11 @@ if page_mode == 'EDS Product Overview':
             <h2 style="margin-bottom: 0.4rem;">e-flow™ by EDS</h2>
             <p style="margin-bottom: 1.2rem; color: #f8f8f8; font-size: 1.1rem;">A premium sewer flow monitoring solution for depth, velocity, and flow data visualization, export, and reporting.</p>
             <ul style="margin: 0 0 1rem 1.2rem;">
-                <li>🏆 Professional UI for water utilities</li>
-                <li>📊 Real-time metrics and configurable dashboards</li>
-                <li>📥 Data export (CSV/JSON/PDF) included</li>
-                <li>🔒 Team roles + admin controls</li>
-                <li>🌐 Deployable via Docker & Streamlit</li>
+                <li>Professional UI for water utilities</li>
+                <li>Real-time metrics and configurable dashboards</li>
+                <li>Data export (CSV/JSON/PDF) included</li>
+                <li>Team roles + admin controls</li>
+                <li>Deployable via Docker &amp; Streamlit</li>
             </ul>
             <p style="margin-bottom:0;">Learn more at <a href='https://www.e-d-s.com.au' style='color:#ffc20e; font-weight:700;' target='_blank'>www.e-d-s.com.au</a></p>
         </div>
@@ -675,7 +678,6 @@ if page_mode == 'Simplified View':
         else:
             st.markdown("""
             <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
-                <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
                 <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">Awaiting first reading</h3>
                 <p style="color: #6b7280; margin: 0 0 1.5rem;">No measurements have been stored yet for this device.</p>
                 <p style="color: #6b7280; font-size: 0.9rem;">Start the <code>monitor.py</code> service to begin collecting data automatically.</p>
@@ -693,14 +695,14 @@ if page_mode == 'Simplified View':
                 <text x="20" y="26" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="700" fill="#ffffff">EDS</text>
             </svg>
             <div>
-                <p style="margin:0; font-size:0.82rem; font-weight:600; color:#3A7F5F; line-height:1.2;">Environmental Data Solutions</p>
+                <p style="margin:0; font-size:0.82rem; font-weight:600; color:#3A7F5F; line-height:1.2;">Environmental Data Services</p>
                 <p style="margin:0; font-size:0.75rem; color:#6b7280; line-height:1.2;">e-flow™ sewer monitoring platform</p>
             </div>
         </div>
         <p style="margin:0; font-size:0.75rem; color:#9ca3af;">
             <a href="https://www.e-d-s.com.au" target="_blank"
                style="color:#3A7F5F; text-decoration:none; font-weight:500;">www.e-d-s.com.au</a>
-            &nbsp;·&nbsp; © 2024 EDS
+            &nbsp;·&nbsp; © 2026 EDS
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -789,15 +791,15 @@ if selected_device_id:
             st.markdown(f"""
             <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 0.5rem;">
                 <div class="metric-card">
-                    <p class="metric-label">💧 Water Depth</p>
+                    <p class="metric-label">Water Depth</p>
                     <p class="metric-value">{depth_str}<span class="metric-unit">mm</span></p>
                 </div>
                 <div class="metric-card">
-                    <p class="metric-label">⚡ Flow Velocity</p>
+                    <p class="metric-label">Flow Velocity</p>
                     <p class="metric-value green">{velocity_str}<span class="metric-unit">m/s</span></p>
                 </div>
                 <div class="metric-card">
-                    <p class="metric-label">🌊 Flow Rate</p>
+                    <p class="metric-label">Flow Rate</p>
                     <p class="metric-value amber">{flow_str}<span class="metric-unit">L/s</span></p>
                 </div>
             </div>
@@ -808,7 +810,7 @@ if selected_device_id:
 
             # ── Main flow chart ─────────────────────────────────────────────
             st.markdown("""
-            <p class="section-title" style="margin-top: 0.5rem;">📊 Flow Rate Analysis</p>
+            <p class="section-title" style="margin-top: 0.5rem;">Flow Rate Analysis</p>
             """, unsafe_allow_html=True)
 
             col_range1, col_range2 = st.columns([1, 2])
@@ -895,14 +897,14 @@ if selected_device_id:
                     st.metric("Est. Volume", f"{total_vol:.1f} m³")
             else:
                 st.info(
-                    f"📊 No data for {graph_start.strftime('%Y-%m-%d %H:%M')} "
+                    f"No data for {graph_start.strftime('%Y-%m-%d %H:%M')} "
                     f"→ {graph_end.strftime('%Y-%m-%d %H:%M')}"
                 )
 
             st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
 
             # ── Time-series tabs ───────────────────────────────────────────
-            st.markdown('<p class="section-title">📈 Time Series Analysis</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">Time Series Analysis</p>', unsafe_allow_html=True)
 
             _chart_layout = dict(
                 hovermode="x unified",
@@ -916,7 +918,7 @@ if selected_device_id:
                 yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
             )
 
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["💧 Depth", "⚡ Velocity", "🌊 Flow", "🌧️ Rainfall & I/I", "📋 Statistics"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Depth", "Velocity", "Flow", "Rainfall & I/I", "Statistics"])
 
             with tab1:
                 fig_depth = px.line(df, x="timestamp", y="depth_mm",
@@ -968,8 +970,8 @@ if selected_device_id:
 
                 if not _has_loc and not _has_rain_station:
                     st.info(
-                        "ℹ️ **No location set for this device.**\n\n"
-                        "Go to ⚙️ Admin Panel → **Map Location & Rain Gauge** to set GPS coordinates "
+                        "**No location set for this device.**\n\n"
+                        "Go to Admin Panel → **Map Location & Rain Gauge** to set GPS coordinates "
                         "and optionally assign a BOM station. Rainfall data will then be fetched automatically."
                     )
                 else:
@@ -1101,7 +1103,7 @@ if selected_device_id:
 
                     # ── Rain events table ──────────────────────────────────
                     if _response.rain_events:
-                        with st.expander(f"🌧️ Rain Events ({len(_response.rain_events)})", expanded=False):
+                        with st.expander(f"Rain Events ({len(_response.rain_events)})", expanded=False):
                             _ev_df = pd.DataFrame([
                                 {
                                     "Start": e.start.strftime("%d/%m %H:%M") if hasattr(e.start, "strftime") else str(e.start),
@@ -1116,12 +1118,12 @@ if selected_device_id:
 
                     # ── I/I flags table ────────────────────────────────────
                     if _response.ii_flags:
-                        _sev_badge = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵"}
-                        with st.expander(f"⚠️ I/I Flags ({len(_response.ii_flags)})", expanded=True):
+                        _sev_color = {"critical": "#c62828", "high": "#e65100", "medium": "#f57f17", "low": "#1565c0"}
+                        with st.expander(f"I/I Flags ({len(_response.ii_flags)})", expanded=True):
                             for _flag in _response.ii_flags:
-                                _icon = _sev_badge.get(_flag.severity, "⚪")
+                                _col = _sev_color.get(_flag.severity, "#555")
                                 st.markdown(
-                                    f"{_icon} **{_flag.severity.upper()}** — "
+                                    f"<span style='font-weight:600;color:{_col};'>{_flag.severity.upper()}</span> — "
                                     f"{_flag.description}  \n"
                                     f"<span style='font-size:0.8rem;color:#6b7280;'>"
                                     f"Peak: {_flag.peak_flow_lps:.1f} L/s &nbsp;·&nbsp; "
@@ -1134,7 +1136,7 @@ if selected_device_id:
 
                     # ── Recommendations ────────────────────────────────────
                     if _response.recommendations:
-                        st.markdown("#### 💡 Recommendations")
+                        st.markdown("#### Recommendations")
                         for _rec in _response.recommendations:
                             st.markdown(_rec)
 
@@ -1142,17 +1144,17 @@ if selected_device_id:
                 st.markdown("#### Aggregate Statistics")
                 col_sum1, col_sum2, col_sum3 = st.columns(3)
                 with col_sum1:
-                    st.markdown("**💧 Water Depth**")
+                    st.markdown("**Water Depth**")
                     st.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
                     st.metric("Median", f"{df['depth_mm'].median():.1f} mm")
                     st.metric("Range", f"{df['depth_mm'].max() - df['depth_mm'].min():.1f} mm")
                 with col_sum2:
-                    st.markdown("**⚡ Flow Velocity**")
+                    st.markdown("**Flow Velocity**")
                     st.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
                     st.metric("Median", f"{df['velocity_mps'].median():.3f} m/s")
                     st.metric("Range", f"{df['velocity_mps'].max() - df['velocity_mps'].min():.3f} m/s")
                 with col_sum3:
-                    st.markdown("**🌊 Flow Rate**")
+                    st.markdown("**Flow Rate**")
                     st.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
                     st.metric("Median", f"{df['flow_lps'].median():.1f} L/s")
                     st.metric("Range", f"{df['flow_lps'].max() - df['flow_lps'].min():.1f} L/s")
@@ -1195,7 +1197,7 @@ if selected_device_id:
 
             # ── Data table & export ────────────────────────────────────────
             st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
-            st.markdown('<p class="section-title">📋 Data Table & Export</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">Data Table & Export</p>', unsafe_allow_html=True)
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
@@ -1221,7 +1223,6 @@ if selected_device_id:
         else:
             st.markdown("""
             <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
-                <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
                 <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">No data in selected window</h3>
                 <p style="color: #6b7280; margin: 0;">Try a wider time window, or start the <code>monitor.py</code> service to collect data.</p>
             </div>
@@ -1229,14 +1230,13 @@ if selected_device_id:
     else:
         st.markdown("""
         <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
-            <p style="font-size: 2.5rem; margin: 0 0 1rem;">📡</p>
             <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">Awaiting first reading</h3>
             <p style="color: #6b7280; margin: 0 0 1.5rem;">No measurements have been stored yet.</p>
             <p style="color: #6b7280; font-size: 0.9rem;">Run <code>python monitor.py</code> or <code>docker-compose up</code> to start collecting data automatically.</p>
         </div>
         """, unsafe_allow_html=True)
 else:
-    st.info("👈 Select a device from the sidebar to view data.")
+    st.info("Select a device from the sidebar to view data.")
 
 # ── Footer ──────────────────────────────────────────────────────────────────
 now_footer = datetime.now(pytz.timezone(DEFAULT_TZ))
@@ -1244,7 +1244,7 @@ st.markdown(f"""
 <div class="app-footer">
     <span class="app-footer-brand">e-flow™ by EDS</span>
     <span class="app-footer-meta">
-        🕐 {now_footer.strftime('%Y-%m-%d %H:%M %Z')} &nbsp;·&nbsp;
+        {now_footer.strftime('%Y-%m-%d %H:%M %Z')} &nbsp;·&nbsp;
         Timezone: {DEFAULT_TZ} &nbsp;·&nbsp;
         Monitor service: {'enabled' if MONITOR_ENABLED else 'disabled'}
     </span>
