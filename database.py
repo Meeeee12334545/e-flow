@@ -1,5 +1,7 @@
+import shutil
 import sqlite3
 import os
+import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -17,6 +19,30 @@ except Exception:
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(Path(__file__).parent / "data" / "flow_data.db")))
 
+_logger = logging.getLogger(__name__)
+
+
+def _migrate_legacy_db(new_path: str) -> None:
+    """One-time migration: copy the legacy root-level flow_data.db to the new
+    ``data/flow_data.db`` location if the new path does not yet contain data.
+
+    This handles the case where an existing deployment upgrading from an older
+    version of the code (which stored the database in the project root) would
+    otherwise start with an empty database and lose all previously collected
+    measurements, devices, and user accounts.
+    """
+    new = Path(new_path)
+    if new.exists() and new.stat().st_size > 0:
+        return  # New path already has data — nothing to do
+
+    # The legacy default was <project_root>/flow_data.db, one level above
+    # the current default <project_root>/data/flow_data.db.
+    old = new.parent.parent / "flow_data.db"
+    if old.exists() and old.resolve() != new.resolve():
+        _logger.info("Migrating legacy database from %s to %s", old, new)
+        shutil.copy2(str(old), str(new))
+        _logger.info("Legacy database migration complete.")
+
 
 class FlowDatabase:
     """Database for storing depth, velocity, and flow data.
@@ -33,6 +59,8 @@ class FlowDatabase:
         else:
             # Ensure the data directory exists before SQLite tries to open the file
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+            # Migrate from legacy root-level flow_data.db on first run with new path
+            _migrate_legacy_db(self.db_path)
         self.init_db()
 
     def init_db(self):
@@ -1162,18 +1190,22 @@ class FlowDatabase:
             conn = sqlite3.connect(self.db_path, timeout=30)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT drs.*, rs.station_name, rs.latitude AS st_lat, rs.longitude AS st_lon, rs.state
-                FROM device_rainfall_stations drs
-                LEFT JOIN rainfall_stations rs ON drs.station_id = rs.station_id
-                WHERE drs.device_id = ?
-                """,
-                (device_id,),
-            )
-            row = cursor.fetchone()
-            conn.close()
-            return dict(row) if row else None
+            try:
+                cursor.execute(
+                    """
+                    SELECT drs.*, rs.station_name, rs.latitude AS st_lat, rs.longitude AS st_lon, rs.state
+                    FROM device_rainfall_stations drs
+                    LEFT JOIN rainfall_stations rs ON drs.station_id = rs.station_id
+                    WHERE drs.device_id = ?
+                    """,
+                    (device_id,),
+                )
+                row = cursor.fetchone()
+                return dict(row) if row else None
+            except sqlite3.OperationalError:
+                return None
+            finally:
+                conn.close()
 
     def save_rainfall_data(self, station_id: str, records: List[Dict]) -> int:
         """Insert rainfall observations for a station. Skips duplicates.
