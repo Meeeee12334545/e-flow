@@ -772,6 +772,8 @@ class AuthDatabase:
                 cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
                 row = cursor.fetchone()
                 return row[0] if row else None
+            except sqlite3.OperationalError:
+                return None
             finally:
                 conn.close()
 
