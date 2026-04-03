@@ -642,22 +642,17 @@ if page_mode == 'Simplified View':
                 )
 
             st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
-            col_download1, col_download2, _ = st.columns([1, 1, 2])
+            col_download1, _ = st.columns([1, 3])
             # Format timestamps as dd/mm/yyyy hh:mm:ss for export
             df_export = df.copy()
             if 'timestamp' in df_export.columns:
                 ts_col = pd.to_datetime(df_export['timestamp'], utc=True, format="ISO8601", errors='coerce')
                 df_export['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
             csv_data = df_export.to_csv(index=False)
-            json_data = df.to_json(orient='records', date_format='iso')
             with col_download1:
                 st.download_button('⬇ Download CSV', data=csv_data,
                                    file_name=f'{selected_device_id}_data.csv', mime='text/csv',
                                    width="stretch")
-            with col_download2:
-                st.download_button('⬇ Download JSON', data=json_data,
-                                   file_name=f'{selected_device_id}_data.json',
-                                   mime='application/json', width="stretch")
         else:
             st.markdown("""
             <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
@@ -1186,21 +1181,13 @@ if selected_device_id:
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-            col_dl1, col_dl2, _ = st.columns([1, 1, 2])
+            col_dl1, _ = st.columns([1, 3])
             with col_dl1:
                 st.download_button(
                     "⬇ Download CSV",
                     data=display_df.to_csv(index=False),
                     file_name=f"flow_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     mime="text/csv",
-                    width="stretch"
-                )
-            with col_dl2:
-                st.download_button(
-                    "⬇ Download JSON",
-                    data=df.to_json(orient="records", date_format="iso"),
-                    file_name=f"flow_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                    mime="application/json",
                     width="stretch"
                 )
         else:

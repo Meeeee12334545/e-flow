@@ -1,5 +1,5 @@
 """
-Reports page – on-demand PDF / HTML report generation with AI insights.
+Reports page – on-demand PDF report generation with AI insights.
 
 Accessible from the Streamlit sidebar navigation.
 """
@@ -19,8 +19,8 @@ from anomaly import run_anomaly_detection
 from reporting import (
     ReportSelections,
     compute_calculations,
+    compute_volume_breakdown,
     create_charts,
-    build_html_report,
     build_pdf_report,
 )
 from shared_styles import apply_styles
@@ -135,9 +135,13 @@ with col_cfg:
         hours = max(1, int((date_to - date_from).total_seconds() / 3600))
 
     st.markdown("**Variables to include**")
-    inc_depth = st.checkbox("Depth (depth_mm)", value=True)
-    inc_vel = st.checkbox("Velocity (velocity_mps)", value=True)
-    inc_flow = st.checkbox("Flow (flow_lps)", value=True)
+    col_v1, col_v2, col_v3 = st.columns(3)
+    with col_v1:
+        inc_depth = st.checkbox("Depth", value=True)
+    with col_v2:
+        inc_vel = st.checkbox("Velocity", value=True)
+    with col_v3:
+        inc_flow = st.checkbox("Flow", value=True)
 
     variables = []
     if inc_depth:
@@ -150,7 +154,39 @@ with col_cfg:
     if not variables:
         st.warning("Select at least one variable.")
 
-    include_ai = st.checkbox("Include AI anomaly analysis", value=True)
+    st.markdown("**Report Content**")
+    inc_stats   = st.checkbox("Summary statistics table", value=True, key="inc_stats")
+    inc_charts  = st.checkbox("Time-series charts", value=True, key="inc_charts")
+    inc_ai      = st.checkbox("Data quality assessment", value=True, key="inc_ai")
+
+    # Volume breakdown — only relevant when flow is selected
+    inc_vol_breakdown = False
+    vol_interval = "daily"
+    if inc_flow:
+        inc_vol_breakdown = st.checkbox(
+            "Flow volume breakdown (AM/PM & daily totals)",
+            value=True,
+            key="inc_vol_breakdown",
+        )
+        if inc_vol_breakdown:
+            vol_interval = st.radio(
+                "Breakdown interval",
+                options=["daily", "am_pm", "hourly"],
+                format_func=lambda x: {
+                    "daily":  "Daily totals",
+                    "am_pm":  "AM & PM + daily totals",
+                    "hourly": "Hourly + daily totals",
+                }[x],
+                index=1,
+                horizontal=True,
+                key="vol_interval",
+            )
+
+    custom_title = st.text_input(
+        "Custom report title (optional)",
+        placeholder="e.g. Monthly Inflow Report — March 2025",
+        key="custom_title",
+    )
 
     generate_clicked = st.button(
         "🗂️ Generate Report",
@@ -187,8 +223,17 @@ with col_prev:
 
             # ── Anomaly detection ──────────────────────────────────────────
             anomaly_rep = None
-            if include_ai and not df_window.empty:
+            if inc_ai and not df_window.empty:
                 anomaly_rep = run_anomaly_detection(df_window, columns=variables)
+
+            # ── Volume breakdown ───────────────────────────────────────────
+            vol_breakdown = None
+            if inc_vol_breakdown and "flow_lps" in variables and not df_window.empty:
+                vol_breakdown = compute_volume_breakdown(
+                    df_window,
+                    interval=vol_interval,
+                    tz=DEFAULT_TZ,
+                )
 
             # ── Build report ───────────────────────────────────────────────
             calculations_all = ["mean", "max", "min", "std", "p50", "p95", "volume", "count"]
@@ -201,19 +246,22 @@ with col_prev:
                 site_id=selected_device_id,
                 location=device_info.get("location", "") if device_info else "",
                 anomaly_report=anomaly_rep,
+                include_stats_table=inc_stats,
+                include_charts=inc_charts,
+                include_volume_breakdown=inc_vol_breakdown,
+                volume_breakdown_interval=vol_interval,
+                report_timezone=DEFAULT_TZ,
+                custom_title=custom_title.strip() if custom_title else "",
             )
 
             calcs = compute_calculations(df_window, selections)
             charts = create_charts(df_window, selections)
 
             _logo_path = str(_ASSETS / "logo_wide.svg")
-            html_content = build_html_report(
-                selected_device_name, df_window, selections, calcs, charts,
-                logo_path=_logo_path,
-            )
             pdf_bytes = build_pdf_report(
                 selected_device_name, df_window, selections, calcs, charts,
                 logo_path=_logo_path,
+                volume_breakdown=vol_breakdown,
             )
 
             # ── Save report record to DB ───────────────────────────────────
@@ -233,7 +281,6 @@ with col_prev:
             except Exception:
                 pass
 
-            st.session_state["last_report_html"] = html_content
             st.session_state["last_report_pdf"] = pdf_bytes
             st.session_state["last_report_name"] = (
                 f"eflow_{selected_device_id}_{report_type_key}_{datetime.now().strftime('%Y%m%d_%H%M')}"
@@ -273,16 +320,6 @@ with col_prev:
             file_name=f"{fname}.pdf",
             mime="application/pdf",
             type="primary",
-        )
-    elif "last_report_html" in st.session_state and st.session_state["last_report_html"]:
-        # Ultimate fallback: HTML download (should rarely be reached)
-        html_bytes = st.session_state["last_report_html"].encode("utf-8")
-        fname = st.session_state.get("last_report_name", "eflow_report")
-        st.download_button(
-            label="⬇️ Download HTML Report",
-            data=html_bytes,
-            file_name=f"{fname}.html",
-            mime="text/html",
         )
 
     if "last_report_df" in st.session_state:

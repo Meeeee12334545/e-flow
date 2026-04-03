@@ -193,6 +193,55 @@ def render_admin_panel():
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
+    # ── Delete Monitoring Site ────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Delete Monitoring Site</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Permanently remove a site and all its collected measurements, anomaly flags, "
+        "reports and rain gauge assignments.</p>",
+        unsafe_allow_html=True,
+    )
+
+    if not all_sites:
+        st.info("No sites configured yet.")
+    else:
+        col_del_site, col_del_site_hint = st.columns([3, 2])
+
+        with col_del_site:
+            _del_site_map = {s["device_name"]: s for s in all_sites}
+            _del_site_sel = st.selectbox(
+                "Select site to delete:",
+                options=list(_del_site_map.keys()),
+                key="delete_site_selector",
+            )
+            _del_site = _del_site_map[_del_site_sel]
+            _confirm_site = st.checkbox(
+                f"I understand this will permanently delete **{_del_site['device_name']}** "
+                "and all its data. This cannot be undone.",
+                key="delete_site_confirm",
+            )
+            if st.button("🗑️ Delete Site", disabled=not _confirm_site, key="delete_site_btn"):
+                ok = flow_db.delete_device(_del_site["device_id"])
+                if ok:
+                    st.success(f"Site '{_del_site['device_name']}' and all its data have been deleted.")
+                    st.rerun()
+                else:
+                    st.error("Failed to delete site.")
+
+        with col_del_site_hint:
+            st.markdown("""
+            <div class="info-box" style="margin-top: 0.25rem; border-left: 4px solid #D93025;">
+                <strong style="color: #D93025;">⚠️ Destructive action</strong><br>
+                <span style="color: #6b7280;">
+                    Deleting a site removes all its flow measurements, anomaly flags,
+                    reports and rain gauge assignments permanently.<br><br>
+                    This action <strong>cannot be undone</strong>.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+
     # ── Map Location & Rain Gauge ────────────────────────────────────────────
     st.markdown('<p class="section-title">Map Location & Rain Gauge</p>', unsafe_allow_html=True)
     st.markdown(
@@ -417,6 +466,60 @@ def render_admin_panel():
             </span>
         </div>
         """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+
+    # ── Delete User ──────────────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Delete User</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Permanently remove a user account and all their session data.</p>",
+        unsafe_allow_html=True,
+    )
+
+    _current_user = get_current_user()
+    _all_users_for_delete = auth_db.list_users_with_devices()
+    # Prevent the currently logged-in admin from deleting their own account
+    _deletable_users = [u for u in _all_users_for_delete if u['username'] != _current_user.get('username')]
+
+    if not _deletable_users:
+        st.info("No other users to delete.")
+    else:
+        col_del_user, col_del_user_hint = st.columns([3, 2])
+
+        with col_del_user:
+            _del_user_sel = st.selectbox(
+                "Select user to delete:",
+                options=[u['username'] for u in _deletable_users],
+                format_func=lambda u: f"{u}  ({next(x['role'] for x in _deletable_users if x['username'] == u)})",
+                key="delete_user_selector",
+            )
+            _del_user = next(u for u in _deletable_users if u['username'] == _del_user_sel)
+            _confirm_user = st.checkbox(
+                f"I understand this will permanently delete **{_del_user['username']}** "
+                "and all their session data. This cannot be undone.",
+                key="delete_user_confirm",
+            )
+            if st.button("🗑️ Delete User", disabled=not _confirm_user, key="delete_user_btn"):
+                ok = auth_db.delete_user(_del_user['user_id'])
+                if ok:
+                    st.success(f"User '{_del_user['username']}' has been deleted.")
+                    st.rerun()
+                else:
+                    st.error("Failed to delete user.")
+
+        with col_del_user_hint:
+            st.markdown("""
+            <div class="info-box" style="margin-top: 0.25rem; border-left: 4px solid #D93025;">
+                <strong style="color: #D93025;">⚠️ Destructive action</strong><br>
+                <span style="color: #6b7280;">
+                    Deleting a user removes their account, all active sessions
+                    and site assignments permanently.<br><br>
+                    You cannot delete your own account.<br><br>
+                    This action <strong>cannot be undone</strong>.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 

@@ -15,7 +15,7 @@ try:
 except Exception:
     _PG_AVAILABLE = False
 
-DATABASE_PATH = Path(__file__).parent / "flow_data.db"
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(Path(__file__).parent / "data" / "flow_data.db")))
 
 
 class FlowDatabase:
@@ -30,6 +30,9 @@ class FlowDatabase:
         self.db_path = db_path or str(DATABASE_PATH)
         if self.use_postgres:
             self.pg_dsn = DATABASE_URL
+        else:
+            # Ensure the data directory exists before SQLite tries to open the file
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self.init_db()
 
     def init_db(self):
@@ -636,6 +639,47 @@ class FlowDatabase:
             cursor.execute("DELETE FROM devices")
             conn.commit()
             conn.close()
+
+    def delete_device(self, device_id: str) -> bool:
+        """Delete a device and all its associated data.
+
+        Removes rain gauge assignments, anomaly flags, scheduled reports, and
+        measurements for the device before removing the device record itself.
+
+        Returns True on success, False if an error occurred.
+        """
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute("DELETE FROM device_rainfall_stations WHERE device_id = %s", (device_id,))
+                cur.execute("DELETE FROM anomaly_flags WHERE device_id = %s", (device_id,))
+                cur.execute("DELETE FROM scheduled_reports WHERE device_id = %s", (device_id,))
+                cur.execute("DELETE FROM measurements WHERE device_id = %s", (device_id,))
+                cur.execute("DELETE FROM devices WHERE device_id = %s", (device_id,))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            try:
+                conn.execute("DELETE FROM device_rainfall_stations WHERE device_id = ?", (device_id,))
+                conn.execute("DELETE FROM anomaly_flags WHERE device_id = ?", (device_id,))
+                conn.execute("DELETE FROM scheduled_reports WHERE device_id = ?", (device_id,))
+                conn.execute("DELETE FROM measurements WHERE device_id = ?", (device_id,))
+                conn.execute("DELETE FROM devices WHERE device_id = ?", (device_id,))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
 
     def flush_db(self):
         """Force a WAL checkpoint to ensure all data is written to the main database file.
