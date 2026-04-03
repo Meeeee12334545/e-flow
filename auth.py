@@ -25,7 +25,7 @@ try:
 except Exception:
     _PG_AVAILABLE = False
 
-DATABASE_PATH = Path(__file__).parent / "flow_data.db"
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(Path(__file__).parent / "data" / "flow_data.db")))
 
 
 class AuthDatabase:

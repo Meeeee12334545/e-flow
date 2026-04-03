@@ -15,7 +15,7 @@ services:
     networks:
       - e-flow-net
     volumes:
-      - ./flow_data.db:/app/flow_data.db
+      - ./data:/app/data
       - ./monitor.log:/app/monitor.log
     environment:
       - MONITOR_ENABLED=true
@@ -23,7 +23,7 @@ services:
       # API-only mode: no headless browser launched, minimises RAM on small droplets
       - SCRAPER_FORCE_REQUESTS=1
       - TIMEZONE=Australia/Brisbane
-      - DATABASE_PATH=/app/flow_data.db
+      - DATABASE_PATH=/app/data/flow_data.db
       - PYTHONUNBUFFERED=1
     logging:
       driver: "json-file"
@@ -56,7 +56,7 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - ./flow_data.db:/app/flow_data.db
+      - ./data:/app/data
     # Wait for monitor to pass its healthcheck before starting the dashboard
     # so the SQLite DB is fully initialized before the UI tries to open it.
     depends_on:
@@ -65,7 +65,7 @@ services:
     environment:
       - STREAMLIT_SERVER_PORT=8501
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
-      - DATABASE_PATH=/app/flow_data.db
+      - DATABASE_PATH=/app/data/flow_data.db
       - PYTHONUNBUFFERED=1
     logging:
       driver: "json-file"
@@ -93,14 +93,14 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - ./flow_data.db:/app/flow_data.db
+      - ./data:/app/data
       - ./monitor.log:/app/monitor.log
     environment:
       - MONITOR_ENABLED=true
       - MONITOR_INTERVAL=60
       - SCRAPER_FORCE_REQUESTS=1
       - TIMEZONE=Australia/Brisbane
-      - DATABASE_PATH=/app/flow_data.db
+      - DATABASE_PATH=/app/data/flow_data.db
       - STREAMLIT_SERVER_PORT=8501
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
       - PYTHONUNBUFFERED=1
