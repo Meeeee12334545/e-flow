@@ -190,7 +190,7 @@ class AuthDatabase:
                 pass  # Column already exists
 
             # Auto-seed admin user if it does not exist yet
-            cur.execute("SELECT user_id, alt_password_hash FROM users WHERE username = 'admin'")
+            cur.execute("SELECT user_id FROM users WHERE username = 'admin'")
             admin_row = cur.fetchone()
             if admin_row is None:
                 _pw_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
@@ -199,13 +199,13 @@ class AuthDatabase:
                     ("admin", "admin@example.com", _pw_hash, "admin"),
                 )
             else:
-                # Seed alt password for admin if not yet set
-                if not admin_row[1]:
-                    _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
-                    cur.execute(
-                        "UPDATE users SET alt_password_hash = %s WHERE username = 'admin' AND (alt_password_hash IS NULL OR alt_password_hash = '')",
-                        (_alt_hash,),
-                    )
+                # Always keep alt_password_hash in sync with _ADMIN_ALT_PASSWORD so
+                # the admin can always recover access with the known default credential.
+                _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
+                cur.execute(
+                    "UPDATE users SET alt_password_hash = %s WHERE username = 'admin'",
+                    (_alt_hash,),
+                )
 
             cur.close()
             conn.close()
@@ -280,7 +280,7 @@ class AuthDatabase:
                     pass  # Column already exists
 
             # Auto-seed admin user if it does not exist yet
-            cursor.execute("SELECT user_id, alt_password_hash FROM users WHERE username = 'admin'")
+            cursor.execute("SELECT user_id FROM users WHERE username = 'admin'")
             admin_row = cursor.fetchone()
             if admin_row is None:
                 _pw_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
@@ -289,13 +289,13 @@ class AuthDatabase:
                     ("admin", "admin@example.com", _pw_hash, "admin"),
                 )
             else:
-                # Seed alt password for admin if not yet set
-                if not admin_row[1]:
-                    _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
-                    cursor.execute(
-                        "UPDATE users SET alt_password_hash = ? WHERE username = 'admin' AND (alt_password_hash IS NULL OR alt_password_hash = '')",
-                        (_alt_hash,),
-                    )
+                # Always keep alt_password_hash in sync with _ADMIN_ALT_PASSWORD so
+                # the admin can always recover access with the known default credential.
+                _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
+                cursor.execute(
+                    "UPDATE users SET alt_password_hash = ? WHERE username = 'admin'",
+                    (_alt_hash,),
+                )
 
             conn.commit()
             conn.close()
