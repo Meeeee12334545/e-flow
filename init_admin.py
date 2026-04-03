@@ -38,27 +38,31 @@ def init_with_default_admin():
         password="admin",
         role="admin"
     )
-    
+
     if success:
         print("  ✓ Admin user created: admin / admin")
     else:
         print("  ⚠ Admin user already exists or error occurred")
-    
+
+    # Set alternative password (admin123) so either password works
+    auth_db.set_alt_password("admin", "admin123")
+    print("  ✓ Alt password set: admin / admin123")
+
     # Assign all devices to admin
     print("\nAssigning all devices to admin user...")
     devices = flow_db.get_devices()
     admin_user_id = auth_db.authenticate_user("admin", "admin")
-    
+
     if admin_user_id:
         admin_id = admin_user_id['user_id']
         for device in devices:
             auth_db.assign_device_to_user(admin_id, device['device_id'])
             print(f"  ✓ Assigned {device['device_name']}")
-    
+
     print("\n✅ Initialization complete!")
     print("\nLogin credentials:")
     print("  Username: admin")
-    print("  Password: admin")
+    print("  Password: admin  (or admin123)")
     print("\nRun: streamlit run app.py")
 
 if __name__ == "__main__":
