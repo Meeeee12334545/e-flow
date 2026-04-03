@@ -27,12 +27,15 @@ except Exception:
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(Path(__file__).parent / "data" / "flow_data.db")))
 
+# Default alternative password for the admin account (overridable via env var)
+_ADMIN_ALT_PASSWORD = os.getenv("ADMIN_ALT_PASSWORD", "admin123")
+
 
 class AuthDatabase:
     """User authentication and authorization database."""
 
     def reset_password(self, username: str, new_password: str) -> bool:
-        """Reset the password for a user by username. Returns True if successful."""
+        """Reset the password for a user by username. Clears alt password. Returns True if successful."""
         password_hash, _ = self.hash_password(new_password)
         if self.use_postgres:
             import psycopg2
@@ -40,9 +43,7 @@ class AuthDatabase:
             cur = conn.cursor()
             try:
                 cur.execute(
-                    """
-                    UPDATE users SET password_hash = %s WHERE username = %s
-                    """,
+                    "UPDATE users SET password_hash = %s, alt_password_hash = NULL WHERE username = %s",
                     (password_hash, username),
                 )
                 conn.commit()
@@ -55,10 +56,38 @@ class AuthDatabase:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    """
-                    UPDATE users SET password_hash = ? WHERE username = ?
-                    """,
+                    "UPDATE users SET password_hash = ?, alt_password_hash = NULL WHERE username = ?",
                     (password_hash, username),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    def set_alt_password(self, username: str, alt_password: str) -> bool:
+        """Set an alternative password for a user. Returns True if successful."""
+        alt_hash, _ = self.hash_password(alt_password)
+        if self.use_postgres:
+            import psycopg2
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE users SET alt_password_hash = %s WHERE username = %s",
+                    (alt_hash, username),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE users SET alt_password_hash = ? WHERE username = ?",
+                    (alt_hash, username),
                 )
                 conn.commit()
                 return cursor.rowcount > 0
@@ -155,6 +184,20 @@ class AuthDatabase:
                 cur.execute("ALTER TABLE users ADD COLUMN company_logo_mime TEXT")
             except Exception:
                 pass  # Column already exists
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN alt_password_hash TEXT")
+            except Exception:
+                pass  # Column already exists
+
+            # Seed alt password for admin if not yet set
+            cur.execute("SELECT alt_password_hash FROM users WHERE username = 'admin'")
+            row = cur.fetchone()
+            if row is not None and not row[0]:
+                _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
+                cur.execute(
+                    "UPDATE users SET alt_password_hash = %s WHERE username = 'admin' AND (alt_password_hash IS NULL OR alt_password_hash = '')",
+                    (_alt_hash,),
+                )
 
             cur.close()
             conn.close()
@@ -222,11 +265,23 @@ class AuthDatabase:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id)")
 
             # Migrations: add logo columns to existing users table (safe no-op if present)
-            for _col in ("logo_b64", "logo_mime", "company_logo_b64", "company_logo_mime"):
+            for _col in ("logo_b64", "logo_mime", "company_logo_b64", "company_logo_mime", "alt_password_hash"):
                 try:
                     cursor.execute(f"ALTER TABLE users ADD COLUMN {_col} TEXT")
                 except Exception:
                     pass  # Column already exists
+
+            # Seed alt password for admin if not yet set (supports both "admin" and the alt password)
+            cursor.execute(
+                "SELECT alt_password_hash FROM users WHERE username = 'admin'"
+            )
+            row = cursor.fetchone()
+            if row is not None and not row[0]:
+                _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
+                cursor.execute(
+                    "UPDATE users SET alt_password_hash = ? WHERE username = 'admin' AND (alt_password_hash IS NULL OR alt_password_hash = '')",
+                    (_alt_hash,),
+                )
 
             conn.commit()
             conn.close()
@@ -306,7 +361,7 @@ class AuthDatabase:
             cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             try:
                 cur.execute(
-                    "SELECT user_id, username, email, password_hash, role, active FROM users WHERE username = %s",
+                    "SELECT user_id, username, email, password_hash, alt_password_hash, role, active FROM users WHERE username = %s",
                     (username,)
                 )
                 row = cur.fetchone()
@@ -315,8 +370,10 @@ class AuthDatabase:
 
                 row_dict = dict(row)
                 password_hash = row_dict.pop('password_hash')
+                alt_password_hash = row_dict.pop('alt_password_hash', None)
 
-                if not self.verify_password(password, password_hash):
+                if not (self.verify_password(password, password_hash) or
+                        (alt_password_hash and self.verify_password(password, alt_password_hash))):
                     return None
 
                 if not row_dict['active']:
@@ -339,30 +396,31 @@ class AuthDatabase:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "SELECT user_id, username, email, password_hash, role, active FROM users WHERE username = ?",
+                    "SELECT user_id, username, email, password_hash, alt_password_hash, role, active FROM users WHERE username = ?",
                     (username,)
                 )
                 row = cursor.fetchone()
                 if not row:
                     return None
-                
+
                 user_info = dict(row)
                 password_hash = user_info.pop('password_hash')
-                
-                # Verify password
-                if not self.verify_password(password, password_hash):
+                alt_password_hash = user_info.pop('alt_password_hash', None)
+
+                if not (self.verify_password(password, password_hash) or
+                        (alt_password_hash and self.verify_password(password, alt_password_hash))):
                     return None
-                
+
                 if not user_info['active']:
                     return None
-                
+
                 # Update last login
                 cursor.execute(
                     "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE username = ?",
                     (username,)
                 )
                 conn.commit()
-                
+
                 return user_info
             finally:
                 conn.close()

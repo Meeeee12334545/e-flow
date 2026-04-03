@@ -116,6 +116,30 @@ def render_profile_page():
                 except Exception as e:
                     st.error(f"Could not remove avatar: {e}")
 
+    # ── Change Password ───────────────────────────────────────────────────────
+    with st.expander("Change Password", expanded=False):
+        st.caption("Enter your current password to set a new one.")
+        current_pw = st.text_input("Current password", type="password", key="chpw_current")
+        new_pw = st.text_input("New password", type="password", key="chpw_new",
+                               help="Minimum 8 characters.")
+        confirm_pw = st.text_input("Confirm new password", type="password", key="chpw_confirm")
+        if st.button("Update Password", type="primary", key="chpw_btn"):
+            if not current_pw or not new_pw or not confirm_pw:
+                st.error("Please fill in all fields.")
+            elif new_pw != confirm_pw:
+                st.error("New passwords do not match.")
+            elif len(new_pw) < 8:
+                st.error("New password must be at least 8 characters.")
+            else:
+                _auth_db = st.session_state.auth_db
+                if _auth_db.authenticate_user(user['username'], current_pw) is None:
+                    st.error("Current password is incorrect.")
+                else:
+                    if _auth_db.reset_password(user['username'], new_pw):
+                        st.success("Password updated successfully.")
+                    else:
+                        st.error("Could not update password. Please try again.")
+
     # ── Company Logo ──────────────────────────────────────────────────────────
     st.markdown('<p class="section-title">Company Logo</p>', unsafe_allow_html=True)
     st.markdown(
