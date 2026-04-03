@@ -1,6 +1,7 @@
 import shutil
 import sqlite3
 import os
+import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -17,6 +18,8 @@ except Exception:
     _PG_AVAILABLE = False
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(Path(__file__).parent / "data" / "flow_data.db")))
+
+_logger = logging.getLogger(__name__)
 
 
 def _migrate_legacy_db(new_path: str) -> None:
@@ -36,7 +39,9 @@ def _migrate_legacy_db(new_path: str) -> None:
     # the current default <project_root>/data/flow_data.db.
     old = new.parent.parent / "flow_data.db"
     if old.exists() and old.resolve() != new.resolve():
+        _logger.info("Migrating legacy database from %s to %s", old, new)
         shutil.copy2(str(old), str(new))
+        _logger.info("Legacy database migration complete.")
 
 
 class FlowDatabase:
@@ -1197,7 +1202,7 @@ class FlowDatabase:
                 )
                 row = cursor.fetchone()
                 return dict(row) if row else None
-            except Exception:
+            except sqlite3.OperationalError:
                 return None
             finally:
                 conn.close()
