@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from auth import AuthDatabase
+from auth import AuthDatabase, _ADMIN_ALT_PASSWORD
 from database import FlowDatabase
 from config import DEVICES
 
@@ -44,9 +44,9 @@ def init_with_default_admin():
     else:
         print("  ⚠ Admin user already exists or error occurred")
 
-    # Set alternative password (admin123) so either password works
-    auth_db.set_alt_password("admin", "admin123")
-    print("  ✓ Alt password set: admin / admin123")
+    # Set alternative password so either "admin" or the alt password works
+    auth_db.set_alt_password("admin", _ADMIN_ALT_PASSWORD)
+    print(f"  ✓ Alt password set: admin / {_ADMIN_ALT_PASSWORD}")
 
     # Assign all devices to admin
     print("\nAssigning all devices to admin user...")
@@ -62,7 +62,7 @@ def init_with_default_admin():
     print("\n✅ Initialization complete!")
     print("\nLogin credentials:")
     print("  Username: admin")
-    print("  Password: admin  (or admin123)")
+    print(f"  Password: admin  (or {_ADMIN_ALT_PASSWORD})")
     print("\nRun: streamlit run app.py")
 
 if __name__ == "__main__":

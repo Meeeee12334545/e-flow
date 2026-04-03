@@ -140,7 +140,8 @@ def render_profile_page():
                     else:
                         st.error("Could not update password. Please try again.")
 
-    # ── Company Logo ──────────────────────────────────────────────────────────    st.markdown('<p class="section-title">Company Logo</p>', unsafe_allow_html=True)
+    # ── Company Logo ──────────────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Company Logo</p>', unsafe_allow_html=True)
     st.markdown(
         "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
         "Upload your own company logo. It will appear in the sidebar and header <em>only for your account</em>. "

@@ -27,6 +27,9 @@ except Exception:
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(Path(__file__).parent / "data" / "flow_data.db")))
 
+# Default alternative password for the admin account (overridable via env var)
+_ADMIN_ALT_PASSWORD = os.getenv("ADMIN_ALT_PASSWORD", "admin123")
+
 
 class AuthDatabase:
     """User authentication and authorization database."""
@@ -190,7 +193,7 @@ class AuthDatabase:
             cur.execute("SELECT alt_password_hash FROM users WHERE username = 'admin'")
             row = cur.fetchone()
             if row is not None and not row[0]:
-                _alt_hash, _ = AuthDatabase.hash_password("admin123")
+                _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
                 cur.execute(
                     "UPDATE users SET alt_password_hash = %s WHERE username = 'admin' AND (alt_password_hash IS NULL OR alt_password_hash = '')",
                     (_alt_hash,),
@@ -268,13 +271,13 @@ class AuthDatabase:
                 except Exception:
                     pass  # Column already exists
 
-            # Seed alt password for admin if not yet set (supports both "admin" and "admin123")
+            # Seed alt password for admin if not yet set (supports both "admin" and the alt password)
             cursor.execute(
                 "SELECT alt_password_hash FROM users WHERE username = 'admin'"
             )
             row = cursor.fetchone()
             if row is not None and not row[0]:
-                _alt_hash, _ = AuthDatabase.hash_password("admin123")
+                _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
                 cursor.execute(
                     "UPDATE users SET alt_password_hash = ? WHERE username = 'admin' AND (alt_password_hash IS NULL OR alt_password_hash = '')",
                     (_alt_hash,),
