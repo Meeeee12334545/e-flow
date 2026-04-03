@@ -194,7 +194,8 @@ def compute_volume_breakdown(
         ts_epoch = sub["_ts"].astype("int64").values / 1e9
         if len(flow_vals) < 1:
             return None
-        vol_l = max(0.0, float(np.trapz(flow_vals, ts_epoch)))
+        _trapz = getattr(np, "trapezoid", np.trapz)
+        vol_l = max(0.0, float(_trapz(flow_vals, ts_epoch)))
         return {
             "volume_l":       vol_l,
             "volume_m3":      vol_l / 1_000.0,
