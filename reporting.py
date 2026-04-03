@@ -189,12 +189,17 @@ def compute_volume_breakdown(
     dfx["_local_date"] = local_ts.dt.date
     dfx["_local_hour"] = local_ts.dt.hour
 
+    # Resolve trapezoidal integration function — np.trapz removed in NumPy 2.0.
+    _trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz", None)
+
     def _integrate(sub: pd.DataFrame) -> Optional[Dict]:
         flow_vals = sub["_flow"].values
-        ts_epoch = sub["_ts"].astype("int64").values / 1e9
+        # Convert tz-aware UTC timestamps to epoch seconds in a way that is
+        # compatible with both pandas 2.x (which no longer allows astype("int64")
+        # on tz-aware DatetimeTZDtype) and older pandas releases.
+        ts_epoch = (sub["_ts"] - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds().values
         if len(flow_vals) < 1:
             return None
-        _trapz = getattr(np, "trapezoid", np.trapz)
         vol_l = max(0.0, float(_trapz(flow_vals, ts_epoch)))
         return {
             "volume_l":       vol_l,
