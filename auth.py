@@ -694,6 +694,41 @@ class AuthDatabase:
             finally:
                 conn.close()
 
+    def delete_user(self, user_id: int) -> bool:
+        """Delete a user and all their associated data.
+
+        Removes sessions and device assignments before removing the user record.
+        Returns True on success, False if an error occurred.
+        """
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute("DELETE FROM sessions WHERE user_id = %s", (user_id,))
+                cur.execute("DELETE FROM user_devices WHERE user_id = %s", (user_id,))
+                cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+                conn.execute("DELETE FROM user_devices WHERE user_id = ?", (user_id,))
+                conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
+
     def delete_session(self, session_id: str) -> bool:
         """Delete/logout a session."""
         if self.use_postgres:
