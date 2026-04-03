@@ -1,5 +1,5 @@
 """
-Reports page – on-demand PDF / HTML report generation with AI insights.
+Reports page – on-demand PDF report generation with AI insights.
 
 Accessible from the Streamlit sidebar navigation.
 """
@@ -21,7 +21,6 @@ from reporting import (
     compute_calculations,
     compute_volume_breakdown,
     create_charts,
-    build_html_report,
     build_pdf_report,
 )
 from shared_styles import apply_styles
@@ -259,11 +258,6 @@ with col_prev:
             charts = create_charts(df_window, selections)
 
             _logo_path = str(_ASSETS / "logo_wide.svg")
-            html_content = build_html_report(
-                selected_device_name, df_window, selections, calcs, charts,
-                logo_path=_logo_path,
-                volume_breakdown=vol_breakdown,
-            )
             pdf_bytes = build_pdf_report(
                 selected_device_name, df_window, selections, calcs, charts,
                 logo_path=_logo_path,
@@ -287,7 +281,6 @@ with col_prev:
             except Exception:
                 pass
 
-            st.session_state["last_report_html"] = html_content
             st.session_state["last_report_pdf"] = pdf_bytes
             st.session_state["last_report_name"] = (
                 f"eflow_{selected_device_id}_{report_type_key}_{datetime.now().strftime('%Y%m%d_%H%M')}"
@@ -327,16 +320,6 @@ with col_prev:
             file_name=f"{fname}.pdf",
             mime="application/pdf",
             type="primary",
-        )
-    elif "last_report_html" in st.session_state and st.session_state["last_report_html"]:
-        # Ultimate fallback: HTML download (should rarely be reached)
-        html_bytes = st.session_state["last_report_html"].encode("utf-8")
-        fname = st.session_state.get("last_report_name", "eflow_report")
-        st.download_button(
-            label="⬇️ Download HTML Report",
-            data=html_bytes,
-            file_name=f"{fname}.html",
-            mime="text/html",
         )
 
     if "last_report_df" in st.session_state:

@@ -15,6 +15,35 @@ import plotly.graph_objects as go
 
 from anomaly import AnomalyReport
 
+# ── Module-level constants ─────────────────────────────────────────────────
+
+# Metric formatting: keys map to format-string templates used in tables.
+_METRIC_FORMATS: Dict[str, str] = {
+    "count":          "{:.0f}",
+    "volume_liters":  "{:,.0f} L",
+    "volume_m3":      "{:,.3f} m³",
+}
+
+
+def _strip_html(text: str) -> str:
+    """Return plain text with all HTML tags removed (safe for PDF output)."""
+    from html.parser import HTMLParser
+
+    class _Stripper(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self._parts: List[str] = []
+
+        def handle_data(self, data: str) -> None:
+            self._parts.append(data)
+
+        def get_text(self) -> str:
+            return "".join(self._parts)
+
+    stripper = _Stripper()
+    stripper.feed(text)
+    return stripper.get_text()
+
 # For static image export of plotly charts
 # kaleido is optional; if unavailable, images will be skipped
 try:
@@ -165,7 +194,7 @@ def compute_volume_breakdown(
         ts_epoch = sub["_ts"].astype("int64").values / 1e9
         if len(flow_vals) < 1:
             return None
-        vol_l = max(0.0, float(np.trapz(flow_vals, ts_epoch))) if len(flow_vals) >= 2 else 0.0
+        vol_l = max(0.0, float(np.trapz(flow_vals, ts_epoch)))
         return {
             "volume_l":       vol_l,
             "volume_m3":      vol_l / 1_000.0,
@@ -575,11 +604,6 @@ def build_html_report(device_name: str,
         "range": "Range", "count": "Total Readings",
         "volume_liters": "Total Volume (L)", "volume_m3": "Total Volume (m³)",
     }
-    _METRIC_FORMATS: Dict[str, str] = {
-        "count":          "{:.0f}",
-        "volume_liters":  "{:,.0f} L",
-        "volume_m3":      "{:,.3f} m³",
-    }
 
     metrics_html = ""
     if selections.include_stats_table and calculations:
@@ -811,9 +835,7 @@ def _build_pdf_reportlab(device_name: str,
             if not df.empty else float(selections.time_window_hours)
         )
         narrative = _quality_narrative(ar, total_rows=len(df), period_hours=period_hours)
-        # Strip HTML tags for plain-text PDF narrative
-        import re as _re
-        plain_narrative = _re.sub(r'<[^>]+>', '', narrative)
+        plain_narrative = _strip_html(narrative)
 
         story.append(Paragraph('Data Quality Assessment', h2_style))
         story.append(Paragraph(plain_narrative, body_style))
@@ -884,11 +906,6 @@ def _build_pdf_reportlab(device_name: str,
         'std': 'Std Deviation', 'p50': 'Median (P50)', 'p95': '95th Percentile (P95)',
         'range': 'Range', 'count': 'Total Readings',
         'volume_liters': 'Total Volume (L)', 'volume_m3': 'Total Volume (m³)',
-    }
-    _METRIC_FORMATS: Dict[str, str] = {
-        'count':         '{:.0f}',
-        'volume_liters': '{:,.0f} L',
-        'volume_m3':     '{:,.3f} m³',
     }
     if selections.include_stats_table and calculations:
         story.append(Paragraph('Summary Statistics', h2_style))
