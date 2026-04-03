@@ -56,6 +56,14 @@ class ReportSelections:
     site_id: str = ""
     location: str = ""
     anomaly_report: Optional[AnomalyReport] = field(default=None)
+    # Content toggles
+    include_stats_table: bool = True
+    include_charts: bool = True
+    include_volume_breakdown: bool = False
+    volume_breakdown_interval: str = "daily"   # "daily" | "am_pm" | "hourly"
+    # Metadata
+    report_timezone: str = "Australia/Brisbane"
+    custom_title: str = ""
 
 
 def compute_calculations(df: pd.DataFrame, selections: ReportSelections) -> Dict[str, Dict[str, float]]:
@@ -118,8 +126,235 @@ def compute_calculations(df: pd.DataFrame, selections: ReportSelections) -> Dict
     return results
 
 
+def compute_volume_breakdown(
+    df: pd.DataFrame,
+    interval: str = "daily",
+    tz: str = "Australia/Brisbane",
+) -> List[Dict]:
+    """Compute flow volume totals broken down by time period.
+
+    Parameters
+    ----------
+    df       : DataFrame with 'timestamp' and 'flow_lps' columns.
+    interval : "daily" | "am_pm" | "hourly"
+    tz       : IANA timezone used for period grouping.
+
+    Returns
+    -------
+    List of dicts with keys:
+        period_label, is_subtotal, is_grand_total,
+        volume_l, volume_m3, volume_ml,
+        mean_flow_lps, peak_flow_lps, reading_count
+    """
+    if df is None or df.empty or "flow_lps" not in df.columns:
+        return []
+
+    dfx = df.copy()
+    dfx["_ts"] = pd.to_datetime(dfx["timestamp"], utc=True)
+    dfx["_flow"] = pd.to_numeric(dfx["flow_lps"], errors="coerce")
+    dfx = dfx.dropna(subset=["_flow", "_ts"]).sort_values("_ts")
+    if dfx.empty:
+        return []
+
+    local_ts = dfx["_ts"].dt.tz_convert(tz)
+    dfx["_local_date"] = local_ts.dt.date
+    dfx["_local_hour"] = local_ts.dt.hour
+
+    def _integrate(sub: pd.DataFrame) -> Optional[Dict]:
+        flow_vals = sub["_flow"].values
+        ts_epoch = sub["_ts"].astype("int64").values / 1e9
+        if len(flow_vals) < 1:
+            return None
+        vol_l = max(0.0, float(np.trapz(flow_vals, ts_epoch))) if len(flow_vals) >= 2 else 0.0
+        return {
+            "volume_l":       vol_l,
+            "volume_m3":      vol_l / 1_000.0,
+            "volume_ml":      vol_l / 1_000_000.0,
+            "mean_flow_lps":  float(flow_vals.mean()),
+            "peak_flow_lps":  float(flow_vals.max()),
+            "reading_count":  int(len(flow_vals)),
+        }
+
+    rows: List[Dict] = []
+
+    if interval == "hourly":
+        dfx["_group"] = local_ts.dt.strftime("%Y-%m-%d_%H")
+        for group_key in sorted(dfx["_group"].unique()):
+            sub = dfx[dfx["_group"] == group_key]
+            r = _integrate(sub)
+            if r is None:
+                continue
+            dt_part, h_part = group_key.rsplit("_", 1)
+            label = f"{pd.Timestamp(dt_part).strftime('%d/%m/%Y')} {h_part}:00–{h_part}:59"
+            rows.append({"period_label": label, "is_subtotal": False, "is_grand_total": False, **r})
+        # Grand total
+        if rows:
+            total_l = sum(r["volume_l"] for r in rows)
+            all_r = _integrate(dfx)
+            if all_r:
+                rows.append({
+                    "period_label": "Period Total",
+                    "is_subtotal": False, "is_grand_total": True,
+                    "volume_l": total_l, "volume_m3": total_l / 1_000.0,
+                    "volume_ml": total_l / 1_000_000.0,
+                    "mean_flow_lps": all_r["mean_flow_lps"],
+                    "peak_flow_lps": all_r["peak_flow_lps"],
+                    "reading_count": all_r["reading_count"],
+                })
+
+    elif interval == "am_pm":
+        dates = sorted(dfx["_local_date"].unique())
+        for date in dates:
+            day_df = dfx[dfx["_local_date"] == date]
+            date_str = date.strftime("%d/%m/%Y")
+            half_vols: List[float] = []
+            for is_am in [True, False]:
+                half_label = "AM  (00:00–11:59)" if is_am else "PM  (12:00–23:59)"
+                half_df = day_df[day_df["_local_hour"] < 12] if is_am else day_df[day_df["_local_hour"] >= 12]
+                r = _integrate(half_df)
+                if r is None or r["reading_count"] == 0:
+                    continue
+                rows.append({
+                    "period_label": f"{date_str}  {half_label}",
+                    "is_subtotal": False, "is_grand_total": False, **r,
+                })
+                half_vols.append(r["volume_l"])
+            # Daily subtotal
+            if half_vols:
+                day_r = _integrate(day_df)
+                day_total_l = sum(half_vols)
+                if day_r:
+                    rows.append({
+                        "period_label": f"{date_str}  Daily Total",
+                        "is_subtotal": True, "is_grand_total": False,
+                        "volume_l":      day_total_l,
+                        "volume_m3":     day_total_l / 1_000.0,
+                        "volume_ml":     day_total_l / 1_000_000.0,
+                        "mean_flow_lps": day_r["mean_flow_lps"],
+                        "peak_flow_lps": day_r["peak_flow_lps"],
+                        "reading_count": day_r["reading_count"],
+                    })
+        # Grand total from all half-day rows
+        half_rows = [r for r in rows if not r["is_subtotal"] and not r["is_grand_total"]]
+        if half_rows:
+            grand_l = sum(r["volume_l"] for r in half_rows)
+            all_r = _integrate(dfx)
+            if all_r:
+                rows.append({
+                    "period_label": "Period Total",
+                    "is_subtotal": False, "is_grand_total": True,
+                    "volume_l":      grand_l,
+                    "volume_m3":     grand_l / 1_000.0,
+                    "volume_ml":     grand_l / 1_000_000.0,
+                    "mean_flow_lps": all_r["mean_flow_lps"],
+                    "peak_flow_lps": all_r["peak_flow_lps"],
+                    "reading_count": all_r["reading_count"],
+                })
+
+    else:  # daily
+        dfx["_group"] = local_ts.dt.strftime("%Y-%m-%d")
+        for group_key in sorted(dfx["_group"].unique()):
+            sub = dfx[dfx["_group"] == group_key]
+            r = _integrate(sub)
+            if r is None:
+                continue
+            label = pd.Timestamp(group_key).strftime("%d/%m/%Y")
+            rows.append({"period_label": label, "is_subtotal": False, "is_grand_total": False, **r})
+        if rows:
+            total_l = sum(r["volume_l"] for r in rows)
+            all_r = _integrate(dfx)
+            if all_r:
+                rows.append({
+                    "period_label": "Period Total",
+                    "is_subtotal": False, "is_grand_total": True,
+                    "volume_l":      total_l,
+                    "volume_m3":     total_l / 1_000.0,
+                    "volume_ml":     total_l / 1_000_000.0,
+                    "mean_flow_lps": all_r["mean_flow_lps"],
+                    "peak_flow_lps": all_r["peak_flow_lps"],
+                    "reading_count": all_r["reading_count"],
+                })
+
+    return rows
+
+
+# Human-readable descriptions for each anomaly type used in the report narrative.
+_ANOMALY_DESCRIPTIONS = {
+    "flatline":       "sensor flatline event(s) — consecutive identical readings "
+                      "(may reflect genuinely stable flow; verify with field records)",
+    "spike":          "rapid rate-of-change alert(s) — abrupt transitions between "
+                      "consecutive readings that may warrant operator review",
+    "dropout":        "data gap(s) — period(s) where no measurements were recorded, "
+                      "likely due to a temporary communications interruption",
+    "out_of_range":   "out-of-range reading(s) — values outside physically plausible "
+                      "instrument bounds; recommend inspection",
+    "velocity_depth": "hydraulic inconsistenc(ies) — velocity unusually high relative "
+                      "to the measured water depth",
+    "zscore":         "statistical outlier(s) — readings significantly outside the "
+                      "rolling measurement baseline",
+}
+
+
+def _quality_narrative(ar: "AnomalyReport", total_rows: int, period_hours: float) -> str:
+    """Return a plain-English data quality narrative for inclusion in reports."""
+    hours_str = f"{period_hours:.1f} hours" if period_hours < 48 else f"{period_hours / 24:.1f} days"
+
+    if not ar.flags:
+        return (
+            f"The automated quality analysis reviewed {total_rows:,} measurements spanning "
+            f"{hours_str}. No data quality events were identified. The monitoring equipment "
+            f"is operating within expected parameters and the collected data is suitable for "
+            f"operational decision-making and regulatory reporting."
+        )
+
+    label_map = {"High": "High", "Medium": "Medium", "Low": "Low"}
+    qual = label_map.get(ar.quality_label, ar.quality_label)
+
+    opening = (
+        f"The automated quality analysis reviewed {total_rows:,} measurements spanning "
+        f"{hours_str}. Overall data quality is assessed as <strong>{qual}</strong> "
+        f"(confidence score {ar.confidence_score:.0f}/100). "
+    )
+
+    findings: List[str] = []
+    type_counts = [
+        (ar.flatline_count,       "flatline"),
+        (ar.spike_count,          "spike"),
+        (ar.dropout_count,        "dropout"),
+        (ar.out_of_range_count,   "out_of_range"),
+        (ar.velocity_depth_count, "velocity_depth"),
+        (ar.zscore_count,         "zscore"),
+    ]
+    for count, atype in type_counts:
+        if count:
+            findings.append(f"{count} {_ANOMALY_DESCRIPTIONS[atype]}")
+
+    if findings:
+        closing = "Events identified for review: " + "; ".join(findings) + ". "
+    else:
+        closing = "No significant data quality concerns were identified. "
+
+    if ar.quality_label == "High":
+        advice = (
+            "The data is suitable for operational reporting. Flagged events are provided "
+            "for information only and do not materially affect data integrity."
+        )
+    elif ar.quality_label == "Medium":
+        advice = (
+            "The data is suitable for general operational use. The flagged periods should "
+            "be reviewed before submitting data for regulatory compliance."
+        )
+    else:
+        advice = (
+            "The flagged data should be carefully reviewed before use in regulatory "
+            "submissions or formal engineering assessments."
+        )
+
+    return opening + closing + advice
+
+
 def create_charts(df: pd.DataFrame, selections: ReportSelections) -> Dict[str, go.Figure]:
-    """Create time-series charts for selected variables."""
+    """Create time-series charts for selected variables with brand styling."""
     charts: Dict[str, go.Figure] = {}
     if df.empty:
         return charts
@@ -127,11 +362,47 @@ def create_charts(df: pd.DataFrame, selections: ReportSelections) -> Dict[str, g
     dfx["timestamp"] = pd.to_datetime(dfx["timestamp"], utc=True)
     dfx = dfx.sort_values("timestamp")
 
+    _COLOURS = {
+        "depth_mm":     "#3A7F5F",
+        "velocity_mps": "#2A9D8F",
+        "flow_lps":     "#1D4E89",
+    }
+    _YLABELS = {
+        "depth_mm":     "Water Depth (mm)",
+        "velocity_mps": "Flow Velocity (m/s)",
+        "flow_lps":     "Flow Rate (L/s)",
+    }
+    _TITLES = {
+        "depth_mm":     "Water Depth",
+        "velocity_mps": "Flow Velocity",
+        "flow_lps":     "Flow Rate",
+    }
+
     for var in selections.variables:
         if var not in dfx.columns:
             continue
-        fig = px.line(dfx, x="timestamp", y=var, title=f"{selections.device_name} — {var}")
-        fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=320)
+        colour = _COLOURS.get(var, "#3A7F5F")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=dfx["timestamp"],
+            y=pd.to_numeric(dfx[var], errors="coerce"),
+            mode="lines",
+            line=dict(color=colour, width=1.5),
+            name=_TITLES.get(var, var),
+        ))
+        fig.update_layout(
+            title=dict(
+                text=f"{selections.device_name} — {_TITLES.get(var, var)}",
+                font=dict(size=13, color="#4A4A4A"),
+            ),
+            xaxis=dict(title="Time", gridcolor="#E5E7EB"),
+            yaxis=dict(title=_YLABELS.get(var, var), gridcolor="#E5E7EB"),
+            plot_bgcolor="#FFFFFF",
+            paper_bgcolor="#FFFFFF",
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=320,
+            font=dict(family="Helvetica, Arial, sans-serif", color="#4A4A4A"),
+        )
         charts[var] = fig
     return charts
 
@@ -153,7 +424,8 @@ def build_html_report(device_name: str,
                       selections: ReportSelections,
                       calculations: Dict[str, Dict[str, float]],
                       charts: Dict[str, go.Figure],
-                      logo_path: Optional[str] = None) -> str:
+                      logo_path: Optional[str] = None,
+                      volume_breakdown: Optional[List[Dict]] = None) -> str:
     """Generate an HTML report string with embedded charts, metrics, AI insights, and optional logo."""
     # Header and metadata
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -164,14 +436,18 @@ def build_html_report(device_name: str,
         "custom": "Custom Report",
     }.get(selections.report_type, "Technical Report")
 
+    display_title = selections.custom_title or f"e-flow {report_type_label}"
+
     # Period label
     if not df.empty:
         ts = pd.to_datetime(df["timestamp"], utc=True)
         period_start = ts.min().strftime("%Y-%m-%d %H:%M")
         period_end = ts.max().strftime("%Y-%m-%d %H:%M")
         period_label = f"{period_start} → {period_end}"
+        period_hours = (ts.max() - ts.min()).total_seconds() / 3600.0
     else:
         period_label = f"Last {selections.time_window_hours} hours"
+        period_hours = float(selections.time_window_hours)
 
     # Logo HTML (if provided) — supports PNG and SVG
     logo_html = ""
@@ -185,58 +461,171 @@ def build_html_report(device_name: str,
         except Exception:
             pass
 
-    # AI insights section
+    # ── AI / Data Quality section ────────────────────────────────────────────
     ar: Optional[AnomalyReport] = selections.anomaly_report
     if ar is not None:
         qual_color = {"High": "#4CAF50", "Medium": "#F4B400", "Low": "#D93025"}.get(ar.quality_label, "#333")
         qual_bg = {"High": "#E8F5E9", "Medium": "#FFF8E1", "Low": "#FDECEA"}.get(ar.quality_label, "#f9fafb")
+        narrative = _quality_narrative(ar, total_rows=len(df), period_hours=period_hours)
+
+        # Only list anomaly types that actually occurred
+        type_rows = ""
+        type_map = [
+            ("Sensor Flatline Events", ar.flatline_count),
+            ("Rapid Rate-of-Change Alerts", ar.spike_count),
+            ("Data Gaps", ar.dropout_count),
+            ("Out-of-Range Readings", ar.out_of_range_count),
+            ("Hydraulic Inconsistencies", ar.velocity_depth_count),
+            ("Statistical Outliers", ar.zscore_count),
+        ]
+        for label, count in type_map:
+            if count:
+                type_rows += f"<tr><td>{label}</td><td>{count}</td></tr>"
+
+        type_table = (
+            f"<table><thead><tr><th>Event Type</th><th>Count</th></tr></thead>"
+            f"<tbody>{type_rows}</tbody></table>"
+        ) if type_rows else ""
+
         ai_html = f"""
         <div class='section card' style='border-left: 4px solid {qual_color}; background: {qual_bg};'>
-          <h2>AI Insights &amp; Data Quality</h2>
-          <p><strong>Data Confidence Rating:</strong>
-             <span style='color:{qual_color}; font-weight:700; font-size:1.1em;'>{ar.quality_label}</span>
-             ({ar.confidence_score:.1f}/100)
-          </p>
-          <p><strong>Anomalies Detected:</strong> {len(ar.flags)}</p>
-          <p><strong>Summary:</strong> {ar.summary}</p>
-          <table>
-            <thead><tr><th>Anomaly Type</th><th>Count</th></tr></thead>
-            <tbody>
-              <tr><td>Flatline</td><td>{ar.flatline_count}</td></tr>
-              <tr><td>Spike</td><td>{ar.spike_count}</td></tr>
-              <tr><td>Data Gaps (Dropouts)</td><td>{ar.dropout_count}</td></tr>
-              <tr><td>Out-of-Range</td><td>{ar.out_of_range_count}</td></tr>
-              <tr><td>Velocity/Depth Inconsistency</td><td>{ar.velocity_depth_count}</td></tr>
-              <tr><td>Statistical Outlier (Z-score)</td><td>{ar.zscore_count}</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class='section card'>
-          <h2>Data Quality Summary</h2>
-          <table>
-            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
-            <tbody>
-              <tr><td>Valid Data</td><td>{ar.pct_valid:.1f}%</td></tr>
-              <tr><td>Flagged Data</td><td>{ar.pct_flagged:.1f}%</td></tr>
-              <tr><td>Total Data Points</td><td>{len(df)}</td></tr>
-              <tr><td>Anomaly Flags</td><td>{len(ar.flags)}</td></tr>
-            </tbody>
-          </table>
+          <h2>Data Quality Assessment</h2>
+          <p style='margin-bottom:10px;'>{narrative}</p>
+          <div style='display:flex;gap:24px;margin-bottom:10px;'>
+            <div>
+              <span style='font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:600;'>Quality Rating</span><br/>
+              <span style='color:{qual_color};font-weight:700;font-size:1.2em;'>{ar.quality_label}</span>
+            </div>
+            <div>
+              <span style='font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:600;'>Confidence Score</span><br/>
+              <span style='font-weight:700;font-size:1.2em;'>{ar.confidence_score:.1f} / 100</span>
+            </div>
+            <div>
+              <span style='font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:600;'>Readings Reviewed</span><br/>
+              <span style='font-weight:700;font-size:1.2em;'>{len(df):,}</span>
+            </div>
+            <div>
+              <span style='font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:600;'>Events Identified</span><br/>
+              <span style='font-weight:700;font-size:1.2em;'>{len(ar.flags)}</span>
+            </div>
+          </div>
+          {type_table}
         </div>
         """
     else:
         ai_html = ""
 
+    # ── Volume breakdown section ─────────────────────────────────────────────
+    vol_html = ""
+    if selections.include_volume_breakdown and volume_breakdown:
+        interval_labels = {
+            "daily": "Daily",
+            "am_pm": "AM / PM &amp; Daily",
+            "hourly": "Hourly",
+        }
+        interval_label = interval_labels.get(selections.volume_breakdown_interval, "")
+        vol_rows_html = ""
+        for row in volume_breakdown:
+            if row.get("is_grand_total"):
+                style = "font-weight:700; background:#E8F3EE;"
+            elif row.get("is_subtotal"):
+                style = "font-weight:600; background:#F4F5F4;"
+            else:
+                style = ""
+            vol_rows_html += (
+                f"<tr style='{style}'>"
+                f"<td style='text-align:left'>{html.escape(row['period_label'])}</td>"
+                f"<td>{row['volume_m3']:,.1f}</td>"
+                f"<td>{row['volume_ml']:.4f}</td>"
+                f"<td>{row['mean_flow_lps']:.2f}</td>"
+                f"<td>{row['peak_flow_lps']:.2f}</td>"
+                f"<td>{row['reading_count']:,}</td>"
+                f"</tr>"
+            )
+        vol_html = f"""
+        <div class='section card'>
+          <h2>Flow Volume Breakdown — {interval_label}</h2>
+          <table>
+            <thead>
+              <tr>
+                <th style='text-align:left'>Period</th>
+                <th>Volume (m³)</th>
+                <th>Volume (ML)</th>
+                <th>Mean Flow (L/s)</th>
+                <th>Peak Flow (L/s)</th>
+                <th>Readings</th>
+              </tr>
+            </thead>
+            <tbody>{vol_rows_html}</tbody>
+          </table>
+          <p class='small'>1 m³ = 1 kL &nbsp;·&nbsp; 1 ML = 1,000 m³ = 1,000,000 L &nbsp;·&nbsp;
+          Volumes computed by trapezoidal integration of flow rate over time.</p>
+        </div>
+        """
+
+    # ── Metrics (Summary Statistics) section ────────────────────────────────
+    _VAR_LABELS = {
+        "depth_mm":     "Water Depth (mm)",
+        "velocity_mps": "Flow Velocity (m/s)",
+        "flow_lps":     "Flow Rate (L/s)",
+    }
+    _METRIC_LABELS = {
+        "mean": "Mean", "max": "Maximum", "min": "Minimum",
+        "std": "Std Deviation", "p50": "Median (P50)", "p95": "95th Percentile (P95)",
+        "range": "Range", "count": "Total Readings",
+        "volume_liters": "Total Volume (L)", "volume_m3": "Total Volume (m³)",
+    }
+    _METRIC_FORMATS: Dict[str, str] = {
+        "count":          "{:.0f}",
+        "volume_liters":  "{:,.0f} L",
+        "volume_m3":      "{:,.3f} m³",
+    }
+
+    metrics_html = ""
+    if selections.include_stats_table and calculations:
+        metrics_html = "<div class='section card'><h2>Summary Statistics</h2>"
+        for var, stats in calculations.items():
+            if not stats:
+                continue
+            metrics_html += f"<h3>{_VAR_LABELS.get(var, var)}</h3>"
+            metrics_html += "<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>"
+            for k, v in stats.items():
+                fmt = _METRIC_FORMATS.get(k, "{:.3f}")
+                formatted = fmt.format(v)
+                metrics_html += f"<tr><td>{_METRIC_LABELS.get(k, k)}</td><td>{formatted}</td></tr>"
+            metrics_html += "</tbody></table>"
+        metrics_html += "</div>"
+
+    # ── Charts section ───────────────────────────────────────────────────────
+    charts_html = ""
+    if selections.include_charts and charts:
+        charts_html = "<div class='section card'><h2>Time-Series Charts</h2>"
+        for var, fig in charts.items():
+            b64 = fig_to_base64_png(fig)
+            if b64:
+                charts_html += (
+                    f"<h3>{_VAR_LABELS.get(var, var)}</h3>"
+                    f"<img src='data:image/png;base64,{b64}' "
+                    f"style='max-width:100%;height:auto;border:1px solid #eee;border-radius:6px;'/>"
+                )
+            else:
+                charts_html += (
+                    f"<h3>{_VAR_LABELS.get(var, var)}</h3>"
+                    + fig.to_html(include_plotlyjs="cdn", full_html=False)
+                )
+        charts_html += "</div>"
+
     intro = f"""
     <html>
       <head>
         <meta charset='utf-8'/>
-        <title>e-flow {report_type_label} — {device_name}</title>
+        <title>{html.escape(display_title)} — {html.escape(device_name)}</title>
         <style>
           body {{ font-family: -apple-system, Segoe UI, Roboto, Inter, sans-serif; color: #4A4A4A; margin: 40px; background: #F4F5F4; }}
-          h1, h2 {{ font-weight: 600; color: #4A4A4A; }}
+          h1, h2, h3 {{ font-weight: 600; color: #4A4A4A; }}
           h1 {{ margin-top: 0; color: #3A7F5F; }}
           h2 {{ color: #2F6B50; }}
+          h3 {{ color: #3A7F5F; font-size: 1em; margin-top: 12px; }}
           .header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-bottom: 3px solid #3A7F5F; padding-bottom: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(58,127,95,0.08); }}
           .header-left {{ display: flex; align-items: center; gap: 20px; }}
           .section {{ margin: 24px 0; }}
@@ -244,11 +633,9 @@ def build_html_report(device_name: str,
           table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
           th, td {{ border: 1px solid #D9D9D9; padding: 10px; text-align: right; }}
           th {{ background: #E8F3EE; text-align: left; font-weight: 600; color: #2F6B50; }}
+          td:first-child {{ text-align: left; }}
           .small {{ color: #6b7280; font-size: 12px; margin-top: 8px; }}
-          .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }}
-          .metric-box {{ border: 1px solid #D9D9D9; padding: 12px; border-radius: 8px; background: white; }}
-          .metric-label {{ color: #6b7280; font-size: 12px; font-weight: 500; text-transform: uppercase; }}
-          .metric-value {{ font-size: 18px; font-weight: 600; color: #3A7F5F; margin-top: 4px; }}
+          .footer {{ margin-top: 40px; padding-top: 12px; border-top: 1px solid #D9D9D9; font-size: 11px; color: #9ca3af; text-align: center; }}
         </style>
       </head>
       <body>
@@ -256,7 +643,7 @@ def build_html_report(device_name: str,
           <div class='header-left'>
             {logo_html}
             <div>
-              <h1>e-flow {report_type_label}</h1>
+              <h1>{html.escape(display_title)}</h1>
               <div class='small'>Generated: {generated_at}</div>
             </div>
           </div>
@@ -264,65 +651,37 @@ def build_html_report(device_name: str,
 
         <div class='section card'>
           <h2>Site Information</h2>
-          <p><strong>Station:</strong> {html.escape(device_name)}</p>
-          {'<p><strong>Site ID:</strong> ' + html.escape(selections.site_id) + '</p>' if selections.site_id else ''}
-          {'<p><strong>Location:</strong> ' + html.escape(selections.location) + '</p>' if selections.location else ''}
-          <p><strong>Monitoring Period:</strong> {html.escape(period_label)}</p>
-          <p><strong>Variables:</strong> {html.escape(', '.join(selections.variables))}</p>
-          <p><strong>Data Points:</strong> {len(df)}</p>
-        </div>
-
-        {ai_html}
-
-        <div class='section card'>
-          <h2>Metrics Glossary</h2>
           <table>
-            <thead><tr><th>Metric</th><th>Definition</th></tr></thead>
+            <thead><tr><th>Field</th><th>Detail</th></tr></thead>
             <tbody>
-              <tr><td><strong>mean</strong></td><td>Average value across all measurements in the time window</td></tr>
-              <tr><td><strong>max</strong></td><td>Highest value recorded</td></tr>
-              <tr><td><strong>min</strong></td><td>Lowest value recorded</td></tr>
-              <tr><td><strong>std</strong></td><td>Standard deviation — how spread out values are from the mean (variability indicator)</td></tr>
-              <tr><td><strong>p50</strong></td><td>Median (50th percentile) — middle value where 50% of data falls below and 50% above</td></tr>
-              <tr><td><strong>p95</strong></td><td>95th percentile — value below which 95% of measurements fall; useful for high-flow/capacity analysis</td></tr>
-              <tr><td><strong>range</strong></td><td>Difference between maximum and minimum values</td></tr>
-              <tr><td><strong>count</strong></td><td>Total number of measurements in the time window</td></tr>
-              <tr><td><strong>volume</strong></td><td>Total flow volume integrated over time (flow_lps only) — reported in liters and cubic meters</td></tr>
+              <tr><td>Station</td><td>{html.escape(device_name)}</td></tr>
+              {'<tr><td>Site ID</td><td>' + html.escape(selections.site_id) + '</td></tr>' if selections.site_id else ''}
+              {'<tr><td>Location</td><td>' + html.escape(selections.location) + '</td></tr>' if selections.location else ''}
+              <tr><td>Monitoring Period</td><td>{html.escape(period_label)}</td></tr>
+              <tr><td>Variables Analysed</td><td>{html.escape(', '.join(_VAR_LABELS.get(v, v) for v in selections.variables))}</td></tr>
+              <tr><td>Total Readings</td><td>{len(df):,}</td></tr>
             </tbody>
           </table>
         </div>
+
+        {ai_html}
+        {vol_html}
+        {metrics_html}
+        {charts_html}
+
+        <div class='footer'>e-flow™ by EDS — Hydrological Intelligence Platform</div>
+      </body>
+    </html>
     """
-
-    # Metrics table
-    metrics_html = "<div class='section card'><h2>Summary Statistics</h2>"
-    for var, stats in calculations.items():
-        metrics_html += f"<h3>{var}</h3>"
-        metrics_html += "<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>"
-        for k, v in stats.items():
-            metrics_html += f"<tr><td>{k}</td><td>{v:.3f}</td></tr>"
-        metrics_html += "</tbody></table>"
-    metrics_html += "</div>"
-
-    # Charts
-    charts_html = "<div class='section card'><h2>Charts</h2>"
-    for var, fig in charts.items():
-        b64 = fig_to_base64_png(fig)
-        if b64:
-            charts_html += f"<h3>{var}</h3><img src='data:image/png;base64,{b64}' style='max-width:100%;height:auto;border:1px solid #eee;border-radius:6px;'/>"
-        else:
-            charts_html += f"<h3>{var}</h3>" + fig.to_html(include_plotlyjs="cdn", full_html=False)
-    charts_html += "</div>"
-
-    outro = "</body></html>"
-
-    return intro + metrics_html + charts_html + outro
+    return intro
 
 
 def _build_pdf_reportlab(device_name: str,
                          df: pd.DataFrame,
                          selections: ReportSelections,
                          calculations: Dict[str, Dict[str, float]],
-                         charts: Dict[str, go.Figure]) -> bytes:
+                         charts: Dict[str, go.Figure],
+                         volume_breakdown: Optional[List[Dict]] = None) -> bytes:
     """Generate a professional PDF using reportlab (pure Python, no system deps)."""
     buf = io.BytesIO()
 
@@ -340,6 +699,8 @@ def _build_pdf_reportlab(device_name: str,
     C_GREEN = rl_colors.HexColor('#3A7F5F')
     C_DARK_GREEN = rl_colors.HexColor('#2F6B50')
     C_LIGHT_GREEN = rl_colors.HexColor('#E8F3EE')
+    C_SUBTOTAL = rl_colors.HexColor('#F4F5F4')
+    C_TOTAL = rl_colors.HexColor('#D6EDE3')
     C_TEXT = rl_colors.HexColor('#4A4A4A')
     C_MUTED = rl_colors.HexColor('#6b7280')
     C_BORDER = rl_colors.HexColor('#D9D9D9')
@@ -374,23 +735,26 @@ def _build_pdf_reportlab(device_name: str,
         'Footer', parent=small_style, alignment=TA_CENTER, spaceBefore=4,
     )
 
-    def _tbl(data, col_widths=None):
+    def _tbl(data, col_widths=None, extra_styles=None):
         t = Table(data, colWidths=col_widths)
-        t.setStyle(TableStyle([
-            ('BACKGROUND',   (0, 0), (-1, 0), C_LIGHT_GREEN),
-            ('TEXTCOLOR',    (0, 0), (-1, 0), C_DARK_GREEN),
-            ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE',     (0, 0), (-1, -1), 9),
-            ('FONTNAME',     (0, 1), (-1, -1), 'Helvetica'),
+        styles = [
+            ('BACKGROUND',    (0, 0), (-1, 0), C_LIGHT_GREEN),
+            ('TEXTCOLOR',     (0, 0), (-1, 0), C_DARK_GREEN),
+            ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE',      (0, 0), (-1, -1), 9),
+            ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, C_ROW_ALT]),
-            ('GRID',         (0, 0), (-1, -1), 0.5, C_BORDER),
-            ('ALIGN',        (1, 0), (-1, -1), 'RIGHT'),
-            ('ALIGN',        (0, 0), (0, -1), 'LEFT'),
-            ('TOPPADDING',   (0, 0), (-1, -1), 5),
+            ('GRID',          (0, 0), (-1, -1), 0.5, C_BORDER),
+            ('ALIGN',         (1, 0), (-1, -1), 'RIGHT'),
+            ('ALIGN',         (0, 0), (0, -1), 'LEFT'),
+            ('TOPPADDING',    (0, 0), (-1, -1), 5),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING',  (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ]))
+            ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 8),
+        ]
+        if extra_styles:
+            styles.extend(extra_styles)
+        t.setStyle(TableStyle(styles))
         return t
 
     story = []
@@ -401,14 +765,21 @@ def _build_pdf_reportlab(device_name: str,
         'monthly': 'Monthly Summary', 'custom': 'Custom Report',
     }.get(selections.report_type, 'Technical Report')
 
+    display_title = selections.custom_title or f'e-flow™ {report_type_label}'
     generated_at = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
-    story.append(Paragraph(f'e-flow™ {report_type_label}', title_style))
+    story.append(Paragraph(html.escape(display_title), title_style))
     story.append(Paragraph(f'Generated: {generated_at}', small_style))
     story.append(HRFlowable(width='100%', thickness=2, color=C_GREEN, spaceAfter=10))
 
     # ── Site information ─────────────────────────────────────────────────────
     story.append(Paragraph('Site Information', h2_style))
+
+    VAR_LABELS = {
+        'depth_mm': 'Water Depth (mm)',
+        'velocity_mps': 'Flow Velocity (m/s)',
+        'flow_lps': 'Flow Rate (L/s)',
+    }
 
     if not df.empty:
         ts = pd.to_datetime(df['timestamp'], utc=True)
@@ -418,75 +789,123 @@ def _build_pdf_reportlab(device_name: str,
     else:
         period_label = f'Last {selections.time_window_hours} hours'
 
-    site_rows = [['Field', 'Value'],
-                 ['Station', html.escape(device_name)]]
+    site_rows = [['Field', 'Value'], ['Station', html.escape(device_name)]]
     if selections.site_id:
         site_rows.append(['Site ID', html.escape(selections.site_id)])
     if selections.location:
         site_rows.append(['Location', html.escape(selections.location)])
     site_rows += [
         ['Monitoring Period', period_label],
-        ['Variables', ', '.join(selections.variables)],
-        ['Data Points', str(len(df))],
+        ['Variables', ', '.join(VAR_LABELS.get(v, v) for v in selections.variables)],
+        ['Total Readings', f'{len(df):,}'],
     ]
     story.append(_tbl(site_rows, col_widths=[55 * mm, USABLE_W - 55 * mm]))
     story.append(Spacer(1, 6 * mm))
 
-    # ── AI Insights ──────────────────────────────────────────────────────────
+    # ── Data Quality Assessment ──────────────────────────────────────────────
     ar: Optional[AnomalyReport] = selections.anomaly_report
     if ar is not None:
-        story.append(Paragraph('AI Insights & Data Quality', h2_style))
+        period_hours = (
+            (pd.to_datetime(df['timestamp'], utc=True).max() -
+             pd.to_datetime(df['timestamp'], utc=True).min()).total_seconds() / 3600.0
+            if not df.empty else float(selections.time_window_hours)
+        )
+        narrative = _quality_narrative(ar, total_rows=len(df), period_hours=period_hours)
+        # Strip HTML tags for plain-text PDF narrative
+        import re as _re
+        plain_narrative = _re.sub(r'<[^>]+>', '', narrative)
+
+        story.append(Paragraph('Data Quality Assessment', h2_style))
+        story.append(Paragraph(plain_narrative, body_style))
+        story.append(Spacer(1, 3 * mm))
+
         ai_rows = [
             ['Metric', 'Value'],
-            ['Data Quality', ar.quality_label],
+            ['Quality Rating', ar.quality_label],
             ['Confidence Score', f'{ar.confidence_score:.1f} / 100'],
-            ['Total Anomalies', str(len(ar.flags))],
-            ['Valid Data', f'{ar.pct_valid:.1f}%'],
-            ['Flagged Data', f'{ar.pct_flagged:.1f}%'],
-            ['Flatline Events', str(ar.flatline_count)],
-            ['Spikes', str(ar.spike_count)],
-            ['Data Gaps', str(ar.dropout_count)],
-            ['Out-of-Range', str(ar.out_of_range_count)],
-            ['Statistical Outliers', str(ar.zscore_count)],
+            ['Events Identified', str(len(ar.flags))],
         ]
-        story.append(_tbl(ai_rows, col_widths=[80 * mm, USABLE_W - 80 * mm]))
-        if ar.summary:
-            story.append(Spacer(1, 3 * mm))
-            story.append(Paragraph(f'<i>Summary: {html.escape(ar.summary)}</i>', body_style))
+        type_map = [
+            ('Sensor Flatline Events', ar.flatline_count),
+            ('Rapid Rate-of-Change Alerts', ar.spike_count),
+            ('Data Gaps', ar.dropout_count),
+            ('Out-of-Range Readings', ar.out_of_range_count),
+            ('Hydraulic Inconsistencies', ar.velocity_depth_count),
+            ('Statistical Outliers', ar.zscore_count),
+        ]
+        for label, count in type_map:
+            if count:
+                ai_rows.append([label, str(count)])
+        story.append(_tbl(ai_rows, col_widths=[100 * mm, USABLE_W - 100 * mm]))
+        story.append(Spacer(1, 6 * mm))
+
+    # ── Flow Volume Breakdown ────────────────────────────────────────────────
+    if selections.include_volume_breakdown and volume_breakdown:
+        interval_labels = {
+            'daily': 'Daily', 'am_pm': 'AM / PM & Daily', 'hourly': 'Hourly',
+        }
+        story.append(Paragraph(
+            f"Flow Volume Breakdown — {interval_labels.get(selections.volume_breakdown_interval, '')}",
+            h2_style,
+        ))
+        # Column widths: Period 62, m³ 26, ML 22, Mean 26, Peak 26, Count 8
+        col_w = [62*mm, 26*mm, 22*mm, 26*mm, 26*mm, 8*mm]
+        vol_data = [['Period', 'Volume (m³)', 'Vol (ML)', 'Mean (L/s)', 'Peak (L/s)', 'N']]
+        extra_styles = []
+        for i, row in enumerate(volume_breakdown, start=1):
+            vol_data.append([
+                row['period_label'],
+                f"{row['volume_m3']:,.1f}",
+                f"{row['volume_ml']:.4f}",
+                f"{row['mean_flow_lps']:.2f}",
+                f"{row['peak_flow_lps']:.2f}",
+                str(row['reading_count']),
+            ])
+            if row.get('is_grand_total'):
+                extra_styles += [
+                    ('BACKGROUND', (0, i), (-1, i), C_TOTAL),
+                    ('FONTNAME',   (0, i), (-1, i), 'Helvetica-Bold'),
+                ]
+            elif row.get('is_subtotal'):
+                extra_styles += [
+                    ('BACKGROUND', (0, i), (-1, i), C_SUBTOTAL),
+                    ('FONTNAME',   (0, i), (-1, i), 'Helvetica-Bold'),
+                ]
+        story.append(_tbl(vol_data, col_widths=col_w, extra_styles=extra_styles))
+        story.append(Paragraph(
+            '1 m³ = 1 kL  ·  1 ML = 1,000 m³  ·  Volumes by trapezoidal integration.',
+            small_style,
+        ))
         story.append(Spacer(1, 6 * mm))
 
     # ── Summary statistics ───────────────────────────────────────────────────
-    if calculations:
+    METRIC_LABELS = {
+        'mean': 'Mean', 'max': 'Maximum', 'min': 'Minimum',
+        'std': 'Std Deviation', 'p50': 'Median (P50)', 'p95': '95th Percentile (P95)',
+        'range': 'Range', 'count': 'Total Readings',
+        'volume_liters': 'Total Volume (L)', 'volume_m3': 'Total Volume (m³)',
+    }
+    _METRIC_FORMATS: Dict[str, str] = {
+        'count':         '{:.0f}',
+        'volume_liters': '{:,.0f} L',
+        'volume_m3':     '{:,.3f} m³',
+    }
+    if selections.include_stats_table and calculations:
         story.append(Paragraph('Summary Statistics', h2_style))
-        VAR_LABELS = {
-            'depth_mm': 'Water Depth (mm)',
-            'velocity_mps': 'Flow Velocity (m/s)',
-            'flow_lps': 'Flow Rate (L/s)',
-        }
-        METRIC_LABELS = {
-            'mean': 'Mean', 'max': 'Maximum', 'min': 'Minimum',
-            'std': 'Std Deviation', 'p50': 'Median (P50)', 'p95': 'P95',
-            'range': 'Range', 'count': 'Count',
-            'volume_liters': 'Total Volume (L)', 'volume_m3': 'Total Volume (m³)',
-        }
         for var, stats in calculations.items():
             if not stats:
                 continue
             story.append(Paragraph(VAR_LABELS.get(var, var), h3_style))
             stat_rows = [['Metric', 'Value']] + [
-                [METRIC_LABELS.get(k, k), f'{v:,.3f}'] for k, v in stats.items()
+                [METRIC_LABELS.get(k, k), _METRIC_FORMATS.get(k, '{:,.3f}').format(v)]
+                for k, v in stats.items()
             ]
             story.append(_tbl(stat_rows, col_widths=[80 * mm, USABLE_W - 80 * mm]))
         story.append(Spacer(1, 6 * mm))
 
     # ── Charts ───────────────────────────────────────────────────────────────
-    if charts and _KALEIDO_AVAILABLE:
-        story.append(Paragraph('Charts', h2_style))
-        VAR_LABELS = {
-            'depth_mm': 'Water Depth (mm)',
-            'velocity_mps': 'Flow Velocity (m/s)',
-            'flow_lps': 'Flow Rate (L/s)',
-        }
+    if selections.include_charts and charts and _KALEIDO_AVAILABLE:
+        story.append(Paragraph('Time-Series Charts', h2_style))
         for var, fig in charts.items():
             b64 = fig_to_base64_png(fig)
             if b64:
@@ -510,7 +929,8 @@ def build_pdf_report(device_name: str,
                      selections: ReportSelections,
                      calculations: Dict[str, Dict[str, float]],
                      charts: Dict[str, go.Figure],
-                     logo_path: Optional[str] = None) -> bytes:
+                     logo_path: Optional[str] = None,
+                     volume_breakdown: Optional[List[Dict]] = None) -> bytes:
     """Generate a PDF report.
 
     Tries WeasyPrint first (richer HTML-CSS rendering); falls back to a
@@ -521,7 +941,8 @@ def build_pdf_report(device_name: str,
     if _WEASYPRINT_AVAILABLE:
         try:
             html_content = build_html_report(
-                device_name, df, selections, calculations, charts, logo_path
+                device_name, df, selections, calculations, charts, logo_path,
+                volume_breakdown=volume_breakdown,
             )
             pdf_bytes = HTML(string=html_content).write_pdf()
             if pdf_bytes:
@@ -533,7 +954,8 @@ def build_pdf_report(device_name: str,
     if _REPORTLAB_AVAILABLE:
         try:
             return _build_pdf_reportlab(
-                device_name, df, selections, calculations, charts
+                device_name, df, selections, calculations, charts,
+                volume_breakdown=volume_breakdown,
             )
         except Exception as e:
             print(f"reportlab PDF generation failed: {e}")

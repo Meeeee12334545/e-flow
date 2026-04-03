@@ -32,16 +32,16 @@ BOUNDS = {
 }
 
 # Thresholds that can be tuned
-FLATLINE_MIN_CONSECUTIVE = 5          # ≥N identical values = flatline
+FLATLINE_MIN_CONSECUTIVE = 12         # ≥N identical values = flatline (12 min at 1-min polling)
 SPIKE_RATE_LIMITS = {                 # max allowable change per minute
     "depth_mm": 500.0,                # mm/min
-    "velocity_mps": 3.0,              # m/s per minute
-    "flow_lps": 1000.0,               # L/s per minute
+    "velocity_mps": 5.0,              # m/s per minute (genuine storm surges can change fast)
+    "flow_lps": 2000.0,               # L/s per minute (pump starts, storm events)
 }
-ZSCORE_WINDOW = 20                    # rolling window for Z-score baseline
-ZSCORE_THRESHOLD = 3.5               # |Z| > threshold → anomaly
-DROPOUT_GAP_MINUTES = 5.0            # gap > N minutes = dropout
-VELOCITY_DEPTH_MIN_DEPTH = 20.0      # mm below which we skip hydraulic check
+ZSCORE_WINDOW = 60                    # rolling window for Z-score baseline (1 hour at 1-min polling)
+ZSCORE_THRESHOLD = 4.5               # |Z| > threshold → anomaly (tightened to reduce rain-event FP)
+DROPOUT_GAP_MINUTES = 15.0           # gap > N minutes = dropout (at least 2 missed polls)
+VELOCITY_DEPTH_MIN_DEPTH = 50.0      # mm below which we skip hydraulic check (shallow flow unreliable)
 VELOCITY_DEPTH_MAX_RATIO = 0.05      # max velocity (m/s) per mm of depth
 
 # Anomaly severity labels
@@ -118,7 +118,11 @@ def detect_out_of_range(df: pd.DataFrame, columns: List[str]) -> List[AnomalyFla
 
 
 def detect_flatline(df: pd.DataFrame, columns: List[str]) -> List[AnomalyFlag]:
-    """Detect sequences where a sensor outputs the same value consecutively."""
+    """Detect sequences where a sensor outputs the same value consecutively.
+
+    Emits a single flag per flatline event (at the first index of the run)
+    to avoid inflating flag counts for what may be genuinely stable flow.
+    """
     flags: List[AnomalyFlag] = []
     for col in columns:
         if col not in df.columns:
@@ -136,18 +140,21 @@ def detect_flatline(df: pd.DataFrame, columns: List[str]) -> List[AnomalyFlag]:
                 j += 1
             run_length = j - i
             if run_length >= FLATLINE_MIN_CONSECUTIVE:
-                # Flag every point in the flatline run
-                for k in range(i, j):
-                    orig_idx = original_indices[k]
-                    flags.append(AnomalyFlag(
-                        index=orig_idx,
-                        timestamp=pd.Timestamp(df.loc[orig_idx, "timestamp"]),
-                        column=col,
-                        anomaly_type="flatline",
-                        severity=SEVERITY_ANOMALY,
-                        description=f"{col} flatline ({series.iloc[i]:.3f}) for {run_length} consecutive readings",
-                        value=float(series.iloc[i]),
-                    ))
+                # One flag per event at the start of the run; note the duration so
+                # operators can judge whether stable flow explains it.
+                orig_idx = original_indices[i]
+                flags.append(AnomalyFlag(
+                    index=orig_idx,
+                    timestamp=pd.Timestamp(df.loc[orig_idx, "timestamp"]),
+                    column=col,
+                    anomaly_type="flatline",
+                    severity=SEVERITY_ANOMALY,
+                    description=(
+                        f"{col} flatline — value {series.iloc[i]:.3f} unchanged "
+                        f"for {run_length} consecutive readings"
+                    ),
+                    value=float(series.iloc[i]),
+                ))
             i = j
     return flags
 
@@ -369,19 +376,19 @@ def run_anomaly_detection(
 
     # Summary text
     if not all_flags:
-        report.summary = "No issues detected"
+        report.summary = "No data quality events identified"
     else:
         parts = []
         if report.flatline_count:
-            parts.append(f"{report.flatline_count} flatline reading(s)")
+            parts.append(f"{report.flatline_count} sensor flatline event(s)")
         if report.spike_count:
-            parts.append(f"{report.spike_count} spike(s)")
+            parts.append(f"{report.spike_count} rapid rate-of-change alert(s)")
         if report.dropout_count:
             parts.append(f"{report.dropout_count} data gap(s)")
         if report.out_of_range_count:
-            parts.append(f"{report.out_of_range_count} out-of-range value(s)")
+            parts.append(f"{report.out_of_range_count} out-of-range reading(s)")
         if report.velocity_depth_count:
-            parts.append(f"{report.velocity_depth_count} velocity/depth inconsistenc(ies)")
+            parts.append(f"{report.velocity_depth_count} hydraulic inconsistenc(ies)")
         if report.zscore_count:
             parts.append(f"{report.zscore_count} statistical outlier(s)")
         report.summary = "; ".join(parts)

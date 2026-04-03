@@ -28,6 +28,10 @@ build/
 
 # Database backups
 *.db-backup
+# Persistent data directory — ignore the SQLite files but keep the folder
+data/*.db
+data/*.db-shm
+data/*.db-wal
 flow_data.db-backup
 
 # Monitor lock file
