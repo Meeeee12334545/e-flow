@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Alternative data input method for e-flow
+Alternative data input method for EDS FlowSense (EDS-FS)
 Since the website uses heavy JavaScript that's difficult to scrape in this environment,
 this provides a way to manually input or import data.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple health check for e-flow monitor.
+Simple health check for EDS FlowSense (EDS-FS) monitor.
 
 Exit codes:
  0 = healthy (recent data present)

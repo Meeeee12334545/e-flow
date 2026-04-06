@@ -1,5 +1,5 @@
 """
-Site baseline learning and alarm advisory engine for e-flow EDS.
+Site baseline learning and alarm advisory engine for EDS FlowSense (EDS-FS).
 
 Analyses the long-term history of a monitoring site and produces:
   - Data sufficiency assessment (how much data exists and what analyses are unlocked)
@@ -756,7 +756,7 @@ def build_intelligence_pdf(
     story = []
     generated_at = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
 
-    story.append(Paragraph("e-flow™ Site Intelligence Report", title_style))
+    story.append(Paragraph("EDS FlowSense™ Site Intelligence Report", title_style))
     story.append(Paragraph(f"Alarm Advisory for: <b>{html.escape(device_name)}</b>", body_style))
     story.append(Paragraph(f"Generated: {generated_at}", small_style))
     story.append(HRFlowable(width="100%", thickness=2, color=C_GREEN, spaceAfter=10))
@@ -850,7 +850,7 @@ def build_intelligence_pdf(
     # ── Footer ────────────────────────────────────────────────────────────────
     story.append(Spacer(1, 6*mm))
     story.append(HRFlowable(width="100%", thickness=1, color=C_BORDER))
-    story.append(Paragraph("e-flow™ by EDS — Hydrological Intelligence Platform", footer_style))
+    story.append(Paragraph("EDS FlowSense™ — Hydrological Intelligence Platform", footer_style))
 
     doc.build(story)
     return buf.getvalue()

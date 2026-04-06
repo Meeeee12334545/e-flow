@@ -31,7 +31,7 @@ from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_pa
 
 # set_page_config MUST be the first Streamlit command in the script
 st.set_page_config(
-    page_title="e-flow | Hydrological Analytics",
+    page_title="EDS FlowSense | Hydrological Analytics",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -674,7 +674,7 @@ if page_mode == 'Simplified View':
             </svg>
             <div>
                 <p style="margin:0; font-size:0.82rem; font-weight:600; color:#3A7F5F; line-height:1.2;">Environmental Data Services</p>
-                <p style="margin:0; font-size:0.75rem; color:#6b7280; line-height:1.2;">e-flow™ sewer monitoring platform</p>
+                <p style="margin:0; font-size:0.75rem; color:#6b7280; line-height:1.2;">EDS FlowSense™ sewer monitoring platform</p>
             </div>
         </div>
         <p style="margin:0; font-size:0.75rem; color:#9ca3af;">
@@ -1212,7 +1212,7 @@ else:
 now_footer = datetime.now(pytz.timezone(DEFAULT_TZ))
 st.markdown(f"""
 <div class="app-footer">
-    <span class="app-footer-brand">e-flow™ by EDS</span>
+    <span class="app-footer-brand">EDS FlowSense™</span>
     <span class="app-footer-meta">
         {now_footer.strftime('%Y-%m-%d %H:%M %Z')} &nbsp;·&nbsp;
         Timezone: {DEFAULT_TZ} &nbsp;·&nbsp;

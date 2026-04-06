@@ -471,7 +471,7 @@ def build_html_report(device_name: str,
         "custom": "Custom Report",
     }.get(selections.report_type, "Technical Report")
 
-    display_title = selections.custom_title or f"e-flow {report_type_label}"
+    display_title = selections.custom_title or f"EDS FlowSense {report_type_label}"
 
     # Period label
     if not df.empty:
@@ -699,7 +699,7 @@ def build_html_report(device_name: str,
         {metrics_html}
         {charts_html}
 
-        <div class='footer'>e-flow™ by EDS — Hydrological Intelligence Platform</div>
+        <div class='footer'>EDS FlowSense™ — Hydrological Intelligence Platform</div>
       </body>
     </html>
     """
@@ -795,7 +795,7 @@ def _build_pdf_reportlab(device_name: str,
         'monthly': 'Monthly Summary', 'custom': 'Custom Report',
     }.get(selections.report_type, 'Technical Report')
 
-    display_title = selections.custom_title or f'e-flow™ {report_type_label}'
+    display_title = selections.custom_title or f'EDS FlowSense™ {report_type_label}'
     generated_at = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
     story.append(Paragraph(html.escape(display_title), title_style))
@@ -941,7 +941,7 @@ def _build_pdf_reportlab(device_name: str,
     # ── Footer ───────────────────────────────────────────────────────────────
     story.append(Spacer(1, 6 * mm))
     story.append(HRFlowable(width='100%', thickness=1, color=C_BORDER))
-    story.append(Paragraph('e-flow™ by EDS — Hydrological Intelligence Platform', footer_style))
+    story.append(Paragraph('EDS FlowSense™ — Hydrological Intelligence Platform', footer_style))
 
     doc.build(story)
     return buf.getvalue()

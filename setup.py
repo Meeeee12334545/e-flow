@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Setup script for e-flow project.
+Setup script for EDS FlowSense (EDS-FS) project.
 Initializes the environment and prepares the system for first use.
 """
 
@@ -33,7 +33,7 @@ def run_command(cmd, description):
 
 def main():
     """Main setup function."""
-    print_header("e-flow Setup")
+    print_header("EDS FlowSense Setup")
     
     # Check Python version
     print_step(1, "Checking Python version")
