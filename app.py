@@ -1017,11 +1017,11 @@ if selected_device_id:
                     )
                     st.plotly_chart(fig_scatter, use_container_width=True)
 
-                    _sc1, _sc2, _sc3 = st.columns(3)
+                    _corr_col, _depth_range_col, _velocity_range_col = st.columns(3)
                     _corr = _df_scatter["depth_mm"].corr(_df_scatter["velocity_mps"])
-                    _sc1.metric("Depth–Velocity Correlation", f"{_corr:.3f}", help="Pearson r — values near ±1 indicate a strong linear relationship")
-                    _sc2.metric("Depth Range", f"{_df_scatter['depth_mm'].min():.0f} – {_df_scatter['depth_mm'].max():.0f} mm")
-                    _sc3.metric("Velocity Range", f"{_df_scatter['velocity_mps'].min():.3f} – {_df_scatter['velocity_mps'].max():.3f} m/s")
+                    _corr_col.metric("Depth–Velocity Correlation", f"{_corr:.3f}", help="Pearson r — values near ±1 indicate a strong linear relationship")
+                    _depth_range_col.metric("Depth Range", f"{_df_scatter['depth_mm'].min():.0f} – {_df_scatter['depth_mm'].max():.0f} mm")
+                    _velocity_range_col.metric("Velocity Range", f"{_df_scatter['velocity_mps'].min():.3f} – {_df_scatter['velocity_mps'].max():.3f} m/s")
                 else:
                     st.info("Insufficient data to render the scatter plot. Both depth and velocity readings are required.")
 
