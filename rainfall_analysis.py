@@ -386,20 +386,20 @@ def detect_inflow_infiltration(
         critical_flags = [f for f in ii_flags if f.severity in ("critical", "high")]
         if critical_flags:
             result.recommendations.append(
-                f"⚠️ {len(critical_flags)} high/critical I/I event(s) detected. "
+                f"{len(critical_flags)} high/critical I/I event(s) detected. "
                 "Inspect sewer network for infiltration entry points, particularly "
                 "after heavy rainfall. Consider CCTV survey and manhole inspection."
             )
         medium_flags = [f for f in ii_flags if f.severity == "medium"]
         if medium_flags:
             result.recommendations.append(
-                f"🔶 {len(medium_flags)} moderate I/I event(s) detected. "
+                f"{len(medium_flags)} moderate I/I event(s) detected. "
                 "Monitor trend over time. Increase collection frequency around rain events."
             )
         low_flags = [f for f in ii_flags if f.severity == "low"]
         if low_flags:
             result.recommendations.append(
-                f"ℹ️ {len(low_flags)} low-level I/I response(s) detected. "
+                f"{len(low_flags)} low-level I/I response(s) detected. "
                 "Within acceptable range; no immediate action required."
             )
         lags = [f.lag_hours for f in ii_flags]
@@ -407,19 +407,19 @@ def detect_inflow_infiltration(
             avg_lag = float(np.mean(lags))
             if avg_lag < 1.0:
                 result.recommendations.append(
-                    f"⚡ Very short lag time ({avg_lag:.1f} h) suggests direct inflow "
+                    f"Very short lag time ({avg_lag:.1f} h) suggests direct inflow "
                     "(surface water entry). Check stormwater connections to sewer."
                 )
             elif avg_lag > 6.0:
                 result.recommendations.append(
-                    f"🐢 Long lag time ({avg_lag:.1f} h) suggests groundwater infiltration. "
+                    f"Long lag time ({avg_lag:.1f} h) suggests groundwater infiltration. "
                     "Inspect pipe joints and manhole seals in the catchment."
                 )
     else:
         result.quality_label = "High"
         result.confidence_score = 85.0
         result.recommendations.append(
-            f"✅ {len(events)} rainfall event(s) detected but no significant I/I responses found. "
+            f"{len(events)} rainfall event(s) detected but no significant I/I responses found. "
             "Sewer appears tight under the observed rainfall conditions."
         )
 

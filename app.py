@@ -638,7 +638,7 @@ if page_mode == 'Simplified View':
 
             if show_note:
                 st.info(
-                    f'ℹ️ No data in the last {selected_window_label}. Showing all available history instead.'
+                    f'No data in the last {selected_window_label}. Showing all available history instead.'
                 )
 
             st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)

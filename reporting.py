@@ -45,12 +45,22 @@ def _strip_html(text: str) -> str:
     return stripper.get_text()
 
 # For static image export of plotly charts
-# kaleido is optional; if unavailable, images will be skipped
+# kaleido is optional; if unavailable, matplotlib is used as fallback
 try:
     import kaleido  # noqa: F401
     _KALEIDO_AVAILABLE = True
 except Exception:
     _KALEIDO_AVAILABLE = False
+
+# matplotlib used as PNG fallback for charts when kaleido is unavailable
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    _MATPLOTLIB_AVAILABLE = True
+except Exception:
+    _MATPLOTLIB_AVAILABLE = False
 
 # For PDF generation
 try:
@@ -442,16 +452,67 @@ def create_charts(df: pd.DataFrame, selections: ReportSelections) -> Dict[str, g
     return charts
 
 
-def fig_to_base64_png(fig: go.Figure) -> Optional[str]:
-    """Render plotly figure to base64 PNG string using kaleido."""
-    if not _KALEIDO_AVAILABLE:
+def _fig_to_png_matplotlib(fig: go.Figure) -> Optional[str]:
+    """Render a plotly Figure to base64 PNG using matplotlib (kaleido-free fallback)."""
+    if not _MATPLOTLIB_AVAILABLE:
         return None
     try:
-        buf = fig.to_image(format="png", scale=2)
-        b64 = base64.b64encode(buf).decode("ascii")
-        return b64
+        traces = fig.data
+        if not traces:
+            return None
+        fig_mpl, ax = plt.subplots(figsize=(10, 3.5))
+        for trace in traces:
+            x_data = trace.x
+            y_data = trace.y
+            colour = "#3A7F5F"
+            try:
+                if trace.line and trace.line.color:
+                    colour = trace.line.color
+            except Exception:
+                pass
+            ax.plot(x_data, y_data, color=colour, linewidth=1.5)
+        layout = fig.layout
+        try:
+            if layout.yaxis and layout.yaxis.title and layout.yaxis.title.text:
+                ax.set_ylabel(layout.yaxis.title.text, fontsize=9, color="#4A4A4A")
+            if layout.xaxis and layout.xaxis.title and layout.xaxis.title.text:
+                ax.set_xlabel(layout.xaxis.title.text, fontsize=9, color="#4A4A4A")
+        except Exception:
+            pass
+        ax.set_facecolor("#FFFFFF")
+        fig_mpl.patch.set_facecolor("#FFFFFF")
+        ax.grid(True, color="#E5E7EB", linewidth=0.5)
+        ax.tick_params(labelsize=7, colors="#4A4A4A")
+        for spine in ax.spines.values():
+            spine.set_color("#D9D9D9")
+        try:
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M"))
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=30, ha="right", fontsize=7)
+        except Exception:
+            pass
+        plt.tight_layout(pad=0.5)
+        buf = io.BytesIO()
+        fig_mpl.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+        plt.close(fig_mpl)
+        buf.seek(0)
+        return base64.b64encode(buf.read()).decode("ascii")
     except Exception:
         return None
+
+
+def fig_to_base64_png(fig: go.Figure) -> Optional[str]:
+    """Render plotly figure to base64 PNG string.
+
+    Tries kaleido first; falls back to matplotlib if kaleido is unavailable or fails.
+    """
+    if _KALEIDO_AVAILABLE:
+        try:
+            buf = fig.to_image(format="png", scale=2)
+            b64 = base64.b64encode(buf).decode("ascii")
+            return b64
+        except Exception:
+            pass
+    return _fig_to_png_matplotlib(fig)
 
 
 def build_html_report(device_name: str,
@@ -641,7 +702,8 @@ def build_html_report(device_name: str,
             else:
                 charts_html += (
                     f"<h3>{_VAR_LABELS.get(var, var)}</h3>"
-                    + fig.to_html(include_plotlyjs="cdn", full_html=False)
+                    f"<p style='color:#9ca3af;font-size:12px;'>Chart unavailable — "
+                    f"install kaleido or matplotlib to enable chart images.</p>"
                 )
         charts_html += "</div>"
 
@@ -711,6 +773,7 @@ def _build_pdf_reportlab(device_name: str,
                          selections: ReportSelections,
                          calculations: Dict[str, Dict[str, float]],
                          charts: Dict[str, go.Figure],
+                         logo_path: Optional[str] = None,
                          volume_breakdown: Optional[List[Dict]] = None) -> bytes:
     """Generate a professional PDF using reportlab (pure Python, no system deps)."""
     buf = io.BytesIO()
@@ -788,6 +851,16 @@ def _build_pdf_reportlab(device_name: str,
         return t
 
     story = []
+
+    # ── Logo ─────────────────────────────────────────────────────────────────
+    if logo_path and Path(logo_path).exists():
+        try:
+            logo_img = RLImage(logo_path, height=18 * mm, width=None)
+            logo_img.hAlign = 'LEFT'
+            story.append(logo_img)
+            story.append(Spacer(1, 3 * mm))
+        except Exception:
+            pass
 
     # ── Header ───────────────────────────────────────────────────────────────
     report_type_label = {
@@ -927,7 +1000,7 @@ def _build_pdf_reportlab(device_name: str,
         story.append(Spacer(1, 6 * mm))
 
     # ── Charts ───────────────────────────────────────────────────────────────
-    if selections.include_charts and charts and _KALEIDO_AVAILABLE:
+    if selections.include_charts and charts:
         story.append(Paragraph('Time-Series Charts', h2_style))
         for var, fig in charts.items():
             b64 = fig_to_base64_png(fig)
@@ -978,6 +1051,7 @@ def build_pdf_report(device_name: str,
         try:
             return _build_pdf_reportlab(
                 device_name, df, selections, calculations, charts,
+                logo_path=logo_path,
                 volume_breakdown=volume_breakdown,
             )
         except Exception as e:
