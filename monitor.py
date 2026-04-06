@@ -155,6 +155,8 @@ class ContinuousMonitor:
         self._shutdown = False
         # Track the active poll interval so we can detect admin changes
         self._current_interval = self._load_poll_interval()
+        # Track per-device last-poll time so each device can have its own interval
+        self._device_last_poll: dict = {}
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._handle_shutdown)
@@ -176,7 +178,7 @@ class ContinuousMonitor:
 
     def _handle_shutdown(self, signum, frame):
         """Handle graceful shutdown on signals."""
-        logger.info("\n🛑 Shutdown signal received, stopping gracefully...")
+        logger.info("\nShutdown signal received, stopping gracefully...")
         self._shutdown = True
         if self.scheduler.running:
             self.scheduler.shutdown(wait=False)
@@ -217,7 +219,7 @@ class ContinuousMonitor:
                 logger.warning("Rainfall refresh failed for %s: %s", device_id, exc)
 
         if refreshed:
-            logger.info("🌧️ Rainfall data refreshed for %d device(s)", refreshed)
+            logger.info("Rainfall data refreshed for %d device(s)", refreshed)
 
     async def check_for_updates_with_retry(self):
         """Check for updates with automatic retry logic."""
@@ -320,13 +322,20 @@ class ContinuousMonitor:
     async def check_for_updates(self):
         """Check the monitor website for updates every 1 minute."""
         self.check_count += 1
+        now = datetime.now()
 
         try:
             logger.info(f"[Check #{self.check_count}] Checking for data updates...")
 
             # ── Devices defined in config.py ────────────────────────────────
             for device_id, device_info in DEVICES.items():
+                device_interval = self._current_interval
+                last_poll = self._device_last_poll.get(device_id)
+                if last_poll is not None and (now - last_poll).total_seconds() < device_interval:
+                    logger.debug(f"  Skipping {device_id} (next poll in {device_interval - (now - last_poll).total_seconds():.0f}s)")
+                    continue
                 logger.info(f"  Checking device: {device_id}")
+                self._device_last_poll[device_id] = now
                 await self._scrape_device(
                     device_id=device_id,
                     device_name=device_info.get("name", device_id),
@@ -345,7 +354,15 @@ class ContinuousMonitor:
                     if not dashboard_url:
                         logger.debug(f"DB device {db_device_id} has no dashboard_url, skipping")
                         continue
+                    # Use device-specific interval if set, otherwise fall back to global
+                    raw_interval = db_device.get("poll_interval")
+                    device_interval = int(raw_interval) if raw_interval and int(raw_interval) > 0 else self._current_interval
+                    last_poll = self._device_last_poll.get(db_device_id)
+                    if last_poll is not None and (now - last_poll).total_seconds() < device_interval:
+                        logger.debug(f"  Skipping {db_device_id} (next poll in {device_interval - (now - last_poll).total_seconds():.0f}s)")
+                        continue
                     logger.info(f"  Checking DB device: {db_device_id}")
+                    self._device_last_poll[db_device_id] = now
                     await self._scrape_device(
                         device_id=db_device_id,
                         device_name=db_device.get("device_name", db_device_id),
@@ -356,7 +373,7 @@ class ContinuousMonitor:
                 logger.error(f"Error checking DB-only devices: {e}", exc_info=True)
 
         except Exception as e:
-            logger.error(f"❌ Error during check: {e}", exc_info=True)
+            logger.error(f"Error during check: {e}", exc_info=True)
             self.error_count += 1
             return False
 
@@ -407,18 +424,20 @@ class ContinuousMonitor:
             logger.error(f"Critical error in run_check: {e}", exc_info=True)
 
     def _apply_interval_if_changed(self):
-        """Re-schedule the monitor job if the DB poll interval differs from current."""
+        """Update the default interval if the DB global setting has changed.
+
+        The scheduler always ticks at SCHEDULER_TICK_SECONDS (30 s) so that
+        devices with a 30 s per-device interval are serviced in time.  This
+        method only refreshes the *default* interval used for devices that
+        have no per-device override.
+        """
         try:
             new_interval = self._load_poll_interval()
             if new_interval != self._current_interval:
                 logger.info(
-                    f"⏱️  Poll interval changed: {self._current_interval}s → {new_interval}s"
+                    f"Poll interval (default) changed: {self._current_interval}s → {new_interval}s"
                 )
                 self._current_interval = new_interval
-                self.scheduler.reschedule_job(
-                    'monitor_job',
-                    trigger=IntervalTrigger(seconds=new_interval),
-                )
         except Exception as e:
             logger.warning(f"Could not apply interval change: {e}")
 
@@ -431,20 +450,27 @@ class ContinuousMonitor:
         # Reload interval in case it was changed while the service was down
         self._current_interval = self._load_poll_interval()
 
+        # The scheduler always ticks at 30 s so that devices configured with a
+        # 30-second per-device interval are served on time.  Per-device
+        # intervals are enforced inside check_for_updates() by comparing each
+        # device's last-poll timestamp against its configured interval.
+        SCHEDULER_TICK = 30
+
         logger.info("=" * 60)
-        logger.info("🚀 CONTINUOUS MONITOR STARTED (PRODUCTION MODE)")
+        logger.info("CONTINUOUS MONITOR STARTED (PRODUCTION MODE)")
         logger.info("=" * 60)
-        logger.info(f"📍 Target: {MONITOR_URL[:80]}...")
-        logger.info(f"⏱️  Interval: Every {self._current_interval} seconds")
-        logger.info(f"📊 Database: {self.db.db_path}")
-        logger.info(f"🔄 Auto-retry: {MAX_RETRY_ATTEMPTS} attempts per check")
-        logger.info(f"💚 Health checks: Every {HEALTH_CHECK_INTERVAL} seconds")
-        logger.info(f"🛡️  Max consecutive errors: {MAX_CONSECUTIVE_ERRORS}")
-        logger.info(f"💾 Storage mode: {'ALL readings (every check)' if STORE_ALL_READINGS else 'CHANGED values only'}")
+        logger.info(f"Target: {MONITOR_URL[:80]}...")
+        logger.info(f"Scheduler tick: every {SCHEDULER_TICK} seconds")
+        logger.info(f"Default device interval: {self._current_interval} seconds")
+        logger.info(f"Database: {self.db.db_path}")
+        logger.info(f"Auto-retry: {MAX_RETRY_ATTEMPTS} attempts per check")
+        logger.info(f"Health checks: Every {HEALTH_CHECK_INTERVAL} seconds")
+        logger.info(f"Max consecutive errors: {MAX_CONSECUTIVE_ERRORS}")
+        logger.info(f"Storage mode: {'ALL readings (every check)' if STORE_ALL_READINGS else 'CHANGED values only'}")
         logger.info("=" * 60)
-        logger.info("✅ Monitoring will detect changes and store only new data" if not STORE_ALL_READINGS else "✅ Monitoring will store EVERY reading (even if unchanged)")
-        logger.info("✅ Automatic retry on failures")
-        logger.info("✅ Health monitoring enabled")
+        logger.info("Monitoring will detect changes and store only new data" if not STORE_ALL_READINGS else "Monitoring will store EVERY reading (even if unchanged)")
+        logger.info("Automatic retry on failures")
+        logger.info("Health monitoring enabled")
         logger.info("Press Ctrl+C to stop")
         logger.info("=" * 60)
 
@@ -452,10 +478,10 @@ class ContinuousMonitor:
         logger.info("Running initial data check...")
         self.run_check()
 
-        # Schedule the job
+        # Schedule the job at a fixed 30s tick
         self.scheduler.add_job(
             self.run_check,
-            IntervalTrigger(seconds=self._current_interval),
+            IntervalTrigger(seconds=SCHEDULER_TICK),
             id='monitor_job',
             name='Monitor USRIOT for updates',
             replace_existing=True
@@ -476,12 +502,12 @@ class ContinuousMonitor:
             pass
         finally:
             logger.info("\n" + "=" * 60)
-            logger.info("📊 MONITORING STOPPED")
+            logger.info("MONITORING STOPPED")
             logger.info("=" * 60)
             logger.info(f"Total checks: {self.check_count}")
             logger.info(f"Data updates: {self.update_count}")
             logger.info(f"Total errors: {self.error_count}")
-            logger.info(f"Final status: {'🟢 HEALTHY' if self.is_healthy else '🔴 UNHEALTHY'}")
+            logger.info(f"Final status: {'HEALTHY' if self.is_healthy else 'UNHEALTHY'}")
             if self.check_count > 0:
                 logger.info(f"Success rate: {(self.update_count / self.check_count * 100):.1f}%")
             logger.info("=" * 60)
