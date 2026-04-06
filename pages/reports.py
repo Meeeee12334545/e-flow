@@ -72,7 +72,7 @@ with st.sidebar:
 st.markdown("""
 <div class="page-header">
     <h1 style="margin:0; font-size:1.9rem; font-weight:700; color:#ffffff;">
-        📄 Report Generation
+        Report Generation
     </h1>
     <p style="margin:0.3rem 0 0; color:rgba(255,255,255,0.85); font-size:0.95rem;">
         Generate on-demand PDF reports with AI data quality insights.
@@ -189,7 +189,7 @@ with col_cfg:
     )
 
     generate_clicked = st.button(
-        "🗂️ Generate Report",
+        "Generate Report",
         type="primary",
         disabled=not variables,
         key="generate_report_btn",
@@ -257,7 +257,7 @@ with col_prev:
             calcs = compute_calculations(df_window, selections)
             charts = create_charts(df_window, selections)
 
-            _logo_path = str(_ASSETS / "logo_wide.svg")
+            _logo_path = get_sidebar_logo_path()
             pdf_bytes = build_pdf_report(
                 selected_device_name, df_window, selections, calcs, charts,
                 logo_path=_logo_path,
@@ -315,7 +315,7 @@ with col_prev:
         pdf_bytes = st.session_state["last_report_pdf"]
         fname = st.session_state.get("last_report_name", "eflow_report")
         st.download_button(
-            label="⬇️ Download PDF Report",
+            label="Download PDF Report",
             data=pdf_bytes,
             file_name=f"{fname}.pdf",
             mime="application/pdf",
@@ -352,7 +352,7 @@ with col_prev:
                 csv_data['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
             csv_data = csv_data.to_csv(index=False).encode("utf-8")
             st.download_button(
-                label="⬇️ Download CSV",
+                label="Download CSV",
                 data=csv_data,
                 file_name=f"{fname}.csv",
                 mime="text/csv",
@@ -380,8 +380,16 @@ with st.expander("View recent anomaly flags for this device", expanded=False):
     flags = db.get_anomaly_flags(device_id=selected_device_id, include_overridden=True, limit=200)
     if flags:
         flags_df = pd.DataFrame(flags)
+        # Format the measurement timestamp to a readable date/time string
+        if 'measurement_timestamp' in flags_df.columns:
+            flags_df['measurement_timestamp'] = (
+                pd.to_datetime(flags_df['measurement_timestamp'], utc=True, errors='coerce')
+                .dt.tz_convert(DEFAULT_TZ)
+                .dt.strftime('%d/%m/%Y %H:%M:%S')
+            )
+            flags_df = flags_df.rename(columns={'measurement_timestamp': 'Date / Time'})
         display_cols = [c for c in
-                        ["measurement_timestamp", "column_name", "anomaly_type",
+                        ["Date / Time", "column_name", "anomaly_type",
                          "severity", "description", "overridden", "override_note"]
                         if c in flags_df.columns]
         st.dataframe(flags_df[display_cols], use_container_width=True, hide_index=True)

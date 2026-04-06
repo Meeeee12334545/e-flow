@@ -189,7 +189,7 @@ def _run_analysis(device_id: str, df: pd.DataFrame) -> SiteBaseline:
 # ── Section 1: Data Readiness ──────────────────────────────────────────────────
 
 def _render_readiness(baseline: Optional[SiteBaseline], df: pd.DataFrame) -> None:
-    st.markdown("### 📊 Data Readiness")
+    st.markdown("### Data Readiness")
 
     if baseline is None:
         suf = check_data_sufficiency(df)
@@ -383,7 +383,7 @@ def _render_profiles(baseline: SiteBaseline) -> None:
         dist  = profile.distribution
 
         with st.expander(f"**{label}** — {dist.count:,} readings", expanded=True):
-            tab1, tab2, tab3 = st.tabs(["⏰ Diurnal Profile", "📅 Day-of-Week", "📊 Distribution"])
+            tab1, tab2, tab3 = st.tabs(["Diurnal Profile", "Day-of-Week", "Distribution"])
 
             with tab1:
                 st.plotly_chart(_diurnal_chart(var, profile), use_container_width=True)
@@ -566,7 +566,7 @@ def _render_recommendations(
 
         st.markdown(
             f"<h4 style='color:{colour}; margin:1.2rem 0 0.4rem; font-size:1rem;'>"
-            f"{'💧' if var == 'depth_mm' else '💨' if var == 'velocity_mps' else '🌊'} {label}</h4>",
+            f"{label}</h4>",
             unsafe_allow_html=True,
         )
 
@@ -744,7 +744,7 @@ _render_recommendations(selected_device_id, cached, selected_sensitivity)
 st.divider()
 
 # ── Download PDF ───────────────────────────────────────────────────────────────
-st.markdown("### 📄 Download Alarm Advisory Report")
+st.markdown("### Download Alarm Advisory Report")
 
 db_recs_for_pdf = db.get_alarm_recommendations(selected_device_id, sensitivity=selected_sensitivity)
 recs_for_pdf: List[AlarmRecommendation] = []

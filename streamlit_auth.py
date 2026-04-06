@@ -52,6 +52,25 @@ def get_org_logo_data_uri() -> str | None:
     return None
 
 
+def get_admin_logo_data_uri() -> str | None:
+    """Return the org-wide admin logo as a data URI, or None if not configured.
+
+    Used on the login screen so the admin-configured logo is always shown,
+    regardless of any per-user logo settings.
+    """
+    auth_db = st.session_state.get('auth_db')
+    if not auth_db:
+        return None
+    try:
+        logo_b64 = auth_db.get_setting('org_logo_b64')
+        logo_mime = auth_db.get_setting('org_logo_mime') or 'image/png'
+        if logo_b64:
+            return f"data:{logo_mime};base64,{logo_b64}"
+    except Exception:
+        pass
+    return None
+
+
 def get_sidebar_logo_path() -> str:
     """Return a file path suitable for st.logo(). Uses the current user's company logo if set,
     then falls back to the org-wide logo, then the EDS default."""
@@ -103,8 +122,8 @@ def login_page():
     """Display a polished, branded login page."""
     apply_styles()
 
-    # Org logo (custom if set, else EDS default)
-    org_logo_uri = get_org_logo_data_uri()
+    # Always use the org-wide admin logo on the sign-in screen
+    org_logo_uri = get_admin_logo_data_uri()
     if org_logo_uri:
         _logo_img_src = org_logo_uri
         _logo_style = "max-height:72px; max-width:280px; display:inline-block; margin-bottom: 0.75rem; object-fit: contain;"
