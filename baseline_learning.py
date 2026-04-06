@@ -592,17 +592,17 @@ def generate_alarm_recommendations(
                     lw  = pct[90] + 0.25 * iqr
                     hw  = pct[95] + 0.50 * iqr
                     crt = pct[99] + iqr
-                    recs.append(_rec("above", "low_warning", lw, sens=sens,
+                    recs.append(_rec("above", "low_warning", lw, sensitivity=sens,
                         basis=(
                             f"P90 ({_fmt(pct[90])} {unit}) + 0.25×IQR ({_fmt(0.25*iqr)} {unit})"
                             f" = {_fmt(lw)} {unit}; {basis_suffix}"
                         ), fp_pct=8.0))
-                    recs.append(_rec("above", "high_warning", hw, sens=sens,
+                    recs.append(_rec("above", "high_warning", hw, sensitivity=sens,
                         basis=(
                             f"P95 ({_fmt(pct[95])} {unit}) + 0.5×IQR ({_fmt(0.5*iqr)} {unit})"
                             f" = {_fmt(hw)} {unit}; {basis_suffix}"
                         ), fp_pct=3.0))
-                    recs.append(_rec("above", "critical", crt, sens=sens,
+                    recs.append(_rec("above", "critical", crt, sensitivity=sens,
                         basis=(
                             f"P99 ({_fmt(pct[99])} {unit}) + 1×IQR ({_fmt(iqr)} {unit})"
                             f" = {_fmt(crt)} {unit}; {basis_suffix}"
@@ -612,13 +612,13 @@ def generate_alarm_recommendations(
                     lw  = pct[95]
                     hw  = pct[99]
                     crt = pct[99] + 2.0 * iqr
-                    recs.append(_rec("above", "low_warning", lw, sens=sens,
+                    recs.append(_rec("above", "low_warning", lw, sensitivity=sens,
                         basis=f"P95 ({_fmt(lw)} {unit}); minimal false positives; {basis_suffix}",
                         fp_pct=3.0))
-                    recs.append(_rec("above", "high_warning", hw, sens=sens,
+                    recs.append(_rec("above", "high_warning", hw, sensitivity=sens,
                         basis=f"P99 ({_fmt(hw)} {unit}); very rare exceedance in normal operation; {basis_suffix}",
                         fp_pct=0.5))
-                    recs.append(_rec("above", "critical", crt, sens=sens,
+                    recs.append(_rec("above", "critical", crt, sensitivity=sens,
                         basis=(
                             f"P99 ({_fmt(pct[99])} {unit}) + 2×IQR ({_fmt(2*iqr)} {unit})"
                             f" = {_fmt(crt)} {unit}; extreme outlier threshold; {basis_suffix}"
@@ -628,13 +628,13 @@ def generate_alarm_recommendations(
                     lw  = pct[85]
                     hw  = pct[92]
                     crt = pct[97]
-                    recs.append(_rec("above", "low_warning", lw, sens=sens,
+                    recs.append(_rec("above", "low_warning", lw, sensitivity=sens,
                         basis=f"P85 ({_fmt(lw)} {unit}); early warning with higher sensitivity; {basis_suffix}",
                         fp_pct=15.0))
-                    recs.append(_rec("above", "high_warning", hw, sens=sens,
+                    recs.append(_rec("above", "high_warning", hw, sensitivity=sens,
                         basis=f"P92 ({_fmt(hw)} {unit}); elevated concern threshold; {basis_suffix}",
                         fp_pct=8.0))
-                    recs.append(_rec("above", "critical", crt, sens=sens,
+                    recs.append(_rec("above", "critical", crt, sensitivity=sens,
                         basis=f"P97 ({_fmt(crt)} {unit}); high-sensitivity critical threshold; {basis_suffix}",
                         fp_pct=3.0))
 
@@ -643,24 +643,24 @@ def generate_alarm_recommendations(
                 if sens == "standard":
                     lw_b  = max(0.0, pct[10])
                     crt_b = max(0.0, pct[5] - 0.5 * iqr)
-                    recs.append(_rec("below", "low_warning", lw_b, sens=sens,
+                    recs.append(_rec("below", "low_warning", lw_b, sensitivity=sens,
                         basis=(
                             f"P10 ({_fmt(pct[10])} {unit}); readings below this may indicate"
                             f" very low flow or sensor near dry-out; {basis_suffix}"
                         ), fp_pct=10.0))
-                    recs.append(_rec("below", "critical", crt_b, sens=sens,
+                    recs.append(_rec("below", "critical", crt_b, sensitivity=sens,
                         basis=(
                             f"P5 ({_fmt(pct[5])} {unit}) − 0.5×IQR ({_fmt(0.5*iqr)} {unit})"
                             f" = {_fmt(crt_b)} {unit}; strong indicator of dry sensor or surcharge; {basis_suffix}"
                         ), fp_pct=1.0))
                 elif sens == "conservative":
                     lw_b = max(0.0, pct[5])
-                    recs.append(_rec("below", "low_warning", lw_b, sens=sens,
+                    recs.append(_rec("below", "low_warning", lw_b, sensitivity=sens,
                         basis=f"P5 ({_fmt(lw_b)} {unit}); conservative dry-sensor threshold; {basis_suffix}",
                         fp_pct=3.0))
                 else:  # sensitive
                     lw_b = max(0.0, pct[25])
-                    recs.append(_rec("below", "low_warning", lw_b, sens=sens,
+                    recs.append(_rec("below", "low_warning", lw_b, sensitivity=sens,
                         basis=f"P25 ({_fmt(lw_b)} {unit}); sensitive low-flow detection; {basis_suffix}",
                         fp_pct=25.0))
 
