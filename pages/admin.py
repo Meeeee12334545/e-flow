@@ -293,7 +293,7 @@ def render_admin_panel():
                     help="Full URL to the USRIOT unit dashboard for this site.",
                     key="edit_site_url",
                 )
-                if st.form_submit_button("Save Changes →", width='stretch'):
+                if st.form_submit_button("Save Changes →", use_container_width=True):
                     if not _edit_name.strip():
                         st.error("Site Name cannot be empty.")
                     elif _edit_url.strip() and not _edit_url.strip().startswith("http"):

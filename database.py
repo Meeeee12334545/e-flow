@@ -524,8 +524,13 @@ class FlowDatabase:
                       dashboard_url: str = None) -> bool:
         """Update an existing device's name, location and dashboard URL.
 
+        Passing None or an empty string for *dashboard_url* preserves the
+        existing value so that a blank form field does not clear the URL.
         Returns True if the device was found and updated, False otherwise.
         """
+        # Normalise: treat empty strings the same as None so the COALESCE
+        # fallback preserves the existing URL when the field is left blank.
+        url = dashboard_url or None
         if self.use_postgres:
             conn = psycopg2.connect(self.pg_dsn)
             cur = conn.cursor()
@@ -538,7 +543,7 @@ class FlowDatabase:
                         dashboard_url = COALESCE(%s, dashboard_url)
                     WHERE device_id = %s
                     """,
-                    (device_name, location, dashboard_url, device_id),
+                    (device_name, location, url, device_id),
                 )
                 conn.commit()
                 return cur.rowcount > 0
@@ -557,7 +562,7 @@ class FlowDatabase:
                         dashboard_url = COALESCE(?, dashboard_url)
                     WHERE device_id = ?
                     """,
-                    (device_name, location, dashboard_url, device_id),
+                    (device_name, location, url, device_id),
                 )
                 conn.commit()
                 return cursor.rowcount > 0
@@ -573,7 +578,8 @@ class FlowDatabase:
                 cur.execute("SELECT value FROM system_settings WHERE key = %s", (key,))
                 row = cur.fetchone()
                 return row[0] if row else default
-            except Exception:
+            except Exception as e:
+                _logger.warning("get_system_setting(%s) failed: %s", key, e)
                 return default
             finally:
                 cur.close()
@@ -585,7 +591,8 @@ class FlowDatabase:
                 cursor.execute("SELECT value FROM system_settings WHERE key = ?", (key,))
                 row = cursor.fetchone()
                 return row[0] if row else default
-            except sqlite3.OperationalError:
+            except sqlite3.OperationalError as e:
+                _logger.warning("get_system_setting(%s) failed: %s", key, e)
                 return default
             finally:
                 conn.close()

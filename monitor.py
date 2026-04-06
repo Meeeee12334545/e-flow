@@ -168,8 +168,10 @@ class ContinuousMonitor:
                 val = int(raw)
                 if val > 0:
                     return val
-        except Exception:
-            pass
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid monitor_poll_interval value in DB: {e}")
+        except Exception as e:
+            logger.warning(f"Could not read monitor_poll_interval from DB: {e}")
         return MONITOR_INTERVAL
 
     def _handle_shutdown(self, signum, frame):

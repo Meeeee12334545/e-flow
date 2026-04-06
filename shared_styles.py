@@ -287,7 +287,7 @@ _CSS = """
     }
 
     .section-title {
-        font-size: 0.78rem !important;
+        font-size: 0.82rem !important;
         font-weight: 700 !important;
         color: var(--muted) !important;
         margin: 0 0 0.75rem 0 !important;
