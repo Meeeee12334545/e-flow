@@ -1,5 +1,5 @@
 """
-Rainfall data module for e-flow.
+Rainfall data module for EDS FlowSense (EDS-FS).
 
 Provides:
 - search_bom_stations()   — search for BOM rainfall stations near a coordinate
@@ -164,7 +164,7 @@ def fetch_bom_rainfall(
     # BOM JSON feed URL (current observations — up to ~72 h history):
     url = f"http://www.bom.gov.au/fwo/{product}/{product}.{station_id}.json"
     try:
-        resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers={"User-Agent": "e-flow/1.0"})
+        resp = requests.get(url, timeout=_REQUEST_TIMEOUT, headers={"User-Agent": "EDS-FS/1.0"})
         resp.raise_for_status()
         payload = resp.json()
     except Exception as exc:

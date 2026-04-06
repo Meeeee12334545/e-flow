@@ -14,7 +14,7 @@ from config import DEVICES
 
 def init_with_default_admin():
     """Initialize with admin/admin123 credentials."""
-    print("Initializing e-flow authentication system...")
+    print("Initializing EDS FlowSense authentication system...")
     
     # Initialize databases
     flow_db = FlowDatabase()

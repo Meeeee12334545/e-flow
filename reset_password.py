@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Reset the password for a user (admin or any user) in e-flow.
+Reset the password for a user (admin or any user) in EDS FlowSense (EDS-FS).
 Usage: python reset_password.py <username> <new_password>
 """
 

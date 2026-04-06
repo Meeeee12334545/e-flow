@@ -42,7 +42,7 @@ if not is_authenticated():
     st.stop()
 
 st.set_page_config(
-    page_title="e-flow | Reports",
+    page_title="EDS FlowSense | Reports",
     layout="wide",
     initial_sidebar_state="expanded",
 )

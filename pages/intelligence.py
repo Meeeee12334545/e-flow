@@ -1,5 +1,5 @@
 """
-Site Intelligence page — baseline learning and alarm advisory for e-flow EDS.
+Site Intelligence page — baseline learning and alarm advisory for EDS FlowSense (EDS-FS).
 
 Analyses long-term monitoring data to:
   • Show data readiness status (insufficient → basic → full → seasonal)
@@ -54,7 +54,7 @@ if not is_authenticated():
     st.stop()
 
 st.set_page_config(
-    page_title="e-flow | Site Intelligence",
+    page_title="EDS FlowSense | Site Intelligence",
     layout="wide",
     initial_sidebar_state="expanded",
 )

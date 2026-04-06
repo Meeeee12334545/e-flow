@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Setup script for e-flow authentication system.
+Setup script for EDS FlowSense (EDS-FS) authentication system.
 
 This script helps initialize the authentication system by creating
 the first admin user and configuring initial devices.

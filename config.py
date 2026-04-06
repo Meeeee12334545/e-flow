@@ -1,4 +1,4 @@
-# Configuration file for e-flow
+# Configuration file for EDS FlowSense (EDS-FS)
 import os
 
 # Timezone for all timestamps

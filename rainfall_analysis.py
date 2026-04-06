@@ -1,5 +1,5 @@
 """
-Rainfall analysis and AI Inflow/Infiltration (I/I) detection module for e-flow.
+Rainfall analysis and AI Inflow/Infiltration (I/I) detection module for EDS FlowSense (EDS-FS).
 
 Public API
 ----------

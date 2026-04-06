@@ -1,5 +1,5 @@
 """
-Shared styling module for the e-flow application.
+Shared styling module for the EDS FlowSense (EDS-FS) application.
 
 Provides a single design system (colors, typography, components) that is
 applied consistently across every Streamlit page.

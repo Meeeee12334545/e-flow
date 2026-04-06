@@ -1,5 +1,5 @@
 """
-AI-driven anomaly detection engine for e-flow EDS DAS.
+AI-driven anomaly detection engine for EDS FlowSense (EDS-FS).
 
 Implements rule-based and statistical models to identify questionable or
 abnormal sensor data, providing confidence scores and anomaly classifications.
