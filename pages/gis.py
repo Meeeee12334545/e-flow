@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 from database import FlowDatabase
@@ -89,7 +90,6 @@ device_metrics: dict = {}
 for dev in devices:
     did = dev["device_id"]
     try:
-        import pandas as pd
         measurements = db.get_measurements(device_id=did, limit=500)
         if measurements:
             df_dev = pd.DataFrame(measurements).copy()
@@ -107,8 +107,6 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ── Site summary table ─────────────────────────────────────────────────────────
 if devices:
-    import pandas as pd
-
     st.markdown('<p class="section-title" style="margin-top:1.5rem;">Site Summary</p>', unsafe_allow_html=True)
     rows = []
     for dev in devices:

@@ -65,7 +65,7 @@ def generate_insights(
                 f"Intermittent zero flow detected ({zero_pct:.0f}% of readings) "
                 "— possible control structure, pump operation or gate present"
             )
-        elif zero_pct < 5 and metrics.get("dwf", 0) is not None:
+        elif zero_pct < 5 and metrics.get("dwf") is not None:
             insights.append(
                 "Continuous flow observed — no intermittent shutoffs detected, "
                 "consistent with a gravity-fed catchment"

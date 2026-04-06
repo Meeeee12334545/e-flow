@@ -67,6 +67,10 @@ def compute_engineering_metrics(df: pd.DataFrame) -> Dict[str, Any]:
     if "flow_lps" in df.columns:
         flow = df["flow_lps"].dropna()
         if not flow.empty:
+            # 10th-percentile approximates dry-weather baseflow.
+            # This assumes the majority of readings occur during dry conditions;
+            # results may be less representative in highly infiltrated systems
+            # or during extended wet periods where dry readings are scarce.
             dwf = float(flow.quantile(_DWF_PERCENTILE))
             pwwf = float(flow.max())
             result["dwf"] = dwf
