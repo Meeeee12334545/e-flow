@@ -649,49 +649,6 @@ def render_admin_panel():
         else:
             st.info("No regular users to display.")
 
-    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
-
-    # ── Polling Interval (additive — read by monitor, does not modify monitor logic) ──
-    st.markdown('<p class="section-title">Polling Interval</p>', unsafe_allow_html=True)
-    st.markdown(
-        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
-        "Set how frequently the monitor service polls each device for new data. "
-        "Changes take effect on the next monitor cycle.</p>",
-        unsafe_allow_html=True,
-    )
-
-    from settings import POLLING_INTERVAL_OPTIONS, get_polling_interval, set_setting as _set_setting
-
-    _current_interval = get_polling_interval(auth_db)
-    _interval_labels = {30: "30 sec", 60: "60 sec", 120: "120 sec", 300: "300 sec"}
-    _interval_options = POLLING_INTERVAL_OPTIONS
-
-    _poll_col, _poll_save_col = st.columns([2, 1])
-    with _poll_col:
-        _selected_interval = st.selectbox(
-            "Polling interval",
-            options=_interval_options,
-            format_func=lambda x: _interval_labels.get(x, f"{x} sec"),
-            index=_interval_options.index(_current_interval)
-            if _current_interval in _interval_options
-            else 1,
-            key="polling_interval_select",
-        )
-    with _poll_save_col:
-        st.markdown("<div style='height:1.85rem'></div>", unsafe_allow_html=True)
-        if st.button("Save Interval", key="save_polling_interval_btn", type="primary"):
-            try:
-                _set_setting(auth_db, "polling_interval", str(_selected_interval))
-                st.success(f"Polling interval set to {_interval_labels.get(_selected_interval, str(_selected_interval))}.")
-            except Exception as _e:
-                st.error(f"Could not save setting: {_e}")
-
-    if _current_interval != _selected_interval:
-        st.caption(
-            f"Currently saved: {_interval_labels.get(_current_interval, str(_current_interval))}. "
-            "Click Save Interval to apply the new value."
-        )
-
 
 if __name__ == "__main__":
     init_auth_state()
