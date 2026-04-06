@@ -1421,6 +1421,7 @@ class FlowDatabase:
                 conn.commit()
                 return True
             except Exception:
+                _logger.warning("save_device_baseline (postgres) failed", exc_info=True)
                 conn.rollback()
                 return False
             finally:
@@ -1446,6 +1447,7 @@ class FlowDatabase:
                 conn.commit()
                 return True
             except Exception:
+                _logger.warning("save_device_baseline (sqlite) failed", exc_info=True)
                 conn.rollback()
                 return False
             finally:

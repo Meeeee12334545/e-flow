@@ -641,13 +641,19 @@ def generate_alarm_recommendations(
             # Below-threshold alarms for depth only (dry-sensor / zero-flow detection)
             if variable == "depth_mm" and "below" in dirs:
                 if sens == "standard":
-                    lw_b  = max(0.0, pct[10])
-                    crt_b = max(0.0, pct[5] - 0.5 * iqr)
+                    lw_b   = max(0.0, pct[10])
+                    hw_b   = max(0.0, pct[5])
+                    crt_b  = max(0.0, pct[5] - 0.5 * iqr)
                     recs.append(_rec("below", "low_warning", lw_b, sensitivity=sens,
                         basis=(
                             f"P10 ({_fmt(pct[10])} {unit}); readings below this may indicate"
                             f" very low flow or sensor near dry-out; {basis_suffix}"
                         ), fp_pct=10.0))
+                    recs.append(_rec("below", "high_warning", hw_b, sensitivity=sens,
+                        basis=(
+                            f"P5 ({_fmt(pct[5])} {unit}); consistently low depth; "
+                            f"verify sensor is not obstructed or dry; {basis_suffix}"
+                        ), fp_pct=5.0))
                     recs.append(_rec("below", "critical", crt_b, sensitivity=sens,
                         basis=(
                             f"P5 ({_fmt(pct[5])} {unit}) − 0.5×IQR ({_fmt(0.5*iqr)} {unit})"
@@ -748,7 +754,7 @@ def build_intelligence_pdf(
         return t
 
     story = []
-    generated_at = datetime.now().strftime("%d/%m/%Y %H:%M")
+    generated_at = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
 
     story.append(Paragraph("e-flow™ Site Intelligence Report", title_style))
     story.append(Paragraph(f"Alarm Advisory for: <b>{html.escape(device_name)}</b>", body_style))
@@ -817,13 +823,18 @@ def build_intelligence_pdf(
                 "high_warning": rl_colors.HexColor("#E65100"),
                 "critical":     C_DANGER,
             }.get(r.level_name, C_TEXT)
+            # Word-aware truncation: break at last space within 90 chars
+            basis_text = r.basis
+            if len(basis_text) > 90:
+                cut = basis_text[:90].rsplit(" ", 1)[0]
+                basis_text = cut + "…"
             rec_rows.append([
                 r.variable_label,
                 r.level_label,
                 r.direction.title(),
                 f"{r.recommended_value:.{_SENSOR_META.get(r.variable, {}).get('precision', 2)}f} {r.unit}",
                 f"≈{r.estimated_fp_pct:.0f}%",
-                r.basis[:80] + ("…" if len(r.basis) > 80 else ""),
+                basis_text,
             ])
             extra_styles.append(("TEXTCOLOR", (1, i), (1, i), level_colour))
             extra_styles.append(("FONTNAME", (1, i), (1, i), "Helvetica-Bold"))

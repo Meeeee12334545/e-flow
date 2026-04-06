@@ -644,7 +644,7 @@ def _render_recommendations(
                         override_val = st.number_input(
                             f"Override value ({unit})",
                             value=float(rec["recommended_value"]),
-                            step=0.1 if prec >= 1 else 1.0,
+                            step=1.0 if prec == 0 else 10 ** (-prec),
                             format=f"%.{prec}f",
                             key=f"override_{rec_id}",
                             label_visibility="collapsed",
