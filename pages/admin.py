@@ -114,71 +114,19 @@ def render_admin_panel():
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
-    # ── Upload Frequency (global default) ─────────────────────────────────────
-    st.markdown('<p class="section-title">Default Collection Frequency</p>', unsafe_allow_html=True)
-    st.markdown(
-        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
-        "Set the default polling interval applied to any monitor that does not have its own "
-        "per-site frequency configured. Changes take effect on the next collection cycle.</p>",
-        unsafe_allow_html=True,
-    )
-
     _FREQ_OPTIONS = {
         "30 seconds": 30,
         "1 minute": 60,
         "2 minutes": 120,
         "5 minutes": 300,
     }
-    _freq_col, _freq_hint_col = st.columns([3, 2])
-
-    with _freq_col:
-        _current_interval_str = flow_db.get_system_setting("monitor_poll_interval", "60")
-        try:
-            _current_interval_val = int(_current_interval_str)
-        except (ValueError, TypeError):
-            _current_interval_val = 60
-
-        # Find the matching label for the current value
-        _current_freq_label = next(
-            (lbl for lbl, val in _FREQ_OPTIONS.items() if val == _current_interval_val),
-            "1 minute",
-        )
-        _selected_freq = st.radio(
-            "Default frequency:",
-            options=list(_FREQ_OPTIONS.keys()),
-            index=list(_FREQ_OPTIONS.keys()).index(_current_freq_label),
-            horizontal=True,
-            key="upload_frequency_radio",
-        )
-        if st.button("Apply Default Frequency", type="primary", key="apply_frequency_btn"):
-            _new_seconds = _FREQ_OPTIONS[_selected_freq]
-            flow_db.save_system_setting("monitor_poll_interval", str(_new_seconds))
-            st.success(
-                f"Default collection frequency set to **{_selected_freq}**. "
-                "The monitor will apply this on its next cycle."
-            )
-            st.rerun()
-
-    with _freq_hint_col:
-        st.markdown(f"""
-        <div class="info-box">
-            <strong>Current default</strong><br>
-            <span style="color: #6b7280;">
-                Active default: <strong style="color:#3A7F5F;">{_current_freq_label}</strong><br><br>
-                Per-site overrides take precedence. Configure individual site frequencies
-                in the <strong>Per-Site Collection Frequency</strong> section below.
-            </span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── Per-Site Collection Frequency ─────────────────────────────────────────
     st.markdown('<p class="section-title">Per-Site Collection Frequency</p>', unsafe_allow_html=True)
     st.markdown(
         "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
-        "Override the collection interval for individual monitoring sites. "
-        "Sites set to <em>Use default</em> inherit the global frequency above.</p>",
+        "Set the collection interval for each individual monitoring site. "
+        "Changes take effect on the next collection cycle.</p>",
         unsafe_allow_html=True,
     )
 
