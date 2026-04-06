@@ -218,6 +218,40 @@ class FlowDatabase:
                 )
                 """
             )
+            # Site intelligence: computed baseline snapshots (one per device)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS device_baselines (
+                    device_id TEXT PRIMARY KEY,
+                    computed_at TIMESTAMPTZ NOT NULL,
+                    readings_used INTEGER NOT NULL,
+                    days_covered DOUBLE PRECISION NOT NULL,
+                    baseline_json TEXT NOT NULL,
+                    status TEXT NOT NULL
+                )
+                """
+            )
+            # Site intelligence: recommended alarm levels per device
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alarm_recommendations (
+                    id SERIAL PRIMARY KEY,
+                    device_id TEXT NOT NULL,
+                    variable TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    level_name TEXT NOT NULL,
+                    recommended_value DOUBLE PRECISION NOT NULL,
+                    sensitivity TEXT NOT NULL,
+                    basis TEXT,
+                    estimated_fp_pct DOUBLE PRECISION,
+                    status TEXT DEFAULT 'pending',
+                    accepted_value DOUBLE PRECISION,
+                    reviewed_by TEXT,
+                    reviewed_at TIMESTAMPTZ,
+                    UNIQUE(device_id, variable, direction, level_name, sensitivity)
+                )
+                """
+            )
             cur.close()
             conn.close()
         else:
@@ -375,6 +409,42 @@ class FlowDatabase:
                     station_id TEXT NOT NULL,
                     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (device_id) REFERENCES devices (device_id)
+                )
+                """
+            )
+
+            # Site intelligence: computed baseline snapshots (one per device)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS device_baselines (
+                    device_id TEXT PRIMARY KEY,
+                    computed_at TIMESTAMP NOT NULL,
+                    readings_used INTEGER NOT NULL,
+                    days_covered REAL NOT NULL,
+                    baseline_json TEXT NOT NULL,
+                    status TEXT NOT NULL
+                )
+                """
+            )
+
+            # Site intelligence: recommended alarm levels per device
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alarm_recommendations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    device_id TEXT NOT NULL,
+                    variable TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    level_name TEXT NOT NULL,
+                    recommended_value REAL NOT NULL,
+                    sensitivity TEXT NOT NULL,
+                    basis TEXT,
+                    estimated_fp_pct REAL,
+                    status TEXT DEFAULT 'pending',
+                    accepted_value REAL,
+                    reviewed_by TEXT,
+                    reviewed_at TIMESTAMP,
+                    UNIQUE(device_id, variable, direction, level_name, sensitivity)
                 )
                 """
             )
@@ -1316,6 +1386,294 @@ class FlowDatabase:
             results = [dict(r) for r in cursor.fetchall()]
             conn.close()
             return results
+
+
+    # ── Site intelligence: baselines & alarm recommendations ─────────────────
+
+    def save_device_baseline(
+        self,
+        device_id: str,
+        computed_at: str,
+        readings_used: int,
+        days_covered: float,
+        baseline_json: str,
+        status: str,
+    ) -> bool:
+        """Upsert the computed baseline snapshot for a device. Returns True on success."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO device_baselines
+                        (device_id, computed_at, readings_used, days_covered, baseline_json, status)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (device_id) DO UPDATE SET
+                        computed_at   = EXCLUDED.computed_at,
+                        readings_used = EXCLUDED.readings_used,
+                        days_covered  = EXCLUDED.days_covered,
+                        baseline_json = EXCLUDED.baseline_json,
+                        status        = EXCLUDED.status
+                    """,
+                    (device_id, computed_at, readings_used, days_covered, baseline_json, status),
+                )
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO device_baselines
+                        (device_id, computed_at, readings_used, days_covered, baseline_json, status)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(device_id) DO UPDATE SET
+                        computed_at   = excluded.computed_at,
+                        readings_used = excluded.readings_used,
+                        days_covered  = excluded.days_covered,
+                        baseline_json = excluded.baseline_json,
+                        status        = excluded.status
+                    """,
+                    (device_id, computed_at, readings_used, days_covered, baseline_json, status),
+                )
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+            finally:
+                conn.close()
+
+    def get_device_baseline(self, device_id: str) -> Optional[Dict]:
+        """Return the stored baseline row for *device_id*, or None if not found."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                cur.execute(
+                    "SELECT * FROM device_baselines WHERE device_id = %s",
+                    (device_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "SELECT * FROM device_baselines WHERE device_id = ?",
+                    (device_id,),
+                )
+                row = cursor.fetchone()
+                return dict(row) if row else None
+            except sqlite3.OperationalError:
+                return None
+            finally:
+                conn.close()
+
+    def save_alarm_recommendations(
+        self,
+        device_id: str,
+        recommendations: List[Dict],
+    ) -> int:
+        """Upsert alarm recommendations for a device.
+
+        Each dict must have: variable, direction, level_name, recommended_value,
+        sensitivity.  Optionally: basis, estimated_fp_pct.
+
+        Existing rows for the same (device_id, variable, direction, level_name,
+        sensitivity) are reset to ``status='pending'`` with the new values so
+        that a fresh recompute clears stale acceptances.
+
+        Returns the number of rows upserted.
+        """
+        if not recommendations:
+            return 0
+        params = [
+            (
+                device_id,
+                r["variable"],
+                r["direction"],
+                r["level_name"],
+                r["recommended_value"],
+                r["sensitivity"],
+                r.get("basis", ""),
+                r.get("estimated_fp_pct"),
+            )
+            for r in recommendations
+        ]
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.executemany(
+                    """
+                    INSERT INTO alarm_recommendations
+                        (device_id, variable, direction, level_name, recommended_value,
+                         sensitivity, basis, estimated_fp_pct, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending')
+                    ON CONFLICT (device_id, variable, direction, level_name, sensitivity)
+                    DO UPDATE SET
+                        recommended_value = EXCLUDED.recommended_value,
+                        basis             = EXCLUDED.basis,
+                        estimated_fp_pct  = EXCLUDED.estimated_fp_pct,
+                        status            = 'pending',
+                        accepted_value    = NULL,
+                        reviewed_by       = NULL,
+                        reviewed_at       = NULL
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cur.rowcount
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.executemany(
+                    """
+                    INSERT INTO alarm_recommendations
+                        (device_id, variable, direction, level_name, recommended_value,
+                         sensitivity, basis, estimated_fp_pct, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                    ON CONFLICT(device_id, variable, direction, level_name, sensitivity)
+                    DO UPDATE SET
+                        recommended_value = excluded.recommended_value,
+                        basis             = excluded.basis,
+                        estimated_fp_pct  = excluded.estimated_fp_pct,
+                        status            = 'pending',
+                        accepted_value    = NULL,
+                        reviewed_by       = NULL,
+                        reviewed_at       = NULL
+                    """,
+                    params,
+                )
+                conn.commit()
+                return cursor.rowcount
+            finally:
+                conn.close()
+
+    def get_alarm_recommendations(
+        self,
+        device_id: str,
+        sensitivity: Optional[str] = None,
+    ) -> List[Dict]:
+        """Return alarm recommendations for *device_id*, optionally filtered by sensitivity."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                if sensitivity:
+                    cur.execute(
+                        """
+                        SELECT * FROM alarm_recommendations
+                        WHERE device_id = %s AND sensitivity = %s
+                        ORDER BY variable, direction, level_name
+                        """,
+                        (device_id, sensitivity),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT * FROM alarm_recommendations
+                        WHERE device_id = %s
+                        ORDER BY variable, sensitivity, direction, level_name
+                        """,
+                        (device_id,),
+                    )
+                return [dict(r) for r in cur.fetchall()]
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            try:
+                if sensitivity:
+                    cursor.execute(
+                        """
+                        SELECT * FROM alarm_recommendations
+                        WHERE device_id = ? AND sensitivity = ?
+                        ORDER BY variable, direction, level_name
+                        """,
+                        (device_id, sensitivity),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        SELECT * FROM alarm_recommendations
+                        WHERE device_id = ?
+                        ORDER BY variable, sensitivity, direction, level_name
+                        """,
+                        (device_id,),
+                    )
+                return [dict(r) for r in cursor.fetchall()]
+            except sqlite3.OperationalError:
+                return []
+            finally:
+                conn.close()
+
+    def update_alarm_recommendation_status(
+        self,
+        rec_id: int,
+        status: str,
+        reviewed_by: str,
+        accepted_value: Optional[float] = None,
+    ) -> bool:
+        """Update the status of a single alarm recommendation row.
+
+        *status* should be ``'accepted'`` or ``'dismissed'``.
+        Returns True if a row was updated.
+        """
+        now = datetime.now(timezone.utc)
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    UPDATE alarm_recommendations
+                    SET status = %s, reviewed_by = %s, reviewed_at = %s, accepted_value = %s
+                    WHERE id = %s
+                    """,
+                    (status, reviewed_by, now, accepted_value, rec_id),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE alarm_recommendations
+                    SET status = ?, reviewed_by = ?, reviewed_at = ?, accepted_value = ?
+                    WHERE id = ?
+                    """,
+                    (status, reviewed_by, now.isoformat(), accepted_value, rec_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
 
 
 if __name__ == "__main__":
