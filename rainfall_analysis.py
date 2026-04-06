@@ -35,9 +35,9 @@ def _to_utc_naive(series: pd.Series) -> pd.Series:
 
 
 # ── Thresholds (adjustable via keyword args) ──────────────────────────────────
-_DEFAULT_RAIN_THRESHOLD_MM = 1.0      # minimum mm/hr to count as "raining"
+_DEFAULT_RAIN_THRESHOLD_MM = 0.1      # minimum mm/hr to count as "raining" (WMO measurable-rain threshold)
 _DEFAULT_II_MULTIPLIER     = 1.5      # flow > baseline × this → I/I flag
-_DRY_DAY_PRECIP_CAP_MM     = 0.5     # days with ≤ this rainfall → dry day
+_DRY_DAY_PRECIP_CAP_MM     = 0.1     # hourly mm/hr ≤ this → dry period for baseline calculation
 _BASELINE_LOOKBACK_DAYS    = 7       # rolling window for dry-weather baseline
 _MIN_DRY_READINGS          = 10      # minimum dry readings to compute baseline
 _EVENT_MERGE_GAP_HOURS     = 3       # merge rain events closer than this many hours
@@ -312,8 +312,8 @@ def detect_inflow_infiltration(
 
     if not events:
         result.recommendations.append(
-            "No rainfall events detected in the selected period. "
-            "All flow represents dry-weather conditions."
+            f"No rainfall events detected (threshold: {rain_threshold_mm} mm/hr). "
+            "All flow in the selected period represents dry-weather conditions."
         )
         result.quality_label = "High"
         result.confidence_score = 90.0
@@ -419,8 +419,8 @@ def detect_inflow_infiltration(
         result.quality_label = "High"
         result.confidence_score = 85.0
         result.recommendations.append(
-            "✅ No significant I/I responses detected. Sewer appears tight under "
-            "the observed rainfall conditions."
+            f"✅ {len(events)} rainfall event(s) detected but no significant I/I responses found. "
+            "Sewer appears tight under the observed rainfall conditions."
         )
 
     return result
