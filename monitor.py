@@ -331,9 +331,11 @@ class ContinuousMonitor:
             for device_id, device_info in DEVICES.items():
                 device_interval = self._current_interval
                 last_poll = self._device_last_poll.get(device_id)
-                if last_poll is not None and (now - last_poll).total_seconds() < device_interval:
-                    logger.debug(f"  Skipping {device_id} (next poll in {device_interval - (now - last_poll).total_seconds():.0f}s)")
-                    continue
+                if last_poll is not None:
+                    elapsed = (now - last_poll).total_seconds()
+                    if elapsed < device_interval:
+                        logger.debug(f"  Skipping {device_id} (next poll in {device_interval - elapsed:.0f}s)")
+                        continue
                 logger.info(f"  Checking device: {device_id}")
                 self._device_last_poll[device_id] = now
                 await self._scrape_device(
@@ -356,11 +358,17 @@ class ContinuousMonitor:
                         continue
                     # Use device-specific interval if set, otherwise fall back to global
                     raw_interval = db_device.get("poll_interval")
-                    device_interval = int(raw_interval) if raw_interval and int(raw_interval) > 0 else self._current_interval
+                    try:
+                        parsed_interval = int(raw_interval) if raw_interval is not None else 0
+                    except (ValueError, TypeError):
+                        parsed_interval = 0
+                    device_interval = parsed_interval if parsed_interval > 0 else self._current_interval
                     last_poll = self._device_last_poll.get(db_device_id)
-                    if last_poll is not None and (now - last_poll).total_seconds() < device_interval:
-                        logger.debug(f"  Skipping {db_device_id} (next poll in {device_interval - (now - last_poll).total_seconds():.0f}s)")
-                        continue
+                    if last_poll is not None:
+                        elapsed = (now - last_poll).total_seconds()
+                        if elapsed < device_interval:
+                            logger.debug(f"  Skipping {db_device_id} (next poll in {device_interval - elapsed:.0f}s)")
+                            continue
                     logger.info(f"  Checking DB device: {db_device_id}")
                     self._device_last_poll[db_device_id] = now
                     await self._scrape_device(
