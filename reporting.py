@@ -855,7 +855,6 @@ def _build_pdf_reportlab(device_name: str,
     # ── Logo ─────────────────────────────────────────────────────────────────
     if logo_path and Path(logo_path).exists():
         try:
-            suffix = Path(logo_path).suffix.lower()
             logo_img = RLImage(logo_path, height=18 * mm, width=None)
             logo_img.hAlign = 'LEFT'
             story.append(logo_img)
