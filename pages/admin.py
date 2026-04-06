@@ -114,12 +114,12 @@ def render_admin_panel():
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
-    # ── Upload Frequency ─────────────────────────────────────────────────────
-    st.markdown('<p class="section-title">Data Collection Frequency</p>', unsafe_allow_html=True)
+    # ── Upload Frequency (global default) ─────────────────────────────────────
+    st.markdown('<p class="section-title">Default Collection Frequency</p>', unsafe_allow_html=True)
     st.markdown(
         "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
-        "Set how often the monitor service polls each meter for new readings. "
-        "Changes take effect on the next collection cycle — no service restart required.</p>",
+        "Set the default polling interval applied to any monitor that does not have its own "
+        "per-site frequency configured. Changes take effect on the next collection cycle.</p>",
         unsafe_allow_html=True,
     )
 
@@ -144,17 +144,17 @@ def render_admin_panel():
             "1 minute",
         )
         _selected_freq = st.radio(
-            "Collection frequency:",
+            "Default frequency:",
             options=list(_FREQ_OPTIONS.keys()),
             index=list(_FREQ_OPTIONS.keys()).index(_current_freq_label),
             horizontal=True,
             key="upload_frequency_radio",
         )
-        if st.button("Apply Frequency", type="primary", key="apply_frequency_btn"):
+        if st.button("Apply Default Frequency", type="primary", key="apply_frequency_btn"):
             _new_seconds = _FREQ_OPTIONS[_selected_freq]
             flow_db.save_system_setting("monitor_poll_interval", str(_new_seconds))
             st.success(
-                f"Collection frequency set to **{_selected_freq}**. "
+                f"Default collection frequency set to **{_selected_freq}**. "
                 "The monitor will apply this on its next cycle."
             )
             st.rerun()
@@ -162,14 +162,73 @@ def render_admin_panel():
     with _freq_hint_col:
         st.markdown(f"""
         <div class="info-box">
-            <strong>Current setting</strong><br>
+            <strong>Current default</strong><br>
             <span style="color: #6b7280;">
-                Active frequency: <strong style="color:#3A7F5F;">{_current_freq_label}</strong><br><br>
-                Higher frequencies give more granular data but consume more resources.
-                For sewer flow monitoring, <strong>1–2 minutes</strong> is typically ideal.
+                Active default: <strong style="color:#3A7F5F;">{_current_freq_label}</strong><br><br>
+                Per-site overrides take precedence. Configure individual site frequencies
+                in the <strong>Per-Site Collection Frequency</strong> section below.
             </span>
         </div>
         """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+
+    # ── Per-Site Collection Frequency ─────────────────────────────────────────
+    st.markdown('<p class="section-title">Per-Site Collection Frequency</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Override the collection interval for individual monitoring sites. "
+        "Sites set to <em>Use default</em> inherit the global frequency above.</p>",
+        unsafe_allow_html=True,
+    )
+
+    _all_sites_freq = flow_db.get_devices()
+    if not _all_sites_freq:
+        st.info("No monitoring sites configured yet. Add a site first.")
+    else:
+        _FREQ_OPTIONS_WITH_DEFAULT = {"Use default": None, **_FREQ_OPTIONS}
+
+        for _fs in _all_sites_freq:
+            _fs_id = _fs["device_id"]
+            _fs_name = _fs["device_name"]
+            _fs_interval = _fs.get("poll_interval")
+
+            # Map current value to a label
+            _fs_current_label = next(
+                (lbl for lbl, val in _FREQ_OPTIONS.items() if val == _fs_interval),
+                "Use default",
+            )
+
+            _fcol_name, _fcol_radio, _fcol_btn = st.columns([2, 3, 1])
+            with _fcol_name:
+                st.markdown(
+                    f"<div style='padding-top:0.5rem;'>"
+                    f"<span style='font-weight:600;color:#4A4A4A;'>{_fs_name}</span><br>"
+                    f"<code style='font-size:0.78rem;color:#6b7280;'>{_fs_id}</code>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+            with _fcol_radio:
+                _fs_selected = st.radio(
+                    f"Frequency for {_fs_id}",
+                    options=list(_FREQ_OPTIONS_WITH_DEFAULT.keys()),
+                    index=list(_FREQ_OPTIONS_WITH_DEFAULT.keys()).index(_fs_current_label),
+                    horizontal=True,
+                    key=f"freq_radio_{_fs_id}",
+                    label_visibility="collapsed",
+                )
+            with _fcol_btn:
+                if st.button("Save", key=f"freq_save_{_fs_id}", type="primary"):
+                    _new_val = _FREQ_OPTIONS_WITH_DEFAULT[_fs_selected]
+                    ok = flow_db.set_device_poll_interval(_fs_id, _new_val)
+                    if ok:
+                        _label_str = _fs_selected if _fs_selected != "Use default" else "default"
+                        st.success(f"Saved — {_fs_name}: {_label_str}")
+                        st.rerun()
+                    else:
+                        st.error("Failed to save.")
+
+            st.markdown("<div style='height:0.25rem'></div>", unsafe_allow_html=True)
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
@@ -353,7 +412,7 @@ def render_admin_panel():
                 "and all its data. This cannot be undone.",
                 key="delete_site_confirm",
             )
-            if st.button("🗑️ Delete Site", disabled=not _confirm_site, key="delete_site_btn"):
+            if st.button("Delete Site", disabled=not _confirm_site, key="delete_site_btn"):
                 ok = flow_db.delete_device(_del_site["device_id"])
                 if ok:
                     st.success(f"Site '{_del_site['device_name']}' and all its data have been deleted.")
@@ -364,7 +423,7 @@ def render_admin_panel():
         with col_del_site_hint:
             st.markdown("""
             <div class="info-box" style="margin-top: 0.25rem; border-left: 4px solid #D93025;">
-                <strong style="color: #D93025;">⚠️ Destructive action</strong><br>
+                <strong style="color: #D93025;">Destructive action</strong><br>
                 <span style="color: #6b7280;">
                     Deleting a site removes all its flow measurements, anomaly flags,
                     reports and rain gauge assignments permanently.<br><br>
@@ -487,7 +546,7 @@ def render_admin_panel():
                         f"{_site_refreshed['latitude']:.3f}, {_site_refreshed['longitude']:.3f}"
                     )
 
-                if st.button("🔍 Find Nearest BOM Stations", key=f"find_stations_{_device_id}"):
+                if st.button("Find Nearest BOM Stations", key=f"find_stations_{_device_id}"):
                     with st.spinner("Searching BOM station catalogue…"):
                         from rainfall import search_bom_stations
                         _stations = search_bom_stations(
@@ -544,7 +603,7 @@ def render_admin_panel():
                 # Option to clear assignment
                 if _assigned:
                     with st.expander("Remove current assignment", expanded=False):
-                        if st.button("🗑️ Remove rain gauge assignment", key=f"remove_station_{_device_id}"):
+                        if st.button("Remove rain gauge assignment", key=f"remove_station_{_device_id}"):
                             # Delete the assignment row
                             try:
                                 import sqlite3 as _sl
@@ -563,7 +622,7 @@ def render_admin_panel():
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
     # ── Create New User ──────────────────────────────────────────────────────
-    st.markdown('<p class="section-title">➕ Create New User</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Create New User</p>', unsafe_allow_html=True)
 
     col_form, col_hint = st.columns([3, 2])
 
@@ -633,7 +692,7 @@ def render_admin_panel():
                 "and all their session data. This cannot be undone.",
                 key="delete_user_confirm",
             )
-            if st.button("🗑️ Delete User", disabled=not _confirm_user, key="delete_user_btn"):
+            if st.button("Delete User", disabled=not _confirm_user, key="delete_user_btn"):
                 ok = auth_db.delete_user(_del_user['user_id'])
                 if ok:
                     st.success(f"User '{_del_user['username']}' has been deleted.")
@@ -644,7 +703,7 @@ def render_admin_panel():
         with col_del_user_hint:
             st.markdown("""
             <div class="info-box" style="margin-top: 0.25rem; border-left: 4px solid #D93025;">
-                <strong style="color: #D93025;">⚠️ Destructive action</strong><br>
+                <strong style="color: #D93025;">Destructive action</strong><br>
                 <span style="color: #6b7280;">
                     Deleting a user removes their account, all active sessions
                     and site assignments permanently.<br><br>
@@ -749,7 +808,7 @@ def render_admin_panel():
                                         auth_db.unassign_device_from_user(
                                             selected_user['user_id'], device_id
                                         )
-                                        st.toast(f"Removed {device['device_name']}", icon="✅")
+                                        st.toast(f"Removed {device['device_name']}")
                                         st.rerun()
                     else:
                         st.info("No sites assigned yet.")

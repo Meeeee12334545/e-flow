@@ -268,7 +268,7 @@ def fetch_latest_reading(device_id: str):
 
     # Return for display; persistence is handled by the monitor service
     timestamp = data.get("timestamp") or datetime.now(pytz.timezone(DEFAULT_TZ))
-    message = "✓ Live reading retrieved — monitor service stores data automatically"
+    message = "Live reading retrieved — monitor service stores data automatically"
     return True, message, timestamp, payload
 
 
@@ -433,11 +433,11 @@ with st.sidebar:
                     if stored:
                         get_cached_measurements.clear()
                         get_cached_measurement_count.clear()
-                        st.success(f"✅ Reading fetched and saved to database at {ts_str}")
+                        st.success(f"Reading fetched and saved to database at {ts_str}")
                     else:
-                        st.info(f"✓ Reading fetched at {ts_str} (no change from last stored value)")
+                        st.info(f"Reading fetched at {ts_str} (no change from last stored value)")
                 except Exception as e:
-                    st.warning(f"⚠️ Reading fetched at {ts_str} but could not save: {e}")
+                    st.warning(f"Reading fetched at {ts_str} but could not save: {e}")
             else:
                 st.error(message)
         
@@ -494,7 +494,7 @@ with st.sidebar:
     if total_measurements == 0:
         st.warning("No measurements yet.")
         if _monitor_proc is not None:
-            st.info("⏳ Background monitor is running — first reading will arrive within 60 seconds. You can also click **Get Latest Data** above to fetch and save a reading right now.")
+            st.info("Background monitor is running — first reading will arrive within 60 seconds. You can also click **Get Latest Data** above to fetch and save a reading right now.")
         else:
             st.info("Click **Get Latest Data** to fetch and save a live reading, or start monitor.py to collect data automatically.")
 
@@ -526,7 +526,7 @@ if page_mode == 'Simplified View':
                 last_ts_str = str(latest['timestamp'])
 
             st.markdown(f"""
-            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 1.75rem;">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 1.25rem;">
                 <div class="metric-card depth">
                     <p class="metric-label">Water Depth</p>
                     <p class="metric-value">{latest_depth}<span class="metric-unit">mm</span></p>
@@ -540,7 +540,7 @@ if page_mode == 'Simplified View':
                     <p class="metric-value amber">{latest_flow}<span class="metric-unit">L/s</span></p>
                 </div>
             </div>
-            <p style="font-size: 0.82rem; color: #6b7280; margin: -0.75rem 0 1.5rem 4px;">
+            <p style="font-size: 0.82rem; color: #6b7280; margin: -0.5rem 0 1.25rem 4px;">
                 Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
             </p>
             """, unsafe_allow_html=True)
@@ -555,8 +555,8 @@ if page_mode == 'Simplified View':
             col_title, col_picker = st.columns([2, 1])
             with col_title:
                 st.markdown("""
-                <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A;">Performance trend</h2>
-                <p style="margin: 0.25rem 0 0 0; color: #6b7280; font-size: 0.92rem;">Flow rate, depth and velocity over the selected window.</p>
+                <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A; font-size: 1.15rem;">Performance trend</h2>
+                <p style="margin: 0.15rem 0 0 0; color: #6b7280; font-size: 0.85rem;">Flow rate, depth and velocity over the selected window.</p>
                 """, unsafe_allow_html=True)
             with col_picker:
                 selected_window, selected_window_label = st.selectbox(
@@ -579,12 +579,11 @@ if page_mode == 'Simplified View':
                 go.Scatter(
                     x=df_window['timestamp'],
                     y=df_window['flow_lps'],
-                    mode='lines+markers',
+                    mode='lines',
                     name='Flow (L/s)',
-                    line=dict(color='#1D4E89', width=2.5),
-                    marker=dict(size=5),
+                    line=dict(color='#1D4E89', width=1.5),
                     fill='tozeroy',
-                    fillcolor='rgba(29, 78, 137, 0.07)',
+                    fillcolor='rgba(29, 78, 137, 0.06)',
                 ),
                 secondary_y=False
             )
@@ -592,10 +591,9 @@ if page_mode == 'Simplified View':
                 go.Scatter(
                     x=df_window['timestamp'],
                     y=df_window['depth_mm'],
-                    mode='lines+markers',
+                    mode='lines',
                     name='Depth (mm)',
-                    line=dict(color='#3A7F5F', width=2, dash='dash'),
-                    marker=dict(size=5)
+                    line=dict(color='#3A7F5F', width=1.5, dash='dash'),
                 ),
                 secondary_y=False
             )
@@ -603,10 +601,9 @@ if page_mode == 'Simplified View':
                 go.Scatter(
                     x=df_window['timestamp'],
                     y=df_window['velocity_mps'],
-                    mode='lines+markers',
+                    mode='lines',
                     name='Velocity (m/s)',
-                    line=dict(color='#2A9D8F', width=2, dash='dot'),
-                    marker=dict(size=5)
+                    line=dict(color='#2A9D8F', width=1.5, dash='dot'),
                 ),
                 secondary_y=True
             )
@@ -614,16 +611,16 @@ if page_mode == 'Simplified View':
                 title=dict(text=''),
                 legend=dict(
                     orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-                    font=dict(size=12),
+                    font=dict(size=11),
                     title=dict(text=''),
                 ),
                 hovermode='x unified',
-                margin=dict(l=0, r=0, t=40, b=0),
+                margin=dict(l=0, r=0, t=32, b=0),
                 template='plotly_white',
-                height=440,
+                height=380,
                 paper_bgcolor='#ffffff',
                 plot_bgcolor='#ffffff',
-                font=dict(family='Inter, -apple-system, sans-serif', color='#4A4A4A', size=12),
+                font=dict(family='Inter, -apple-system, sans-serif', color='#4A4A4A', size=11),
                 xaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
                 yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
             )
@@ -650,7 +647,7 @@ if page_mode == 'Simplified View':
                 df_export['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
             csv_data = df_export.to_csv(index=False)
             with col_download1:
-                st.download_button('⬇ Download CSV', data=csv_data,
+                st.download_button('Download CSV', data=csv_data,
                                    file_name=f'{selected_device_id}_data.csv', mime='text/csv',
                                    width="stretch")
         else:
@@ -737,7 +734,7 @@ if selected_device_id:
 
         if df_filtered.empty and not df.empty:
             st.warning(
-                f"⚠️ No data in the last {_time_label}. "
+                f"No data in the last {_time_label}. "
                 f"Oldest record: {df['timestamp'].min().strftime('%Y-%m-%d %H:%M')}, "
                 f"Latest: {df['timestamp'].max().strftime('%Y-%m-%d %H:%M')}. "
                 "Try a wider time window."
@@ -782,7 +779,7 @@ if selected_device_id:
                 </div>
             </div>
             <p style="font-size: 0.82rem; color: #6b7280; margin: 0 0 1.5rem 4px;">
-                ✓ Last reading: {lu_str} &nbsp;·&nbsp; {len(df)} records in selected window
+                Last reading: {lu_str} &nbsp;·&nbsp; {len(df)} records in selected window
             </p>
             """, unsafe_allow_html=True)
 
@@ -839,12 +836,11 @@ if selected_device_id:
                 fig_main_flow.add_trace(go.Scatter(
                     x=df_graph["timestamp"],
                     y=df_graph["flow_lps"],
-                    mode='lines+markers',
+                    mode='lines',
                     name='Flow Rate (L/s)',
-                    line=dict(color='#1D4E89', width=2.5),
-                    marker=dict(size=5, color='#1D4E89'),
+                    line=dict(color='#1D4E89', width=1.5),
                     fill='tozeroy',
-                    fillcolor='rgba(29, 78, 137, 0.07)',
+                    fillcolor='rgba(29, 78, 137, 0.06)',
                     hovertemplate='<b>%{x|%Y-%m-%d %H:%M}</b><br>Flow: %{y:.2f} L/s<extra></extra>'
                 ))
                 fig_main_flow.update_layout(
@@ -900,9 +896,8 @@ if selected_device_id:
 
             with tab1:
                 fig_depth = px.line(df, x="timestamp", y="depth_mm",
-                                    labels={"depth_mm": "Depth (mm)", "timestamp": "Time"},
-                                    markers=True)
-                fig_depth.update_traces(line=dict(color="#3A7F5F", width=2.5), marker=dict(size=5))
+                                    labels={"depth_mm": "Depth (mm)", "timestamp": "Time"})
+                fig_depth.update_traces(line=dict(color="#3A7F5F", width=1.5))
                 fig_depth.update_layout(**_chart_layout)
                 fig_depth.update_yaxes(title_text="Depth (mm)")
                 st.plotly_chart(fig_depth, use_container_width=True)
@@ -914,9 +909,8 @@ if selected_device_id:
 
             with tab2:
                 fig_vel = px.line(df, x="timestamp", y="velocity_mps",
-                                  labels={"velocity_mps": "Velocity (m/s)", "timestamp": "Time"},
-                                  markers=True)
-                fig_vel.update_traces(line=dict(color="#2A9D8F", width=2.5), marker=dict(size=5))
+                                  labels={"velocity_mps": "Velocity (m/s)", "timestamp": "Time"})
+                fig_vel.update_traces(line=dict(color="#2A9D8F", width=1.5))
                 fig_vel.update_layout(**_chart_layout)
                 fig_vel.update_yaxes(title_text="Velocity (m/s)")
                 st.plotly_chart(fig_vel, use_container_width=True)
@@ -928,9 +922,8 @@ if selected_device_id:
 
             with tab3:
                 fig_flow = px.line(df, x="timestamp", y="flow_lps",
-                                   labels={"flow_lps": "Flow (L/s)", "timestamp": "Time"},
-                                   markers=True)
-                fig_flow.update_traces(line=dict(color="#1D4E89", width=2.5), marker=dict(size=5))
+                                   labels={"flow_lps": "Flow (L/s)", "timestamp": "Time"})
+                fig_flow.update_traces(line=dict(color="#1D4E89", width=1.5))
                 fig_flow.update_layout(**_chart_layout)
                 fig_flow.update_yaxes(title_text="Flow Rate (L/s)")
                 st.plotly_chart(fig_flow, use_container_width=True)
@@ -969,7 +962,7 @@ if selected_device_id:
                                 df_rain["timestamp"] = pd.to_datetime(df_rain["timestamp"])
                         except Exception as _re:
                             df_rain = pd.DataFrame(columns=["timestamp", "rainfall_mm"])
-                            st.warning(f"⚠️ Could not load rainfall data: {_re}")
+                            st.warning(f"Could not load rainfall data: {_re}")
 
                     # ── Analysis ──────────────────────────────────────────
                     _df_flow_r = df.copy() if not df.empty else pd.DataFrame(columns=["timestamp", "flow_lps"])
@@ -1025,9 +1018,9 @@ if selected_device_id:
                                 x=df["timestamp"],
                                 y=df["flow_lps"],
                                 name="Flow (L/s)",
-                                line=dict(color="#1D4E89", width=2.5),
+                                line=dict(color="#1D4E89", width=1.5),
                                 fill="tozeroy",
-                                fillcolor="rgba(29,78,137,0.07)",
+                                fillcolor="rgba(29,78,137,0.06)",
                                 hovertemplate="%{y:.2f} L/s<extra>Flow</extra>",
                             ),
                             secondary_y=False,
@@ -1184,7 +1177,7 @@ if selected_device_id:
             col_dl1, _ = st.columns([1, 3])
             with col_dl1:
                 st.download_button(
-                    "⬇ Download CSV",
+                    "Download CSV",
                     data=display_df.to_csv(index=False),
                     file_name=f"flow_{selected_device_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     mime="text/csv",

@@ -169,12 +169,15 @@ class FlowDatabase:
                 )
                 """
             )
-            # Migrate devices table — add lat/lon and dashboard_url if absent
+            # Migrate devices table — add lat/lon, dashboard_url and poll_interval if absent
             cur.execute(
                 "ALTER TABLE devices ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION"
             )
             cur.execute(
                 "ALTER TABLE devices ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION"
+            )
+            cur.execute(
+                "ALTER TABLE devices ADD COLUMN IF NOT EXISTS poll_interval INTEGER"
             )
             # Rainfall stations cache
             cur.execute(
@@ -296,6 +299,11 @@ class FlowDatabase:
                 pass
             try:
                 cursor.execute("ALTER TABLE devices ADD COLUMN longitude REAL")
+            except Exception:
+                pass
+            # Add per-device poll interval column
+            try:
+                cursor.execute("ALTER TABLE devices ADD COLUMN poll_interval INTEGER")
             except Exception:
                 pass
 
@@ -1219,6 +1227,38 @@ class FlowDatabase:
                 cursor.execute(
                     "UPDATE devices SET latitude = ?, longitude = ? WHERE device_id = ?",
                     (latitude, longitude, device_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    def set_device_poll_interval(self, device_id: str, seconds: int) -> bool:
+        """Set the per-device collection interval in seconds.
+
+        Pass *None* for *seconds* to clear the override and inherit the global
+        ``monitor_poll_interval`` system setting.  Returns True on success.
+        """
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE devices SET poll_interval = %s WHERE device_id = %s",
+                    (seconds, device_id),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE devices SET poll_interval = ? WHERE device_id = ?",
+                    (seconds, device_id),
                 )
                 conn.commit()
                 return cursor.rowcount > 0
