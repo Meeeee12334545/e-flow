@@ -252,6 +252,16 @@ class FlowDatabase:
                 )
                 """
             )
+            # System-wide key-value settings (e.g. monitor_poll_interval)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            )
             cur.close()
             conn.close()
         else:
@@ -449,6 +459,17 @@ class FlowDatabase:
                 """
             )
 
+            # System-wide key-value settings (e.g. monitor_poll_interval)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
             conn.commit()
             conn.close()
 
@@ -494,6 +515,106 @@ class FlowDatabase:
                         dashboard_url = COALESCE(excluded.dashboard_url, devices.dashboard_url)
                     """,
                     (device_id, device_name, location, dashboard_url),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def update_device(self, device_id: str, device_name: str, location: str = None,
+                      dashboard_url: str = None) -> bool:
+        """Update an existing device's name, location and dashboard URL.
+
+        Returns True if the device was found and updated, False otherwise.
+        """
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    UPDATE devices SET
+                        device_name   = %s,
+                        location      = %s,
+                        dashboard_url = COALESCE(%s, dashboard_url)
+                    WHERE device_id = %s
+                    """,
+                    (device_name, location, dashboard_url, device_id),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE devices SET
+                        device_name   = ?,
+                        location      = ?,
+                        dashboard_url = COALESCE(?, dashboard_url)
+                    WHERE device_id = ?
+                    """,
+                    (device_name, location, dashboard_url, device_id),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
+
+    def get_system_setting(self, key: str, default: str = None) -> Optional[str]:
+        """Retrieve a system setting by key. Returns *default* if not set."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute("SELECT value FROM system_settings WHERE key = %s", (key,))
+                row = cur.fetchone()
+                return row[0] if row else default
+            except Exception:
+                return default
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT value FROM system_settings WHERE key = ?", (key,))
+                row = cursor.fetchone()
+                return row[0] if row else default
+            except sqlite3.OperationalError:
+                return default
+            finally:
+                conn.close()
+
+    def save_system_setting(self, key: str, value: str) -> None:
+        """Upsert a system setting."""
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO system_settings (key, value)
+                    VALUES (%s, %s)
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+                    """,
+                    (key, value),
+                )
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
+                    (key, value),
                 )
                 conn.commit()
             finally:

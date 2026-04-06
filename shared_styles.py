@@ -75,7 +75,7 @@ _CSS = """
     }
 
     .block-container {
-        padding: 1.5rem 2rem 3rem !important;
+        padding: 1.25rem 2rem 3rem !important;
         max-width: 1400px !important;
     }
 
@@ -287,11 +287,11 @@ _CSS = """
     }
 
     .section-title {
-        font-size: 1.05rem !important;
+        font-size: 0.78rem !important;
         font-weight: 700 !important;
-        color: var(--text) !important;
+        color: var(--muted) !important;
         margin: 0 0 0.75rem 0 !important;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
         border-left: 3px solid var(--primary);
         padding-left: 10px;
@@ -740,6 +740,83 @@ _CSS = """
 
     [data-testid="stDataFrame"] tbody tr:hover td {
         background: var(--primary-soft) !important;
+    }
+
+    /* ── Form inputs — polished appearance ── */
+    .stTextInput input, .stTextArea textarea, .stNumberInput input {
+        border: 1.5px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important;
+        background: var(--surface) !important;
+        color: var(--text) !important;
+        font-size: 0.9rem !important;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+        padding: 0.55rem 0.85rem !important;
+    }
+
+    .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus {
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 3px rgba(58,127,95,0.12) !important;
+        outline: none !important;
+    }
+
+    .stTextInput label, .stTextArea label, .stSelectbox label,
+    .stNumberInput label, .stRadio label {
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: var(--muted) !important;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        margin-bottom: 0.3rem !important;
+    }
+
+    /* ── Radio buttons — pill style ── */
+    .stRadio [data-testid="stMarkdownContainer"] p {
+        font-size: 0.88rem !important;
+        color: var(--text) !important;
+    }
+
+    .stRadio > div[role="radiogroup"] {
+        gap: 0.4rem !important;
+    }
+
+    /* ── Checkbox ── */
+    .stCheckbox label {
+        font-size: 0.88rem !important;
+        color: var(--text) !important;
+        text-transform: none !important;
+        letter-spacing: 0 !important;
+        font-weight: 400 !important;
+    }
+
+    /* ── Alert / info / success banners — tighter ── */
+    .stAlert {
+        border-radius: var(--radius-sm) !important;
+        font-size: 0.88rem !important;
+        padding: 0.7rem 1rem !important;
+    }
+
+    /* ── Forms ── */
+    [data-testid="stForm"] {
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-md) !important;
+        padding: 1.25rem 1.5rem 1rem !important;
+        background: var(--surface) !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+
+    [data-testid="stForm"] [data-testid="stFormSubmitButton"] > button {
+        margin-top: 0.5rem !important;
+        width: 100% !important;
+        padding: 0.65rem 1.4rem !important;
+        font-size: 0.92rem !important;
+        letter-spacing: 0.03em;
+    }
+
+    /* ── Dividers — subtle horizontal rule ── */
+    hr {
+        border: none !important;
+        border-top: 1px solid var(--border) !important;
+        margin: 1.5rem 0 !important;
     }
 
     /* ── Quality / status text badges ── */

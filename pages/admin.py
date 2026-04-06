@@ -114,6 +114,65 @@ def render_admin_panel():
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
+    # ── Upload Frequency ─────────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Data Collection Frequency</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Set how often the monitor service polls each meter for new readings. "
+        "Changes take effect on the next collection cycle — no service restart required.</p>",
+        unsafe_allow_html=True,
+    )
+
+    _FREQ_OPTIONS = {
+        "30 seconds": 30,
+        "1 minute": 60,
+        "2 minutes": 120,
+        "5 minutes": 300,
+    }
+    _freq_col, _freq_hint_col = st.columns([3, 2])
+
+    with _freq_col:
+        _current_interval_str = flow_db.get_system_setting("monitor_poll_interval", "60")
+        try:
+            _current_interval_val = int(_current_interval_str)
+        except (ValueError, TypeError):
+            _current_interval_val = 60
+
+        # Find the matching label for the current value
+        _current_freq_label = next(
+            (lbl for lbl, val in _FREQ_OPTIONS.items() if val == _current_interval_val),
+            "1 minute",
+        )
+        _selected_freq = st.radio(
+            "Collection frequency:",
+            options=list(_FREQ_OPTIONS.keys()),
+            index=list(_FREQ_OPTIONS.keys()).index(_current_freq_label),
+            horizontal=True,
+            key="upload_frequency_radio",
+        )
+        if st.button("Apply Frequency", type="primary", key="apply_frequency_btn"):
+            _new_seconds = _FREQ_OPTIONS[_selected_freq]
+            flow_db.save_system_setting("monitor_poll_interval", str(_new_seconds))
+            st.success(
+                f"Collection frequency set to **{_selected_freq}**. "
+                "The monitor will apply this on its next cycle."
+            )
+            st.rerun()
+
+    with _freq_hint_col:
+        st.markdown(f"""
+        <div class="info-box">
+            <strong>Current setting</strong><br>
+            <span style="color: #6b7280;">
+                Active frequency: <strong style="color:#3A7F5F;">{_current_freq_label}</strong><br><br>
+                Higher frequencies give more granular data but consume more resources.
+                For sewer flow monitoring, <strong>1–2 minutes</strong> is typically ideal.
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+
     # ── Add New Monitoring Site ──────────────────────────────────────────────
     st.markdown('<p class="section-title">Add New Monitoring Site</p>', unsafe_allow_html=True)
 
@@ -190,6 +249,80 @@ def render_admin_panel():
                     f"<span style='color:#6b7280;font-size:0.82rem;'>{url_display}</span>",
                     unsafe_allow_html=True,
                 )
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+
+    # ── Edit Monitoring Site ──────────────────────────────────────────────────
+    st.markdown('<p class="section-title">Edit Monitoring Site</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Update the name, location or dashboard URL for an existing monitoring site.</p>",
+        unsafe_allow_html=True,
+    )
+
+    # Refresh after potential adds above
+    _all_sites_for_edit = flow_db.get_devices()
+    if not _all_sites_for_edit:
+        st.info("No sites configured yet. Add a site first.")
+    else:
+        _edit_site_map = {s["device_name"]: s for s in _all_sites_for_edit}
+        _edit_col, _edit_hint_col = st.columns([3, 2])
+
+        with _edit_col:
+            _edit_sel = st.selectbox(
+                "Select site to edit:",
+                options=list(_edit_site_map.keys()),
+                key="edit_site_selector",
+            )
+            _edit_site = _edit_site_map[_edit_sel]
+
+            with st.form("edit_site_form"):
+                _edit_name = st.text_input(
+                    "Site Name",
+                    value=_edit_site.get("device_name", ""),
+                    key="edit_site_name",
+                )
+                _edit_location = st.text_input(
+                    "Location",
+                    value=_edit_site.get("location") or "",
+                    key="edit_site_location",
+                )
+                _edit_url = st.text_input(
+                    "Dashboard URL",
+                    value=_edit_site.get("dashboard_url") or "",
+                    help="Full URL to the USRIOT unit dashboard for this site.",
+                    key="edit_site_url",
+                )
+                if st.form_submit_button("Save Changes →", width='stretch'):
+                    if not _edit_name.strip():
+                        st.error("Site Name cannot be empty.")
+                    elif _edit_url.strip() and not _edit_url.strip().startswith("http"):
+                        st.error("Dashboard URL must start with http:// or https://")
+                    else:
+                        ok = flow_db.update_device(
+                            device_id=_edit_site["device_id"],
+                            device_name=_edit_name.strip(),
+                            location=_edit_location.strip() or None,
+                            dashboard_url=_edit_url.strip() or None,
+                        )
+                        if ok:
+                            st.success(f"Site '{_edit_name.strip()}' updated successfully.")
+                            st.rerun()
+                        else:
+                            st.error("Failed to update site.")
+
+        with _edit_hint_col:
+            st.markdown(f"""
+            <div class="info-box" style="margin-top: 0.25rem;">
+                <strong>Editing site:</strong> <code>{_edit_site['device_id']}</code><br>
+                <span style="color: #6b7280;">
+                    The Site ID (<code>{_edit_site['device_id']}</code>) cannot be changed
+                    as it is used to link collected measurements.<br><br>
+                    You can update the name, physical location description,
+                    and the USRIOT dashboard URL at any time.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
 
