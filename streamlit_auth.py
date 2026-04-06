@@ -276,7 +276,7 @@ def render_auth_header():
                     st.switch_page("pages/profile.py")
             if st.button("Reports", width="stretch", key="nav_reports"):
                 st.switch_page("pages/reports.py")
-            if st.button("Intelligence", width="stretch", key="nav_intelligence"):
+            if st.button("FlowSense™ Analysis", width="stretch", key="nav_intelligence"):
                 st.switch_page("pages/intelligence.py")
         else:
             st.markdown(

@@ -700,12 +700,14 @@ if selected_device_id:
     col_fd_title, col_fd_range = st.columns([2, 1])
     with col_fd_title:
         st.markdown(f"""
-        <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A;">
-            Full Dashboard — {selected_device_name}
-        </h2>
-        <p style="margin: 0.25rem 0 1rem; color: #6b7280; font-size: 0.92rem;">
-            Detailed time-series analytics and statistics
-        </p>
+        <div style="border-left: 4px solid #3A7F5F; padding-left: 0.85rem; margin-bottom: 0.75rem;">
+            <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A; font-size: 1.35rem;">
+                {selected_device_name}
+            </h2>
+            <p style="margin: 0.2rem 0 0; color: #6b7280; font-size: 0.88rem;">
+                Full Dashboard &nbsp;·&nbsp; Time-series analytics, statistics &amp; hydraulic analysis
+            </p>
+        </div>
         """, unsafe_allow_html=True)
     with col_fd_range:
         time_range, _time_label = st.selectbox(
@@ -764,22 +766,26 @@ if selected_device_id:
                 lu_str = str(last_update)
 
             st.markdown(f"""
-            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 0.5rem;">
-                <div class="metric-card">
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 0.5rem;">
+                <div class="metric-card depth">
                     <p class="metric-label">Water Depth</p>
                     <p class="metric-value">{depth_str}<span class="metric-unit">mm</span></p>
                 </div>
-                <div class="metric-card">
+                <div class="metric-card velocity">
                     <p class="metric-label">Flow Velocity</p>
                     <p class="metric-value green">{velocity_str}<span class="metric-unit">m/s</span></p>
                 </div>
-                <div class="metric-card">
+                <div class="metric-card flow">
                     <p class="metric-label">Flow Rate</p>
                     <p class="metric-value amber">{flow_str}<span class="metric-unit">L/s</span></p>
                 </div>
+                <div class="metric-card" style="border-top-color: #9ca3af;">
+                    <p class="metric-label">Records</p>
+                    <p class="metric-value" style="color:#9ca3af;">{len(df)}<span class="metric-unit">pts</span></p>
+                </div>
             </div>
             <p style="font-size: 0.82rem; color: #6b7280; margin: 0 0 1.5rem 4px;">
-                Last reading: {lu_str} &nbsp;·&nbsp; {len(df)} records in selected window
+                Last reading: {lu_str} &nbsp;·&nbsp; {_time_label} window
             </p>
             """, unsafe_allow_html=True)
 
@@ -892,7 +898,7 @@ if selected_device_id:
                 yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
             )
 
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Depth", "Velocity", "Flow", "Rainfall & I/I", "Statistics"])
+            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Depth", "Velocity", "Flow", "Depth vs Velocity", "Rainfall & I/I", "Statistics"])
 
             with tab1:
                 fig_depth = px.line(df, x="timestamp", y="depth_mm",
@@ -934,6 +940,92 @@ if selected_device_id:
                 col_s4.metric("Std Dev", f"{df['flow_lps'].std():.1f} L/s")
 
             with tab4:
+                # ── Depth vs Velocity scatter plot ──────────────────────────
+                _df_scatter = df[["depth_mm", "velocity_mps", "flow_lps", "timestamp"]].dropna(subset=["depth_mm", "velocity_mps"])
+                if not _df_scatter.empty:
+                    _scatter_col1, _scatter_col2 = st.columns([3, 1])
+                    with _scatter_col2:
+                        _colour_by = st.selectbox(
+                            "Colour points by",
+                            options=["Flow Rate (L/s)", "Time"],
+                            index=0,
+                            key="scatter_colour_by",
+                        )
+                    with _scatter_col1:
+                        st.markdown(
+                            "<p style='font-size:0.88rem;color:#6b7280;margin:0 0 0.5rem;'>"
+                            "Each point represents one measurement. Colour encodes the selected variable — "
+                            "useful for identifying hydraulic rating curves and flow regime patterns.</p>",
+                            unsafe_allow_html=True,
+                        )
+
+                    if _colour_by == "Flow Rate (L/s)":
+                        fig_scatter = px.scatter(
+                            _df_scatter,
+                            x="depth_mm",
+                            y="velocity_mps",
+                            color="flow_lps",
+                            color_continuous_scale=[
+                                [0.0, "#c8e6f4"],
+                                [0.5, "#1D4E89"],
+                                [1.0, "#0a1f3a"],
+                            ],
+                            labels={
+                                "depth_mm": "Water Depth (mm)",
+                                "velocity_mps": "Flow Velocity (m/s)",
+                                "flow_lps": "Flow Rate (L/s)",
+                            },
+                            hover_data={"timestamp": True, "flow_lps": ":.2f"},
+                        )
+                        fig_scatter.update_coloraxes(colorbar_title="Flow (L/s)")
+                    else:
+                        _df_scatter = _df_scatter.copy()
+                        _df_scatter["_ts_num"] = pd.to_datetime(_df_scatter["timestamp"]).astype("int64")
+                        fig_scatter = px.scatter(
+                            _df_scatter,
+                            x="depth_mm",
+                            y="velocity_mps",
+                            color="_ts_num",
+                            color_continuous_scale=[
+                                [0.0, "#e8f3ee"],
+                                [0.5, "#3A7F5F"],
+                                [1.0, "#1a3d2a"],
+                            ],
+                            labels={
+                                "depth_mm": "Water Depth (mm)",
+                                "velocity_mps": "Flow Velocity (m/s)",
+                            },
+                            hover_data={"timestamp": True, "_ts_num": False},
+                        )
+                        fig_scatter.update_coloraxes(
+                            colorbar_title="Time →",
+                            colorbar_tickvals=[],
+                        )
+
+                    fig_scatter.update_traces(
+                        marker=dict(size=6, opacity=0.75, line=dict(width=0.5, color="rgba(255,255,255,0.4)")),
+                    )
+                    fig_scatter.update_layout(
+                        height=480,
+                        template="plotly_white",
+                        paper_bgcolor="#ffffff",
+                        plot_bgcolor="#ffffff",
+                        font=dict(family="Inter, -apple-system, sans-serif", color="#4A4A4A", size=12),
+                        margin=dict(l=0, r=0, t=20, b=0),
+                        xaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9", title="Water Depth (mm)"),
+                        yaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9", title="Flow Velocity (m/s)"),
+                    )
+                    st.plotly_chart(fig_scatter, use_container_width=True)
+
+                    _corr_col, _depth_range_col, _velocity_range_col = st.columns(3)
+                    _corr = _df_scatter["depth_mm"].corr(_df_scatter["velocity_mps"])
+                    _corr_col.metric("Depth–Velocity Correlation", f"{_corr:.3f}", help="Pearson r — values near ±1 indicate a strong linear relationship")
+                    _depth_range_col.metric("Depth Range", f"{_df_scatter['depth_mm'].min():.0f} – {_df_scatter['depth_mm'].max():.0f} mm")
+                    _velocity_range_col.metric("Velocity Range", f"{_df_scatter['velocity_mps'].min():.3f} – {_df_scatter['velocity_mps'].max():.3f} m/s")
+                else:
+                    st.info("Insufficient data to render the scatter plot. Both depth and velocity readings are required.")
+
+            with tab5:
                 # ── Rainfall & I/I tab ─────────────────────────────────────
                 _dev_info_r = next((d for d in db.get_devices() if d["device_id"] == selected_device_id), None)
                 _has_loc = _dev_info_r and _dev_info_r.get("latitude") and _dev_info_r.get("longitude")
@@ -1111,60 +1203,93 @@ if selected_device_id:
                         for _rec in _response.recommendations:
                             st.markdown(_rec)
 
-            with tab5:
-                st.markdown("#### Aggregate Statistics")
+            with tab6:
+                st.markdown(
+                    "<p class='section-title' style='margin-top:0;'>Aggregate Statistics</p>",
+                    unsafe_allow_html=True,
+                )
                 col_sum1, col_sum2, col_sum3 = st.columns(3)
                 with col_sum1:
-                    st.markdown("**Water Depth**")
+                    st.markdown(
+                        "<p style='font-weight:600;color:#3A7F5F;font-size:0.9rem;"
+                        "margin:0 0 0.5rem;border-bottom:2px solid #3A7F5F;padding-bottom:4px;'>"
+                        "Water Depth</p>",
+                        unsafe_allow_html=True,
+                    )
                     st.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
                     st.metric("Median", f"{df['depth_mm'].median():.1f} mm")
-                    st.metric("Range", f"{df['depth_mm'].max() - df['depth_mm'].min():.1f} mm")
+                    st.metric("Std Dev", f"{df['depth_mm'].std():.1f} mm")
+                    st.metric("Range", f"{df['depth_mm'].min():.0f} – {df['depth_mm'].max():.0f} mm")
                 with col_sum2:
-                    st.markdown("**Flow Velocity**")
+                    st.markdown(
+                        "<p style='font-weight:600;color:#2A9D8F;font-size:0.9rem;"
+                        "margin:0 0 0.5rem;border-bottom:2px solid #2A9D8F;padding-bottom:4px;'>"
+                        "Flow Velocity</p>",
+                        unsafe_allow_html=True,
+                    )
                     st.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
                     st.metric("Median", f"{df['velocity_mps'].median():.3f} m/s")
-                    st.metric("Range", f"{df['velocity_mps'].max() - df['velocity_mps'].min():.3f} m/s")
+                    st.metric("Std Dev", f"{df['velocity_mps'].std():.3f} m/s")
+                    st.metric("Range", f"{df['velocity_mps'].min():.3f} – {df['velocity_mps'].max():.3f} m/s")
                 with col_sum3:
-                    st.markdown("**Flow Rate**")
+                    st.markdown(
+                        "<p style='font-weight:600;color:#1D4E89;font-size:0.9rem;"
+                        "margin:0 0 0.5rem;border-bottom:2px solid #1D4E89;padding-bottom:4px;'>"
+                        "Flow Rate</p>",
+                        unsafe_allow_html=True,
+                    )
                     st.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
                     st.metric("Median", f"{df['flow_lps'].median():.1f} L/s")
-                    st.metric("Range", f"{df['flow_lps'].max() - df['flow_lps'].min():.1f} L/s")
+                    st.metric("Std Dev", f"{df['flow_lps'].std():.1f} L/s")
+                    st.metric("Range", f"{df['flow_lps'].min():.1f} – {df['flow_lps'].max():.1f} L/s")
 
-                st.markdown("---")
-                st.markdown("#### Distribution")
-                dist_col1, dist_col2 = st.columns(2)
+                st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    "<p class='section-title'>Frequency Distributions</p>",
+                    unsafe_allow_html=True,
+                )
+                _hist_layout = dict(
+                    height=240, template="plotly_white", paper_bgcolor="#ffffff",
+                    plot_bgcolor="#ffffff", margin=dict(l=0, r=0, t=10, b=0),
+                    font=dict(family="Inter, sans-serif", size=11, color="#4A4A4A"),
+                    xaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9"),
+                    yaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9", title="Count"),
+                )
+                dist_col1, dist_col2, dist_col3 = st.columns(3)
                 with dist_col1:
-                    fig_hist_d = px.histogram(df, x="depth_mm", nbins=20,
-                                              labels={"depth_mm": "Depth (mm)"})
-                    fig_hist_d.update_traces(marker_color="#3A7F5F")
-                    fig_hist_d.update_layout(
-                        height=280, template="plotly_white", paper_bgcolor="#ffffff",
-                        plot_bgcolor="#ffffff", margin=dict(l=0, r=0, t=10, b=0),
-                        font=dict(family='Inter, sans-serif', size=11),
-                        xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
-                    )
+                    fig_hist_d = px.histogram(df, x="depth_mm", nbins=25,
+                                              labels={"depth_mm": "Depth (mm)", "count": "Count"})
+                    fig_hist_d.update_traces(marker_color="#3A7F5F", marker_line_color="#2F6B50", marker_line_width=0.5)
+                    fig_hist_d.update_layout(**_hist_layout)
+                    fig_hist_d.update_xaxes(title_text="Depth (mm)")
                     st.plotly_chart(fig_hist_d, use_container_width=True)
                 with dist_col2:
-                    fig_hist_f = px.histogram(df, x="flow_lps", nbins=20,
-                                              labels={"flow_lps": "Flow (L/s)"})
-                    fig_hist_f.update_traces(marker_color="#1D4E89")
-                    fig_hist_f.update_layout(
-                        height=280, template="plotly_white", paper_bgcolor="#ffffff",
-                        plot_bgcolor="#ffffff", margin=dict(l=0, r=0, t=10, b=0),
-                        font=dict(family='Inter, sans-serif', size=11),
-                        xaxis=dict(gridcolor='#f0f4f4'), yaxis=dict(gridcolor='#f0f4f4')
-                    )
+                    fig_hist_v = px.histogram(df, x="velocity_mps", nbins=25,
+                                              labels={"velocity_mps": "Velocity (m/s)", "count": "Count"})
+                    fig_hist_v.update_traces(marker_color="#2A9D8F", marker_line_color="#1e7a6e", marker_line_width=0.5)
+                    fig_hist_v.update_layout(**_hist_layout)
+                    fig_hist_v.update_xaxes(title_text="Velocity (m/s)")
+                    st.plotly_chart(fig_hist_v, use_container_width=True)
+                with dist_col3:
+                    fig_hist_f = px.histogram(df, x="flow_lps", nbins=25,
+                                              labels={"flow_lps": "Flow (L/s)", "count": "Count"})
+                    fig_hist_f.update_traces(marker_color="#1D4E89", marker_line_color="#163a67", marker_line_width=0.5)
+                    fig_hist_f.update_layout(**_hist_layout)
+                    fig_hist_f.update_xaxes(title_text="Flow Rate (L/s)")
                     st.plotly_chart(fig_hist_f, use_container_width=True)
 
-                st.markdown("---")
-                st.markdown("#### Collection Summary")
+                st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    "<p class='section-title'>Collection Summary</p>",
+                    unsafe_allow_html=True,
+                )
                 col_c1, col_c2, col_c3, col_c4 = st.columns(4)
                 col_c1.metric("Total Records", len(df))
                 time_span_h = (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 3600
                 col_c2.metric("Time Span", f"{time_span_h:.1f} h")
-                col_c3.metric("Rate", f"{len(df) / max(1, time_span_h):.1f}/hr")
+                col_c3.metric("Collection Rate", f"{len(df) / max(1, time_span_h):.1f}/hr")
                 completeness = (len(df) - df[['depth_mm', 'velocity_mps', 'flow_lps']].isna().sum().max()) / max(1, len(df)) * 100
-                col_c4.metric("Completeness", f"{completeness:.0f}%")
+                col_c4.metric("Data Completeness", f"{completeness:.0f}%")
 
             # ── Data table & export ────────────────────────────────────────
             st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
