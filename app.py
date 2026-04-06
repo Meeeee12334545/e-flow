@@ -498,6 +498,147 @@ with st.sidebar:
         else:
             st.info("Click **Get Latest Data** to fetch and save a live reading, or start monitor.py to collect data automatically.")
 
+# ── Engineering Intelligence Panel (additive — does not modify existing logic) ─
+from metrics import compute_engineering_metrics
+from insights import generate_insights
+
+_ei_metrics: dict = {}
+_ei_insights: list = []
+
+if selected_device_id:
+    _ei_measurements = get_cached_measurements(device_id=selected_device_id)
+    if _ei_measurements:
+        _ei_df = pd.DataFrame(_ei_measurements).copy()
+        _ei_df['timestamp'] = pd.to_datetime(_ei_df['timestamp'], errors='coerce')
+        _ei_df = _ei_df.dropna(subset=['timestamp'])
+        _ei_df.sort_values('timestamp', inplace=True)
+        _ei_metrics = compute_engineering_metrics(_ei_df)
+        _ei_insights = generate_insights(_ei_df, _ei_metrics)
+
+        # ── Site Status Line ──────────────────────────────────────────────────
+        _ss = _ei_metrics.get("site_status", "")
+        _ss_color = _ei_metrics.get("site_status_color", "#6b7280")
+        st.markdown(f"""
+        <div style="background:{_ss_color}18;border-left:4px solid {_ss_color};
+                    padding:10px 16px;border-radius:8px;margin-bottom:1.25rem;
+                    display:flex;align-items:center;gap:10px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:{_ss_color};
+                         display:inline-block;flex-shrink:0;"></span>
+            <span style="font-size:0.9rem;font-weight:600;color:{_ss_color};">
+                Site Status: {_ss}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Engineering Summary ───────────────────────────────────────────────
+        _dwf = _ei_metrics.get("dwf")
+        _pwwf = _ei_metrics.get("pwwf")
+        _ii_risk = _ei_metrics.get("ii_risk", "—")
+        _ii_color = _ei_metrics.get("ii_risk_color", "#6b7280")
+        _conf = _ei_metrics.get("confidence", 0.0)
+        _conf_exp = _ei_metrics.get("confidence_explanation", "")
+        _dwf_str = f"{_dwf:.1f} L/s" if _dwf is not None else "—"
+        _pwwf_str = f"{_pwwf:.1f} L/s" if _pwwf is not None else "—"
+
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+                    gap:16px;margin-bottom:1.25rem;">
+            <div style="background:#fff;border:1px solid #D9D9D9;border-radius:12px;
+                        padding:18px 20px;">
+                <p style="margin:0 0 6px;font-size:0.72rem;font-weight:600;color:#6b7280;
+                           text-transform:uppercase;letter-spacing:0.05em;">
+                    Dry Weather Flow</p>
+                <p style="margin:0;font-size:1.6rem;font-weight:700;color:#33736D;
+                           line-height:1.2;">{_dwf_str}</p>
+                <p style="margin:4px 0 0;font-size:0.72rem;color:#6b7280;">
+                    10th-percentile dry-period flow</p>
+            </div>
+            <div style="background:#fff;border:1px solid #D9D9D9;border-radius:12px;
+                        padding:18px 20px;">
+                <p style="margin:0 0 6px;font-size:0.72rem;font-weight:600;color:#6b7280;
+                           text-transform:uppercase;letter-spacing:0.05em;">
+                    Peak Wet Weather Flow</p>
+                <p style="margin:0;font-size:1.6rem;font-weight:700;color:#33736D;
+                           line-height:1.2;">{_pwwf_str}</p>
+                <p style="margin:4px 0 0;font-size:0.72rem;color:#6b7280;">
+                    Maximum recorded flow rate</p>
+            </div>
+            <div style="background:#fff;border:1px solid #D9D9D9;border-radius:12px;
+                        padding:18px 20px;">
+                <p style="margin:0 0 6px;font-size:0.72rem;font-weight:600;color:#6b7280;
+                           text-transform:uppercase;letter-spacing:0.05em;">
+                    I/I Risk</p>
+                <p style="margin:0;font-size:1.6rem;font-weight:700;
+                           color:{_ii_color};line-height:1.2;">{_ii_risk}</p>
+                <p style="margin:4px 0 0;font-size:0.72rem;color:#6b7280;">
+                    Inflow/infiltration assessment</p>
+            </div>
+            <div style="background:#fff;border:1px solid #D9D9D9;border-radius:12px;
+                        padding:18px 20px;">
+                <p style="margin:0 0 6px;font-size:0.72rem;font-weight:600;color:#6b7280;
+                           text-transform:uppercase;letter-spacing:0.05em;">
+                    Data Confidence</p>
+                <p style="margin:0;font-size:1.6rem;font-weight:700;color:#33736D;
+                           line-height:1.2;">{_conf:.0f}%</p>
+                <p style="margin:4px 0 0;font-size:0.72rem;color:#6b7280;">
+                    {_conf_exp}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── System Health + Model Readiness ───────────────────────────────────
+        _sys_health = _ei_metrics.get("system_health", "—")
+        _sys_color = _ei_metrics.get("system_health_color", "#6b7280")
+        _readiness_label = _ei_metrics.get("model_readiness_label", "—")
+        _readiness_color = _ei_metrics.get("model_readiness_color", "#6b7280")
+
+        _col_sh, _col_mr = st.columns(2)
+        with _col_sh:
+            st.markdown(f"""
+            <div style="background:{_sys_color}12;border:1px solid {_sys_color}40;
+                        border-radius:10px;padding:12px 16px;
+                        display:flex;align-items:center;gap:10px;margin-bottom:0.75rem;">
+                <span style="width:12px;height:12px;border-radius:50%;
+                             background:{_sys_color};display:inline-block;flex-shrink:0;">
+                </span>
+                <div>
+                    <span style="font-size:0.72rem;color:#6b7280;font-weight:600;">
+                        SYSTEM STATUS</span><br>
+                    <span style="font-size:1rem;font-weight:700;color:{_sys_color};">
+                        {_sys_health}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        with _col_mr:
+            st.markdown(f"""
+            <div style="background:{_readiness_color}12;border:1px solid {_readiness_color}40;
+                        border-radius:10px;padding:12px 16px;
+                        display:flex;align-items:center;gap:10px;margin-bottom:0.75rem;">
+                <div style="width:12px;height:12px;border-radius:3px;
+                            background:{_readiness_color};display:inline-block;flex-shrink:0;">
+                </div>
+                <div>
+                    <span style="font-size:0.72rem;color:#6b7280;font-weight:600;">
+                        MODEL READINESS</span><br>
+                    <span style="font-size:1rem;font-weight:700;color:{_readiness_color};">
+                        {_readiness_label}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ── Automated Insights ────────────────────────────────────────────────
+        if _ei_insights:
+            with st.expander("🔍 Automated Engineering Insights", expanded=True):
+                for _ins in _ei_insights:
+                    st.markdown(
+                        f"<p style='margin:0 0 0.4rem;font-size:0.88rem;"
+                        f"color:#4A4A4A;line-height:1.6;'>"
+                        f"• {_ins}</p>",
+                        unsafe_allow_html=True,
+                    )
+
+        st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+
 # Main content area
 page_mode = st.session_state.get('page_mode', 'Simplified View')
 
@@ -544,6 +685,40 @@ if page_mode == 'Simplified View':
                 Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
             </p>
             """, unsafe_allow_html=True)
+
+            # ── KPI Interpretation (additive) ─────────────────────────────────
+            if _ei_metrics:
+                _kpi_lines = []
+                _vel_raw = latest['velocity_mps'] if pd.notna(latest['velocity_mps']) else None
+                if _vel_raw is not None:
+                    if _vel_raw < 0.6:
+                        _kpi_lines.append(
+                            f"Velocity: {_vel_raw:.3f} m/s — below self-cleansing threshold (0.6 m/s)"
+                        )
+                    else:
+                        _kpi_lines.append(
+                            f"Velocity: {_vel_raw:.3f} m/s — above self-cleansing threshold"
+                        )
+                _ii_r = _ei_metrics.get("ii_risk")
+                _ii_c = _ei_metrics.get("ii_risk_color", "#6b7280")
+                if _ii_r and _ii_r != "Unknown":
+                    _ii_desc = {
+                        "HIGH": "significant rainfall-derived inflow entering the network",
+                        "MEDIUM": "moderate wet-weather flow response detected",
+                        "LOW": "dry weather conditions — no significant inflow detected",
+                    }.get(_ii_r, "")
+                    if _ii_desc:
+                        _kpi_lines.append(f"I/I Risk: {_ii_r} — {_ii_desc}")
+                if _kpi_lines:
+                    _kpi_items = "".join(
+                        f"<span style='display:block;margin-bottom:2px;'>{l}</span>"
+                        for l in _kpi_lines
+                    )
+                    st.markdown(
+                        f"<div style='font-size:0.8rem;color:#6b7280;margin:-0.5rem 0 1.25rem 4px;"
+                        f"line-height:1.7;'>{_kpi_items}</div>",
+                        unsafe_allow_html=True,
+                    )
 
             time_window_options = [
                 (24, '24 hours'),
@@ -785,6 +960,41 @@ if selected_device_id:
                 ✓ Last reading: {lu_str} &nbsp;·&nbsp; {len(df)} records in selected window
             </p>
             """, unsafe_allow_html=True)
+
+            # ── KPI Interpretation (additive) ─────────────────────────────────
+            if _ei_metrics:
+                _fd_kpi_lines = []
+                if velocity is not None and not pd.isna(velocity):
+                    if float(velocity) < 0.6:
+                        _fd_kpi_lines.append(
+                            f"Velocity: {velocity:.3f} m/s — below self-cleansing threshold (0.6 m/s)"
+                        )
+                    else:
+                        _fd_kpi_lines.append(
+                            f"Velocity: {velocity:.3f} m/s — above self-cleansing threshold"
+                        )
+                _ii_r = _ei_metrics.get("ii_risk")
+                _ii_desc_fd = {
+                    "HIGH": "significant rainfall-derived inflow entering the network",
+                    "MEDIUM": "moderate wet-weather flow response detected",
+                    "LOW": "dry weather conditions — no significant inflow detected",
+                }.get(_ii_r or "", "")
+                if _ii_r and _ii_r != "Unknown" and _ii_desc_fd:
+                    _fd_kpi_lines.append(f"I/I Risk: {_ii_r} — {_ii_desc_fd}")
+                _fd_conf = _ei_metrics.get("confidence")
+                _fd_conf_exp = _ei_metrics.get("confidence_explanation", "")
+                if _fd_conf is not None and _fd_conf_exp:
+                    _fd_kpi_lines.append(f"Confidence: {_fd_conf:.0f}% — {_fd_conf_exp}")
+                if _fd_kpi_lines:
+                    _fd_kpi_items = "".join(
+                        f"<span style='display:block;margin-bottom:2px;'>{l}</span>"
+                        for l in _fd_kpi_lines
+                    )
+                    st.markdown(
+                        f"<div style='font-size:0.8rem;color:#6b7280;margin:-0.75rem 0 1.25rem 4px;"
+                        f"line-height:1.7;'>{_fd_kpi_items}</div>",
+                        unsafe_allow_html=True,
+                    )
 
             # ── Main flow chart ─────────────────────────────────────────────
             st.markdown("""
