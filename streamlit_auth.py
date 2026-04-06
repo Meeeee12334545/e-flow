@@ -56,11 +56,16 @@ def get_admin_logo_data_uri() -> str | None:
     """Return the org-wide admin logo as a data URI, or None if not configured.
 
     Used on the login screen so the admin-configured logo is always shown,
-    regardless of any per-user logo settings.
+    regardless of any per-user logo settings.  Falls back to a direct
+    AuthDatabase instantiation when session state is not yet available (e.g.
+    on the very first render of the login page).
     """
     auth_db = st.session_state.get('auth_db')
     if not auth_db:
-        return None
+        try:
+            auth_db = AuthDatabase()
+        except Exception:
+            return None
     try:
         logo_b64 = auth_db.get_setting('org_logo_b64')
         logo_mime = auth_db.get_setting('org_logo_mime') or 'image/png'
