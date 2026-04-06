@@ -153,10 +153,26 @@ class ContinuousMonitor:
         self.last_health_check = datetime.now()
         self.is_healthy = True
         self._shutdown = False
-        
+        # Track the active poll interval so we can detect admin changes
+        self._current_interval = self._load_poll_interval()
+
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
+
+    def _load_poll_interval(self) -> int:
+        """Read monitor_poll_interval from DB; fall back to env/config default."""
+        try:
+            raw = self.db.get_system_setting("monitor_poll_interval")
+            if raw is not None:
+                val = int(raw)
+                if val > 0:
+                    return val
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid monitor_poll_interval value in DB: {e}")
+        except Exception as e:
+            logger.warning(f"Could not read monitor_poll_interval from DB: {e}")
+        return MONITOR_INTERVAL
 
     def _handle_shutdown(self, signum, frame):
         """Handle graceful shutdown on signals."""
@@ -385,20 +401,41 @@ class ContinuousMonitor:
         try:
             asyncio.run(self.check_for_updates_with_retry())
             self.perform_health_check()
+            # Check whether the admin has changed the poll interval; reschedule if so
+            self._apply_interval_if_changed()
         except Exception as e:
             logger.error(f"Critical error in run_check: {e}", exc_info=True)
+
+    def _apply_interval_if_changed(self):
+        """Re-schedule the monitor job if the DB poll interval differs from current."""
+        try:
+            new_interval = self._load_poll_interval()
+            if new_interval != self._current_interval:
+                logger.info(
+                    f"⏱️  Poll interval changed: {self._current_interval}s → {new_interval}s"
+                )
+                self._current_interval = new_interval
+                self.scheduler.reschedule_job(
+                    'monitor_job',
+                    trigger=IntervalTrigger(seconds=new_interval),
+                )
+        except Exception as e:
+            logger.warning(f"Could not apply interval change: {e}")
 
     def start_monitoring(self):
         """Start the continuous monitoring service with auto-restart capability."""
         if not MONITOR_ENABLED:
             logger.error("Monitoring is disabled in config.py")
             return
-        
+
+        # Reload interval in case it was changed while the service was down
+        self._current_interval = self._load_poll_interval()
+
         logger.info("=" * 60)
         logger.info("🚀 CONTINUOUS MONITOR STARTED (PRODUCTION MODE)")
         logger.info("=" * 60)
         logger.info(f"📍 Target: {MONITOR_URL[:80]}...")
-        logger.info(f"⏱️  Interval: Every {MONITOR_INTERVAL} seconds")
+        logger.info(f"⏱️  Interval: Every {self._current_interval} seconds")
         logger.info(f"📊 Database: {self.db.db_path}")
         logger.info(f"🔄 Auto-retry: {MAX_RETRY_ATTEMPTS} attempts per check")
         logger.info(f"💚 Health checks: Every {HEALTH_CHECK_INTERVAL} seconds")
@@ -410,15 +447,15 @@ class ContinuousMonitor:
         logger.info("✅ Health monitoring enabled")
         logger.info("Press Ctrl+C to stop")
         logger.info("=" * 60)
-        
+
         # Run initial check
         logger.info("Running initial data check...")
         self.run_check()
-        
+
         # Schedule the job
         self.scheduler.add_job(
             self.run_check,
-            IntervalTrigger(seconds=MONITOR_INTERVAL),
+            IntervalTrigger(seconds=self._current_interval),
             id='monitor_job',
             name='Monitor USRIOT for updates',
             replace_existing=True
