@@ -210,18 +210,25 @@ def _render_readiness(baseline: Optional[SiteBaseline], df: pd.DataFrame) -> Non
     col_c.metric("Data Coverage", f"{suf.days_covered:.1f} days")
     col_d.metric("Collection Rate", f"{suf.readings_per_day:.0f} /day")
 
-    st.markdown(f"""
-    <div style="background:{bg}; border:2px solid {colour}; border-radius:10px;
-                padding:14px 18px; margin:0.5rem 0 1rem;">
-        <div style="font-size:1.05rem; font-weight:700; color:{colour}; margin-bottom:6px;">
-            {status_label}
+    if suf.status == "insufficient":
+        st.info(
+            "ℹ️ **Data collection in progress.** FlowSense Analysis requires a minimum of "
+            "**7 days** of data to carry out high-level analysis. Continue collecting data "
+            "and return once sufficient coverage has been reached."
+        )
+    else:
+        st.markdown(f"""
+        <div style="background:{bg}; border:2px solid {colour}; border-radius:10px;
+                    padding:14px 18px; margin:0.5rem 0 1rem;">
+            <div style="font-size:1.05rem; font-weight:700; color:{colour}; margin-bottom:6px;">
+                {status_label}
+            </div>
+            <div style="font-size:0.88rem; color:#4A4A4A;">{suf.status_description}</div>
+            <div style="font-size:0.84rem; color:#6b7280; margin-top:6px;">
+                <em>{suf.next_level_description}</em>
+            </div>
         </div>
-        <div style="font-size:0.88rem; color:#4A4A4A;">{suf.status_description}</div>
-        <div style="font-size:0.84rem; color:#6b7280; margin-top:6px;">
-            <em>{suf.next_level_description}</em>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # Progress bar showing level achieved
     level_pct = {"insufficient": 5, "early": 15, "basic": 40, "full": 70, "seasonal": 100}.get(suf.status, 5)
@@ -611,141 +618,6 @@ def _render_dwf_profiles(baseline: SiteBaseline, df_all: "pd.DataFrame", df_rain
         )
 
 
-# ── Section 3c: Hydraulic Capacity Analysis ────────────────────────────────────
-
-def _render_hydraulic(df_all: "pd.DataFrame") -> None:
-    """Render the advanced hydraulic capacity analysis section."""
-    st.markdown("### 🔩 Advanced Hydraulic Capacity Analysis")
-
-    st.markdown(
-        "<p style='font-size:0.88rem; color:#6b7280; margin:0 0 0.8rem;'>"
-        "Enter the pipe parameters below. Manning's equation is used to calculate "
-        "the theoretical full-bore capacity, then each measurement is expressed "
-        "as a percentage of that capacity."
-        "</p>",
-        unsafe_allow_html=True,
-    )
-
-    if "flow_lps" not in df_all.columns:
-        st.info("Flow rate (flow_lps) data is required for hydraulic analysis.")
-        return
-
-    hyd_col1, hyd_col2, hyd_col3 = st.columns(3)
-    with hyd_col1:
-        diameter_mm = st.number_input(
-            "Pipe Internal Diameter (mm)",
-            min_value=50, max_value=3000,
-            value=300, step=25,
-            key="hyd_diameter",
-            help="Internal diameter of the monitored pipe in millimetres.",
-        )
-    with hyd_col2:
-        manning_n = st.number_input(
-            "Manning's n (roughness)",
-            min_value=0.005, max_value=0.050,
-            value=0.013, step=0.001,
-            format="%.3f",
-            key="hyd_manning",
-            help=(
-                "Manning's roughness coefficient. "
-                "Typical values: smooth PVC/HDPE 0.009–0.011; "
-                "concrete/clay 0.013–0.015; older brick 0.015–0.020."
-            ),
-        )
-    with hyd_col3:
-        slope_pct = st.number_input(
-            "Longitudinal Slope (%)",
-            min_value=0.01, max_value=20.0,
-            value=0.50, step=0.05,
-            format="%.2f",
-            key="hyd_slope",
-            help=(
-                "Pipe invert slope as a percentage. "
-                "Typical design minimum: 0.5% (1:200). "
-                "Steeper grades increase capacity significantly."
-            ),
-        )
-
-    try:
-        from hydraulic import compute_pipe_capacity, compute_hydraulic_utilisation
-    except ImportError:
-        st.error("hydraulic module not found.")
-        return
-
-    qfull = compute_pipe_capacity(diameter_mm, manning_n, slope_pct)
-
-    st.markdown(
-        f"<div style='background:#E8F3EE; border-left:4px solid #3A7F5F; border-radius:6px; "
-        f"padding:10px 16px; margin-bottom:1rem; font-size:0.88rem; color:#4A4A4A;'>"
-        f"<strong>Full-bore capacity (Manning's equation):</strong> "
-        f"<span style='font-size:1.15rem; font-weight:700; color:#2F6B50;'>{qfull:.1f} L/s</span>"
-        f"&nbsp; | &nbsp; {qfull * 3.6:.2f} m³/hr"
-        f"&nbsp; | &nbsp; Ø{diameter_mm} mm, n = {manning_n:.3f}, S = {slope_pct:.2f}%"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
-    report = compute_hydraulic_utilisation(
-        df_all, qfull,
-        pipe_diameter_mm=float(diameter_mm),
-        manning_n=manning_n,
-        slope_pct=slope_pct,
-    )
-    if report is None:
-        st.info("Insufficient flow data to compute hydraulic utilisation.")
-        return
-
-    # Metric row
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Mean Utilisation", f"{report.mean_utilisation_pct:.1f}%",
-              help="Mean flow as % of full-bore capacity")
-    m2.metric("Median Utilisation", f"{report.median_utilisation_pct:.1f}%",
-              help="Median flow as % of full-bore capacity")
-    m3.metric("P90 Utilisation", f"{report.p90_utilisation_pct:.1f}%",
-              help="90th-percentile utilisation — what the pipe carries for 10% of the time")
-    m4.metric("Peak Utilisation", f"{report.max_utilisation_pct:.1f}%",
-              help="Maximum observed utilisation")
-    m5.metric("Surcharge Events", str(len(report.full_bore_events)),
-              help=f"Periods where utilisation exceeded {90:.0f}% of full-bore capacity")
-
-    # Risk badge
-    risk_colour = report.surcharge_risk_colour
-    st.markdown(
-        f"<div style='margin:0.6rem 0;'>"
-        f"<span style='background:{risk_colour}20; color:{risk_colour}; border:1.5px solid {risk_colour}; "
-        f"border-radius:20px; padding:4px 16px; font-size:0.88rem; font-weight:700;'>"
-        f"Surcharge Risk: {report.surcharge_risk_label}"
-        f"</span></div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"<p style='font-size:0.85rem; color:#4A4A4A; margin-top:0.4rem;'>{report.interpretation}</p>",
-        unsafe_allow_html=True,
-    )
-
-    # Full-bore events table
-    if report.full_bore_events:
-        with st.expander(f"Surcharge Events ({len(report.full_bore_events)})", expanded=False):
-            import pandas as _pd
-            rows_ev = [
-                {
-                    "Start (UTC)": e.start.strftime("%Y-%m-%d %H:%M") if hasattr(e.start, "strftime") else str(e.start),
-                    "End (UTC)":   e.end.strftime("%Y-%m-%d %H:%M") if hasattr(e.end, "strftime") else str(e.end),
-                    "Duration (min)": f"{e.duration_minutes:.0f}",
-                    "Peak Utilisation": f"{e.peak_utilisation_pct:.1f}%",
-                }
-                for e in report.full_bore_events
-            ]
-            st.dataframe(_pd.DataFrame(rows_ev), width="stretch", hide_index=True)
-
-    st.caption(
-        "Manning's equation: Q = (1/n) × A × R²/³ × S½ — where A = πD²/4, R = D/4 for a "
-        "full circular section. Utilisation is the ratio of measured flow to the theoretical "
-        "full-bore capacity. Results should be validated against as-built pipe survey data. "
-        "Slope and roughness are the dominant parameters — confirm these from as-built drawings."
-    )
-
-
 # ── Section 4: Alarm Recommendations ──────────────────────────────────────────
 
 def _render_recommendations(
@@ -1036,11 +908,6 @@ if _has_loc_intel or _has_station_intel:
     _render_dwf_profiles(cached, df_all, _df_rain_intel)
 else:
     _render_dwf_profiles(cached, df_all, None)
-
-st.divider()
-
-# ── Section 3c: Hydraulic Analysis ────────────────────────────────────────────
-_render_hydraulic(df_all)
 
 st.divider()
 
