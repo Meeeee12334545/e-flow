@@ -551,14 +551,22 @@ if selected_device_id:
         with _cs_col2:
             _end_date = st.date_input("End date", value=_now_tz.date(), key="fd_cust_end_date")
             _end_time = st.time_input("End time", value=_now_tz.time(), key="fd_cust_end_time")
-        graph_start = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(_start_date, _start_time))
-        graph_end = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(_end_date, _end_time))
+        # is_dst=False prevents AmbiguousTimeError during DST transitions
+        try:
+            graph_start = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(_start_date, _start_time), is_dst=False)
+            graph_end   = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(_end_date,   _end_time),   is_dst=False)
+        except Exception:
+            graph_start = _default_start
+            graph_end   = _now_tz
+        if graph_end <= graph_start:
+            st.error("End date/time must be after the start date/time. Please adjust the custom range.")
+            st.stop()
         selected_hours = max(1, int((graph_end - graph_start).total_seconds() / 3600))
         _time_label = "Custom range"
 
-    # Get measurements — limit scales with the selected time period
-    # (~25 readings/hour is a conservative estimate for delta-compressed sewer data)
-    _fetch_limit = max(3000, min(50000, selected_hours * 25))
+    # Estimate ~25 readings/hour for delta-compressed sewer data; clamp to 3 000–50 000
+    _READINGS_PER_HOUR = 25
+    _fetch_limit = max(3000, min(50000, selected_hours * _READINGS_PER_HOUR))
     measurements = get_cached_measurements(device_id=selected_device_id, limit=_fetch_limit)
 
     if measurements:
