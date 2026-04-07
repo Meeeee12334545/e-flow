@@ -577,7 +577,7 @@ if selected_device_id:
                 lu_str = str(last_update)
 
             st.markdown(f"""
-            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 0.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 0.5rem;">
                 <div class="metric-card depth">
                     <p class="metric-label">Water Depth</p>
                     <p class="metric-value">{depth_str}<span class="metric-unit">mm</span></p>
@@ -589,10 +589,6 @@ if selected_device_id:
                 <div class="metric-card flow">
                     <p class="metric-label">Flow Rate</p>
                     <p class="metric-value amber">{flow_str}<span class="metric-unit">L/s</span></p>
-                </div>
-                <div class="metric-card" style="border-top-color: #9ca3af;">
-                    <p class="metric-label">Records</p>
-                    <p class="metric-value" style="color:#9ca3af;">{len(df)}<span class="metric-unit">pts</span></p>
                 </div>
             </div>
             <p style="font-size: 0.82rem; color: #6b7280; margin: 0 0 1.5rem 4px;">
@@ -1140,7 +1136,10 @@ if selected_device_id:
             st.markdown('<p class="section-title">Data Table & Export</p>', unsafe_allow_html=True)
             display_df = df_graph[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
-            display_df["Timestamp"] = display_df["Timestamp"].astype(str)
+            _ts = pd.to_datetime(display_df["Timestamp"])
+            if _ts.dt.tz is None:
+                _ts = _ts.dt.tz_localize(pytz.utc)
+            display_df["Timestamp"] = _ts.dt.tz_convert(pytz.timezone(DEFAULT_TZ)).dt.strftime('%Y-%m-%d %H:%M:%S%z')
             st.dataframe(display_df, width="stretch", hide_index=True)
 
             col_dl1, _ = st.columns([1, 3])
