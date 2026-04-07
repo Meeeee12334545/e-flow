@@ -317,16 +317,6 @@ with st.sidebar:
     # Add authentication header
     render_auth_header()
 
-    st.markdown("## Interface")
-
-    page_mode = st.selectbox(
-        "View mode",
-        options=["Simplified View", "Full Dashboard"],
-        index=0,
-        help="Simplified View for standard users, Full Dashboard for power users."
-    )
-    st.session_state['page_mode'] = page_mode
-
     st.markdown("## Device")
 
     st.markdown("""
@@ -360,9 +350,14 @@ with st.sidebar:
             st.info("As an admin, go to the Admin Panel to manage device assignments")
         st.stop()
     
+    # Order: FIT100 first, then remaining sites in insertion (created_at) order
+    _device_name_list = [d['device_name'] for d in devices]
+    if "FIT100" in _device_name_list:
+        _device_name_list = ["FIT100"] + [n for n in _device_name_list if n != "FIT100"]
+
     selected_device_name: str = st.selectbox(
         "Select Device",
-        options=sorted(device_names.keys()),
+        options=_device_name_list,
         key="device_selector",
     )
     selected_device_id = device_names[selected_device_name]
@@ -500,191 +495,6 @@ with st.sidebar:
             st.info("Click **Get Latest Data** to fetch and save a live reading, or start monitor.py to collect data automatically.")
 
 # Main content area
-page_mode = st.session_state.get('page_mode', 'Simplified View')
-
-if page_mode == 'Simplified View':
-    if selected_device_id:
-        measurements = get_cached_measurements(device_id=selected_device_id)
-        if measurements:
-            df = pd.DataFrame(measurements)
-            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-            df = df.dropna(subset=['timestamp'])
-            df.sort_values('timestamp', inplace=True)
-            latest = df.iloc[-1]
-            now_local = datetime.now(pytz.timezone(DEFAULT_TZ))
-            latest_depth = f"{latest['depth_mm']:.1f}" if pd.notna(latest['depth_mm']) else 'N/A'
-            latest_velocity = f"{latest['velocity_mps']:.3f}" if pd.notna(latest['velocity_mps']) else 'N/A'
-            latest_flow = f"{latest['flow_lps']:.1f}" if pd.notna(latest['flow_lps']) else 'N/A'
-
-            # Latest reading timestamp
-            try:
-                last_ts = pd.to_datetime(latest['timestamp'])
-                if last_ts.tzinfo is None:
-                    last_ts = last_ts.tz_localize(pytz.utc)
-                last_ts_local = last_ts.astimezone(pytz.timezone(DEFAULT_TZ))
-                last_ts_str = last_ts_local.strftime('%d %b %Y, %H:%M %Z')
-            except Exception:
-                last_ts_str = str(latest['timestamp'])
-
-            st.markdown(f"""
-            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 1.25rem;">
-                <div class="metric-card depth">
-                    <p class="metric-label">Water Depth</p>
-                    <p class="metric-value">{latest_depth}<span class="metric-unit">mm</span></p>
-                </div>
-                <div class="metric-card velocity">
-                    <p class="metric-label">Flow Velocity</p>
-                    <p class="metric-value green">{latest_velocity}<span class="metric-unit">m/s</span></p>
-                </div>
-                <div class="metric-card flow">
-                    <p class="metric-label">Flow Rate</p>
-                    <p class="metric-value amber">{latest_flow}<span class="metric-unit">L/s</span></p>
-                </div>
-            </div>
-            <p style="font-size: 0.82rem; color: #6b7280; margin: -0.5rem 0 1.25rem 4px;">
-                Last reading: {last_ts_str} &nbsp;·&nbsp; {len(df)} total records in database
-            </p>
-            """, unsafe_allow_html=True)
-
-            time_window_options = [
-                (24, '24 hours'),
-                (48, '2 days'),
-                (72, '3 days'),
-                (168, '7 days'),
-                (720, '30 days')
-            ]
-            col_title, col_picker = st.columns([2, 1])
-            with col_title:
-                st.markdown("""
-                <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A; font-size: 1.15rem;">Performance trend</h2>
-                <p style="margin: 0.15rem 0 0 0; color: #6b7280; font-size: 0.85rem;">Flow rate, depth and velocity over the selected window.</p>
-                """, unsafe_allow_html=True)
-            with col_picker:
-                selected_window, selected_window_label = st.selectbox(
-                    'Time window',
-                    options=time_window_options,
-                    format_func=lambda x: x[1],
-                    index=0,
-                    key='simplified_view_window'
-                )
-
-            cutoff = now_local - timedelta(hours=selected_window)
-            df_window = df[df['timestamp'] >= cutoff].sort_values('timestamp')
-            show_note = False
-            if df_window.empty:
-                show_note = True
-                df_window = df.sort_values('timestamp')
-
-            fig = make_subplots(specs=[[{"secondary_y": True}]])
-            fig.add_trace(
-                go.Scatter(
-                    x=df_window['timestamp'],
-                    y=df_window['flow_lps'],
-                    mode='lines',
-                    name='Flow (L/s)',
-                    line=dict(color='#1D4E89', width=1.5),
-                    fill='tozeroy',
-                    fillcolor='rgba(29, 78, 137, 0.06)',
-                ),
-                secondary_y=False
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=df_window['timestamp'],
-                    y=df_window['depth_mm'],
-                    mode='lines',
-                    name='Depth (mm)',
-                    line=dict(color='#3A7F5F', width=1.5, dash='dash'),
-                ),
-                secondary_y=False
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=df_window['timestamp'],
-                    y=df_window['velocity_mps'],
-                    mode='lines',
-                    name='Velocity (m/s)',
-                    line=dict(color='#2A9D8F', width=1.5, dash='dot'),
-                ),
-                secondary_y=True
-            )
-            fig.update_layout(
-                title=dict(text=''),
-                legend=dict(
-                    orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1,
-                    font=dict(size=11),
-                    title=dict(text=''),
-                ),
-                hovermode='x unified',
-                margin=dict(l=0, r=0, t=32, b=0),
-                template='plotly_white',
-                height=380,
-                paper_bgcolor='#ffffff',
-                plot_bgcolor='#ffffff',
-                font=dict(family='Inter, -apple-system, sans-serif', color='#4A4A4A', size=11),
-                xaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
-                yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
-            )
-            # Hide any auto-generated unnamed traces (e.g. secondary-y anchors)
-            fig.for_each_trace(
-                lambda t: t.update(showlegend=False) if not t.name else None
-            )
-            fig.update_xaxes(title_text='Time')
-            fig.update_yaxes(title_text='Flow (L/s) / Depth (mm)', secondary_y=False)
-            fig.update_yaxes(title_text='Velocity (m/s)', secondary_y=True)
-            st.plotly_chart(fig, width="stretch")
-
-            if show_note:
-                st.info(
-                    f'No data in the last {selected_window_label}. Showing all available history instead.'
-                )
-
-            st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
-            col_download1, _ = st.columns([1, 3])
-            # Format timestamps as dd/mm/yyyy hh:mm:ss for export
-            df_export = df.copy()
-            if 'timestamp' in df_export.columns:
-                ts_col = pd.to_datetime(df_export['timestamp'], utc=True, format="ISO8601", errors='coerce')
-                df_export['timestamp'] = ts_col.dt.tz_convert(DEFAULT_TZ).dt.strftime('%d/%m/%Y %H:%M:%S')
-            csv_data = df_export.to_csv(index=False)
-            with col_download1:
-                st.download_button('Download CSV', data=csv_data,
-                                   file_name=f'{selected_device_id}_data.csv', mime='text/csv',
-                                   width="stretch")
-        else:
-            st.markdown("""
-            <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
-                <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">Awaiting first reading</h3>
-                <p style="color: #6b7280; margin: 0 0 1.5rem;">No measurements have been stored yet for this device.</p>
-                <p style="color: #6b7280; font-size: 0.9rem;">Start the <code>monitor.py</code> service to begin collecting data automatically.</p>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.warning('No device selected. Choose a device in the sidebar.')
-
-    st.markdown("""
-    <div style="margin-top: 2.5rem; padding: 1.25rem 1.5rem; border-top: 1px solid #D9D9D9;
-                display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="20" cy="20" r="20" fill="#3A7F5F"/>
-                <text x="20" y="26" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="700" fill="#ffffff">EDS</text>
-            </svg>
-            <div>
-                <p style="margin:0; font-size:0.82rem; font-weight:600; color:#3A7F5F; line-height:1.2;">Environmental Data Services</p>
-                <p style="margin:0; font-size:0.75rem; color:#6b7280; line-height:1.2;">EDS FlowSense™ sewer monitoring platform</p>
-            </div>
-        </div>
-        <p style="margin:0; font-size:0.75rem; color:#9ca3af;">
-            <a href="https://www.e-d-s.com.au" target="_blank"
-               style="color:#3A7F5F; text-decoration:none; font-weight:500;">www.e-d-s.com.au</a>
-            &nbsp;·&nbsp; © 2026 EDS
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.stop()
-
 if selected_device_id:
     # ── Full Dashboard ──────────────────────────────────────────────────────
     # Time range selector for the full dashboard
