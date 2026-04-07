@@ -28,11 +28,14 @@ from baseline_learning import (
     baseline_to_json,
     build_intelligence_pdf,
     compute_site_baseline,
+    compute_dwf_diurnal_profile,
     generate_alarm_recommendations,
     check_data_sufficiency,
     _SENSOR_META,
     _LEVEL_LABELS,
     _SENSITIVITY_LABELS,
+    _MIN_DAYS_BASIC,
+    _MIN_READINGS_BASIC,
 )
 from database import FlowDatabase
 from shared_styles import apply_styles
@@ -82,7 +85,7 @@ with st.sidebar:
 st.markdown("""
 <div class="page-header">
     <h1 style="margin:0; font-size:1.9rem; font-weight:700; color:#ffffff;">
-        🧠 Site Intelligence
+        Site Intelligence
     </h1>
     <p style="margin:0.3rem 0 0; color:rgba(255,255,255,0.85); font-size:0.95rem;">
         Learn from historical data to generate site-specific alarm recommendations and trend insights.
@@ -105,12 +108,14 @@ selected_device_id = device_names[selected_device_name]
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 _STATUS_COLOURS = {
     "insufficient": ("#D93025", "#FDECEA"),
+    "early":        ("#9C27B0", "#F3E5F5"),
     "basic":        ("#F4B400", "#FFF8E1"),
     "full":         ("#3A7F5F", "#E8F3EE"),
     "seasonal":     ("#1D4E89", "#E3EBF6"),
 }
 _STATUS_LABELS = {
     "insufficient": "Insufficient Data",
+    "early":        "Early Analysis",
     "basic":        "Basic Analysis",
     "full":         "Full Analysis",
     "seasonal":     "Seasonal Analysis",
@@ -219,7 +224,7 @@ def _render_readiness(baseline: Optional[SiteBaseline], df: pd.DataFrame) -> Non
     """, unsafe_allow_html=True)
 
     # Progress bar showing level achieved
-    level_pct = {"insufficient": 5, "basic": 33, "full": 66, "seasonal": 100}.get(suf.status, 5)
+    level_pct = {"insufficient": 5, "early": 15, "basic": 40, "full": 70, "seasonal": 100}.get(suf.status, 5)
     st.progress(level_pct / 100, text=f"Analysis readiness: {level_pct}%")
 
 
@@ -369,6 +374,65 @@ def _hex_to_rgb(hex_colour: str) -> str:
     return f"{r},{g},{b}"
 
 
+def _dwf_diurnal_chart(variable: str, dwf_profile, all_profile) -> go.Figure:
+    """Side-by-side DWF median vs all-data median diurnal chart."""
+    colour = _VAR_COLOURS.get(variable, "#3A7F5F")
+    meta   = _SENSOR_META.get(variable, {})
+    unit   = meta.get("unit", "")
+    label  = meta.get("label", variable)
+    hours  = list(range(24))
+
+    fig = go.Figure()
+
+    # All-data P25–P75 band (faint)
+    fig.add_trace(go.Scatter(
+        x=hours + hours[::-1],
+        y=all_profile.diurnal.p75 + all_profile.diurnal.p25[::-1],
+        fill="toself",
+        fillcolor=f"rgba({_hex_to_rgb(colour)},0.10)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="All-data P25–P75", showlegend=True, legendrank=4,
+    ))
+    # All-data median (dashed)
+    fig.add_trace(go.Scatter(
+        x=hours, y=all_profile.diurnal.median,
+        mode="lines",
+        line=dict(color=colour, width=1.5, dash="dot"),
+        name="All-data median", legendrank=3,
+    ))
+    # DWF P25–P75 band
+    fig.add_trace(go.Scatter(
+        x=hours + hours[::-1],
+        y=dwf_profile.p75 + dwf_profile.p25[::-1],
+        fill="toself",
+        fillcolor="rgba(26,61,140,0.14)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="DWF P25–P75", showlegend=True, legendrank=2,
+    ))
+    # DWF median (solid, contrasting)
+    fig.add_trace(go.Scatter(
+        x=hours, y=dwf_profile.median,
+        mode="lines+markers",
+        line=dict(color="#1D4E89", width=2.5),
+        marker=dict(size=5, color="#1D4E89"),
+        name="DWF median", legendrank=1,
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"{label} — Dry-Weather Flow Diurnal Profile",
+            font=dict(size=13, color="#2F6B50"),
+        ),
+        xaxis=dict(title="Hour of Day (UTC)", tickmode="linear", dtick=3, gridcolor="#F0F0F0"),
+        yaxis=dict(title=f"{label} ({unit})", gridcolor="#F0F0F0"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        plot_bgcolor="#FAFAFA", paper_bgcolor="white",
+        margin=dict(l=50, r=20, t=50, b=40),
+        height=320,
+    )
+    return fig
+
+
 # ── Section 2: Baseline Profiles ───────────────────────────────────────────────
 
 def _render_profiles(baseline: SiteBaseline) -> None:
@@ -495,6 +559,193 @@ def _render_trends(baseline: SiteBaseline) -> None:
     )
 
 
+# ── Section 3b: DWF Diurnal Profiles ──────────────────────────────────────────
+
+def _render_dwf_profiles(baseline: SiteBaseline, df_all: "pd.DataFrame", df_rainfall: Optional["pd.DataFrame"]) -> None:
+    """Render the Dry-Weather Flow diurnal profiles section."""
+    st.markdown("### 💧 Dry-Weather Flow Diurnal Profiles")
+
+    if not baseline.profiles:
+        st.info("No sensor profiles available for DWF analysis.")
+        return
+
+    if df_rainfall is None or df_rainfall.empty:
+        st.info(
+            "No rainfall data available for this device. Assign a rainfall station or GPS "
+            "coordinates in the Admin Panel to enable DWF-masked diurnal profiling."
+        )
+        return
+
+    any_rendered = False
+    for var in ["flow_lps", "depth_mm", "velocity_mps"]:
+        if var not in baseline.profiles:
+            continue
+        profile = baseline.profiles[var]
+        dwf = compute_dwf_diurnal_profile(df_all, var, df_rainfall)
+        if dwf is None:
+            continue
+        meta  = _SENSOR_META.get(var, {})
+        label = meta.get("label", var)
+        total_dry = sum(dwf.counts)
+        total_all = sum(profile.diurnal.counts)
+        any_rendered = True
+
+        with st.expander(
+            f"**{label}** — {total_dry:,} dry-weather readings "
+            f"({total_dry / max(total_all, 1) * 100:.0f}% of all readings)",
+            expanded=(var == "flow_lps"),
+        ):
+            st.plotly_chart(_dwf_diurnal_chart(var, dwf, profile), use_container_width=True)
+            st.caption(
+                "Blue solid line = dry-weather-only median (rainfall ≤ 0.1 mm/hr). "
+                "Dotted line = all-data median (includes wet-weather I/I signal). "
+                "The gap between these curves indicates the wet-weather flow contribution. "
+                "Use the DWF median to set baseline alarm thresholds — it is more representative "
+                "of normal sewer conditions and reduces false alarms during rainfall events."
+            )
+
+    if not any_rendered:
+        st.info(
+            "Insufficient dry-weather readings to compute DWF diurnal profiles. "
+            "This can occur with very limited rainfall data coverage."
+        )
+
+
+# ── Section 3c: Hydraulic Capacity Analysis ────────────────────────────────────
+
+def _render_hydraulic(df_all: "pd.DataFrame") -> None:
+    """Render the advanced hydraulic capacity analysis section."""
+    st.markdown("### 🔩 Advanced Hydraulic Capacity Analysis")
+
+    st.markdown(
+        "<p style='font-size:0.88rem; color:#6b7280; margin:0 0 0.8rem;'>"
+        "Enter the pipe parameters below. Manning's equation is used to calculate "
+        "the theoretical full-bore capacity, then each measurement is expressed "
+        "as a percentage of that capacity."
+        "</p>",
+        unsafe_allow_html=True,
+    )
+
+    if "flow_lps" not in df_all.columns:
+        st.info("Flow rate (flow_lps) data is required for hydraulic analysis.")
+        return
+
+    hyd_col1, hyd_col2, hyd_col3 = st.columns(3)
+    with hyd_col1:
+        diameter_mm = st.number_input(
+            "Pipe Internal Diameter (mm)",
+            min_value=50, max_value=3000,
+            value=300, step=25,
+            key="hyd_diameter",
+            help="Internal diameter of the monitored pipe in millimetres.",
+        )
+    with hyd_col2:
+        manning_n = st.number_input(
+            "Manning's n (roughness)",
+            min_value=0.005, max_value=0.050,
+            value=0.013, step=0.001,
+            format="%.3f",
+            key="hyd_manning",
+            help=(
+                "Manning's roughness coefficient. "
+                "Typical values: smooth PVC/HDPE 0.009–0.011; "
+                "concrete/clay 0.013–0.015; older brick 0.015–0.020."
+            ),
+        )
+    with hyd_col3:
+        slope_pct = st.number_input(
+            "Longitudinal Slope (%)",
+            min_value=0.01, max_value=20.0,
+            value=0.50, step=0.05,
+            format="%.2f",
+            key="hyd_slope",
+            help=(
+                "Pipe invert slope as a percentage. "
+                "Typical design minimum: 0.5% (1:200). "
+                "Steeper grades increase capacity significantly."
+            ),
+        )
+
+    try:
+        from hydraulic import compute_pipe_capacity, compute_hydraulic_utilisation
+    except ImportError:
+        st.error("hydraulic module not found.")
+        return
+
+    qfull = compute_pipe_capacity(diameter_mm, manning_n, slope_pct)
+
+    st.markdown(
+        f"<div style='background:#E8F3EE; border-left:4px solid #3A7F5F; border-radius:6px; "
+        f"padding:10px 16px; margin-bottom:1rem; font-size:0.88rem; color:#4A4A4A;'>"
+        f"<strong>Full-bore capacity (Manning's equation):</strong> "
+        f"<span style='font-size:1.15rem; font-weight:700; color:#2F6B50;'>{qfull:.1f} L/s</span>"
+        f"&nbsp; | &nbsp; {qfull * 3.6:.2f} m³/hr"
+        f"&nbsp; | &nbsp; Ø{diameter_mm} mm, n = {manning_n:.3f}, S = {slope_pct:.2f}%"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    report = compute_hydraulic_utilisation(
+        df_all, qfull,
+        pipe_diameter_mm=float(diameter_mm),
+        manning_n=manning_n,
+        slope_pct=slope_pct,
+    )
+    if report is None:
+        st.info("Insufficient flow data to compute hydraulic utilisation.")
+        return
+
+    # Metric row
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Mean Utilisation", f"{report.mean_utilisation_pct:.1f}%",
+              help="Mean flow as % of full-bore capacity")
+    m2.metric("Median Utilisation", f"{report.median_utilisation_pct:.1f}%",
+              help="Median flow as % of full-bore capacity")
+    m3.metric("P90 Utilisation", f"{report.p90_utilisation_pct:.1f}%",
+              help="90th-percentile utilisation — what the pipe carries for 10% of the time")
+    m4.metric("Peak Utilisation", f"{report.max_utilisation_pct:.1f}%",
+              help="Maximum observed utilisation")
+    m5.metric("Surcharge Events", str(len(report.full_bore_events)),
+              help=f"Periods where utilisation exceeded {90:.0f}% of full-bore capacity")
+
+    # Risk badge
+    risk_colour = report.surcharge_risk_colour
+    st.markdown(
+        f"<div style='margin:0.6rem 0;'>"
+        f"<span style='background:{risk_colour}20; color:{risk_colour}; border:1.5px solid {risk_colour}; "
+        f"border-radius:20px; padding:4px 16px; font-size:0.88rem; font-weight:700;'>"
+        f"Surcharge Risk: {report.surcharge_risk_label}"
+        f"</span></div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<p style='font-size:0.85rem; color:#4A4A4A; margin-top:0.4rem;'>{report.interpretation}</p>",
+        unsafe_allow_html=True,
+    )
+
+    # Full-bore events table
+    if report.full_bore_events:
+        with st.expander(f"Surcharge Events ({len(report.full_bore_events)})", expanded=False):
+            import pandas as _pd
+            rows_ev = [
+                {
+                    "Start (UTC)": e.start.strftime("%Y-%m-%d %H:%M") if hasattr(e.start, "strftime") else str(e.start),
+                    "End (UTC)":   e.end.strftime("%Y-%m-%d %H:%M") if hasattr(e.end, "strftime") else str(e.end),
+                    "Duration (min)": f"{e.duration_minutes:.0f}",
+                    "Peak Utilisation": f"{e.peak_utilisation_pct:.1f}%",
+                }
+                for e in report.full_bore_events
+            ]
+            st.dataframe(_pd.DataFrame(rows_ev), use_container_width=True, hide_index=True)
+
+    st.caption(
+        "Manning's equation: Q = (1/n) × A × R²/³ × S½ — where A = πD²/4, R = D/4 for a "
+        "full circular section. Utilisation is the ratio of measured flow to the theoretical "
+        "full-bore capacity. Results should be validated against as-built pipe survey data. "
+        "Slope and roughness are the dominant parameters — confirm these from as-built drawings."
+    )
+
+
 # ── Section 4: Alarm Recommendations ──────────────────────────────────────────
 
 def _render_recommendations(
@@ -503,6 +754,15 @@ def _render_recommendations(
     selected_sensitivity: str,
 ) -> None:
     st.markdown("### 🔔 Alarm Level Recommendations")
+
+    # Alarm recommendations require at least basic data quality
+    if not baseline.sufficiency.has_basic:
+        st.info(
+            f"🔒 Alarm threshold recommendations require at least **{_MIN_DAYS_BASIC} days** and "
+            f"**{_MIN_READINGS_BASIC:,} readings** for statistical reliability. "
+            "Keep collecting data — recommendations will unlock automatically."
+        )
+        return
 
     # Load persisted recommendations from DB
     db_recs = db.get_alarm_recommendations(device_id, sensitivity=selected_sensitivity)
@@ -701,13 +961,23 @@ _render_readiness(cached, df_all)
 
 st.divider()
 
-if cached is None or not cached.sufficiency.has_basic:
+if cached is None or not cached.sufficiency.has_early:
     st.info(
         "🔍 Not enough data has been collected to run a meaningful analysis yet. "
-        "Once you have at least **7 days** and **5,000 readings**, click "
-        "**Compute Baselines** to unlock profile charts and alarm recommendations."
+        "Once you have at least **1 day** and **100 readings**, click "
+        "**Compute Baselines** to unlock preliminary profile charts."
     )
     st.stop()
+
+# ── Early-stage caveat banner ──────────────────────────────────────────────────
+if cached.sufficiency.status == "early":
+    st.warning(
+        "⚠️ **Early-stage analysis** — fewer than 7 days of data have been collected. "
+        "Distribution charts and diurnal profiles are shown for informational purposes "
+        "only and **should not be used to set alarm thresholds**. "
+        f"Alarm recommendations will unlock once at least **{_MIN_DAYS_BASIC} days** and "
+        f"**{_MIN_READINGS_BASIC:,} readings** are available."
+    )
 
 # ── Sensitivity selector ───────────────────────────────────────────────────────
 sensitivity_options = list(_SENSITIVITY_LABELS.keys())
@@ -735,6 +1005,42 @@ st.divider()
 
 # ── Section 3: Trends ─────────────────────────────────────────────────────────
 _render_trends(cached)
+
+st.divider()
+
+# ── Section 3b: DWF Diurnal Profiles ──────────────────────────────────────────
+# Load rainfall data if the device has a station or GPS coordinates
+_dev_info_intel = next((d for d in db.get_devices() if d["device_id"] == selected_device_id), None)
+_has_loc_intel = _dev_info_intel and _dev_info_intel.get("latitude") and _dev_info_intel.get("longitude")
+_has_station_intel = db.get_device_rainfall_station(selected_device_id) is not None
+
+if _has_loc_intel or _has_station_intel:
+    from datetime import timezone as _tz_intel
+    from datetime import timedelta as _td_intel
+    _rain_to_intel = datetime.now(_tz_intel.utc)
+    _rain_from_intel = _rain_to_intel - _td_intel(days=max(int(cached.days_covered), 7))
+    with st.spinner("Loading rainfall data for DWF profiling…"):
+        try:
+            from rainfall import get_rainfall_for_device as _get_rain_intel
+            _rain_records_intel = _get_rain_intel(
+                selected_device_id, db, _rain_from_intel, _rain_to_intel
+            )
+            _df_rain_intel = (
+                pd.DataFrame(_rain_records_intel) if _rain_records_intel
+                else pd.DataFrame(columns=["timestamp", "rainfall_mm"])
+            )
+            if not _df_rain_intel.empty:
+                _df_rain_intel["timestamp"] = pd.to_datetime(_df_rain_intel["timestamp"])
+        except Exception as _e_rain:
+            _df_rain_intel = pd.DataFrame(columns=["timestamp", "rainfall_mm"])
+    _render_dwf_profiles(cached, df_all, _df_rain_intel)
+else:
+    _render_dwf_profiles(cached, df_all, None)
+
+st.divider()
+
+# ── Section 3c: Hydraulic Analysis ────────────────────────────────────────────
+_render_hydraulic(df_all)
 
 st.divider()
 

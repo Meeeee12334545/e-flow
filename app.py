@@ -25,6 +25,7 @@ from rainfall_analysis import (
     compute_dry_weather_baseline,
     detect_rain_events,
     detect_inflow_infiltration,
+    compute_flow_rainfall_correlation,
 )
 
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user, get_org_logo_data_uri, get_sidebar_logo_path
@@ -1202,6 +1203,39 @@ if selected_device_id:
                         st.markdown("#### Recommendations")
                         for _rec in _response.recommendations:
                             st.markdown(_rec)
+
+                    # ── Flow–Rainfall Correlation ──────────────────────────
+                    if not df_rain.empty and "flow_lps" in _df_flow_r.columns:
+                        st.markdown("#### Flow–Rainfall Correlation")
+                        _corr = compute_flow_rainfall_correlation(_df_flow_r, df_rain)
+                        if _corr is not None:
+                            _corr_qual_colour = {
+                                "Strong": "#3A7F5F",
+                                "Moderate": "#F4B400",
+                                "Weak": "#E65100",
+                                "None": "#9E9E9E",
+                            }.get(_corr.quality_label, "#9E9E9E")
+                            _cc1, _cc2, _cc3, _cc4 = st.columns(4)
+                            _cc1.metric("Pearson r", f"{_corr.pearson_r:.3f}",
+                                        help="Linear correlation at zero lag (rainfall vs flow)")
+                            _cc2.metric("R²", f"{_corr.r_squared:.3f}",
+                                        help="Proportion of flow variance explained by rainfall at zero lag")
+                            _cc3.metric("Best Lag", f"{_corr.best_lag_hours:.0f} h",
+                                        help="Lag (hours) at which flow-rainfall cross-correlation is highest")
+                            _cc4.metric("Samples", f"{_corr.sample_size:,}",
+                                        help="Number of hourly paired flow/rainfall readings used")
+                            st.markdown(
+                                f"<span style='background:{_corr_qual_colour}20; color:{_corr_qual_colour}; "
+                                f"border:1px solid {_corr_qual_colour}; border-radius:20px; "
+                                f"padding:2px 12px; font-size:0.83rem; font-weight:700;'>"
+                                f"{_corr.quality_label} correlation</span>",
+                                unsafe_allow_html=True,
+                            )
+                            st.markdown(
+                                f"<p style='font-size:0.85rem; color:#4A4A4A; margin-top:0.4rem;'>"
+                                f"{_corr.interpretation}</p>",
+                                unsafe_allow_html=True,
+                            )
 
             with tab6:
                 st.markdown(
