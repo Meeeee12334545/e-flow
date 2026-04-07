@@ -24,6 +24,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _to_naive_utc(dt: datetime) -> datetime:
+    """Normalise *dt* to a tz-naive UTC datetime (no-op if already naive)."""
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
 # ── BOM public resources ───────────────────────────────────────────────────────
 # Station list: BOM Climate Data Services – plain-text station catalogue.
 # The file is space-delimited with fixed column widths.
@@ -160,6 +167,8 @@ def fetch_bom_rainfall(
     Returns a DataFrame with columns [timestamp, rainfall_mm] indexed by UTC time.
     Returns an empty DataFrame if the station data is unavailable.
     """
+    date_from = _to_naive_utc(date_from)
+    date_to = _to_naive_utc(date_to)
     product = BOM_STATE_PRODUCTS.get(state.upper(), ("IDN60801", "IDN60801"))[0]
     # BOM JSON feed URL (current observations — up to ~72 h history):
     url = f"http://www.bom.gov.au/fwo/{product}/{product}.{station_id}.json"
@@ -219,6 +228,8 @@ def fetch_open_meteo_rainfall(
 
     Returns a DataFrame with columns [timestamp, rainfall_mm].
     """
+    date_from = _to_naive_utc(date_from)
+    date_to = _to_naive_utc(date_to)
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     # Open-Meteo archive is available up to ~5 days ago
     archive_cutoff = now_utc - timedelta(days=5)
@@ -289,8 +300,8 @@ def fetch_open_meteo_rainfall(
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     # Filter to requested range
     df = df[
-        (df["timestamp"] >= pd.to_datetime(date_from).tz_localize(None))
-        & (df["timestamp"] <= pd.to_datetime(date_to).tz_localize(None))
+        (df["timestamp"] >= date_from)
+        & (df["timestamp"] <= date_to)
     ]
     df = df.drop_duplicates(subset="timestamp").sort_values("timestamp").reset_index(drop=True)
     return df
@@ -314,6 +325,10 @@ def get_rainfall_for_device(
 
     Returns a DataFrame with columns [timestamp, rainfall_mm], possibly empty.
     """
+    # Normalise to naive UTC so all downstream comparisons are tz-consistent
+    date_from = _to_naive_utc(date_from)
+    date_to = _to_naive_utc(date_to)
+
     # Resolve data source
     assignment = db.get_device_rainfall_station(device_id)
     device_list = db.get_devices()
