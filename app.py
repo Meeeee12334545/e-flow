@@ -632,7 +632,7 @@ if page_mode == 'Simplified View':
             fig.update_xaxes(title_text='Time')
             fig.update_yaxes(title_text='Flow (L/s) / Depth (mm)', secondary_y=False)
             fig.update_yaxes(title_text='Velocity (m/s)', secondary_y=True)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             if show_note:
                 st.info(
@@ -864,7 +864,7 @@ if selected_device_id:
                     yaxis=dict(gridcolor='#f0f4f4', linecolor='#D9D9D9'),
                     legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
                 )
-                st.plotly_chart(fig_main_flow, use_container_width=True)
+                st.plotly_chart(fig_main_flow, width="stretch")
 
                 col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                 with col_stat1:
@@ -907,7 +907,7 @@ if selected_device_id:
                 fig_depth.update_traces(line=dict(color="#3A7F5F", width=1.5))
                 fig_depth.update_layout(**_chart_layout)
                 fig_depth.update_yaxes(title_text="Depth (mm)")
-                st.plotly_chart(fig_depth, use_container_width=True)
+                st.plotly_chart(fig_depth, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
                 col_s2.metric("Max", f"{df['depth_mm'].max():.1f} mm")
@@ -920,7 +920,7 @@ if selected_device_id:
                 fig_vel.update_traces(line=dict(color="#2A9D8F", width=1.5))
                 fig_vel.update_layout(**_chart_layout)
                 fig_vel.update_yaxes(title_text="Velocity (m/s)")
-                st.plotly_chart(fig_vel, use_container_width=True)
+                st.plotly_chart(fig_vel, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
                 col_s2.metric("Max", f"{df['velocity_mps'].max():.3f} m/s")
@@ -933,7 +933,7 @@ if selected_device_id:
                 fig_flow.update_traces(line=dict(color="#1D4E89", width=1.5))
                 fig_flow.update_layout(**_chart_layout)
                 fig_flow.update_yaxes(title_text="Flow Rate (L/s)")
-                st.plotly_chart(fig_flow, use_container_width=True)
+                st.plotly_chart(fig_flow, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 col_s1.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
                 col_s2.metric("Max", f"{df['flow_lps'].max():.1f} L/s")
@@ -1016,7 +1016,7 @@ if selected_device_id:
                         xaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9", title="Water Depth (mm)"),
                         yaxis=dict(gridcolor="#f0f4f4", linecolor="#D9D9D9", title="Flow Velocity (m/s)"),
                     )
-                    st.plotly_chart(fig_scatter, use_container_width=True)
+                    st.plotly_chart(fig_scatter, width="stretch")
 
                     _corr_col, _depth_range_col, _velocity_range_col = st.columns(3)
                     _corr = _df_scatter["depth_mm"].corr(_df_scatter["velocity_mps"])
@@ -1155,7 +1155,7 @@ if selected_device_id:
                             title_text="Rainfall (mm/hr)", secondary_y=True,
                             autorange="reversed",
                         )
-                        st.plotly_chart(_fig_rain, use_container_width=True)
+                        st.plotly_chart(_fig_rain, width="stretch")
                     elif df.empty:
                         st.info("No flow data available for the selected window.")
                     else:
@@ -1178,7 +1178,7 @@ if selected_device_id:
                                 }
                                 for e in _response.rain_events
                             ])
-                            st.dataframe(_ev_df, use_container_width=True, hide_index=True)
+                            st.dataframe(_ev_df, width="stretch", hide_index=True)
 
                     # ── I/I flags table ────────────────────────────────────
                     if _response.ii_flags:
@@ -1296,21 +1296,21 @@ if selected_device_id:
                     fig_hist_d.update_traces(marker_color="#3A7F5F", marker_line_color="#2F6B50", marker_line_width=0.5)
                     fig_hist_d.update_layout(**_hist_layout)
                     fig_hist_d.update_xaxes(title_text="Depth (mm)")
-                    st.plotly_chart(fig_hist_d, use_container_width=True)
+                    st.plotly_chart(fig_hist_d, width="stretch")
                 with dist_col2:
                     fig_hist_v = px.histogram(df, x="velocity_mps", nbins=25,
                                               labels={"velocity_mps": "Velocity (m/s)", "count": "Count"})
                     fig_hist_v.update_traces(marker_color="#2A9D8F", marker_line_color="#1e7a6e", marker_line_width=0.5)
                     fig_hist_v.update_layout(**_hist_layout)
                     fig_hist_v.update_xaxes(title_text="Velocity (m/s)")
-                    st.plotly_chart(fig_hist_v, use_container_width=True)
+                    st.plotly_chart(fig_hist_v, width="stretch")
                 with dist_col3:
                     fig_hist_f = px.histogram(df, x="flow_lps", nbins=25,
                                               labels={"flow_lps": "Flow (L/s)", "count": "Count"})
                     fig_hist_f.update_traces(marker_color="#1D4E89", marker_line_color="#163a67", marker_line_width=0.5)
                     fig_hist_f.update_layout(**_hist_layout)
                     fig_hist_f.update_xaxes(title_text="Flow Rate (L/s)")
-                    st.plotly_chart(fig_hist_f, use_container_width=True)
+                    st.plotly_chart(fig_hist_f, width="stretch")
 
                 st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
                 st.markdown(
@@ -1331,7 +1331,7 @@ if selected_device_id:
             display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.dataframe(display_df, width="stretch", hide_index=True)
 
             col_dl1, _ = st.columns([1, 3])
             with col_dl1:
