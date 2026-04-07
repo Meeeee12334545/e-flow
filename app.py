@@ -902,47 +902,47 @@ if selected_device_id:
             tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Depth", "Velocity", "Flow", "Depth vs Velocity", "Rainfall & I/I", "Statistics"])
 
             with tab1:
-                fig_depth = px.line(df, x="timestamp", y="depth_mm",
+                fig_depth = px.line(df_graph, x="timestamp", y="depth_mm",
                                     labels={"depth_mm": "Depth (mm)", "timestamp": "Time"})
                 fig_depth.update_traces(line=dict(color="#3A7F5F", width=1.5))
                 fig_depth.update_layout(**_chart_layout)
                 fig_depth.update_yaxes(title_text="Depth (mm)")
                 st.plotly_chart(fig_depth, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-                col_s1.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
-                col_s2.metric("Max", f"{df['depth_mm'].max():.1f} mm")
-                col_s3.metric("Min", f"{df['depth_mm'].min():.1f} mm")
-                col_s4.metric("Std Dev", f"{df['depth_mm'].std():.1f} mm")
+                col_s1.metric("Mean", f"{df_graph['depth_mm'].mean():.1f} mm")
+                col_s2.metric("Max", f"{df_graph['depth_mm'].max():.1f} mm")
+                col_s3.metric("Min", f"{df_graph['depth_mm'].min():.1f} mm")
+                col_s4.metric("Std Dev", f"{df_graph['depth_mm'].std():.1f} mm")
 
             with tab2:
-                fig_vel = px.line(df, x="timestamp", y="velocity_mps",
+                fig_vel = px.line(df_graph, x="timestamp", y="velocity_mps",
                                   labels={"velocity_mps": "Velocity (m/s)", "timestamp": "Time"})
                 fig_vel.update_traces(line=dict(color="#2A9D8F", width=1.5))
                 fig_vel.update_layout(**_chart_layout)
                 fig_vel.update_yaxes(title_text="Velocity (m/s)")
                 st.plotly_chart(fig_vel, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-                col_s1.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
-                col_s2.metric("Max", f"{df['velocity_mps'].max():.3f} m/s")
-                col_s3.metric("Min", f"{df['velocity_mps'].min():.3f} m/s")
-                col_s4.metric("Std Dev", f"{df['velocity_mps'].std():.3f} m/s")
+                col_s1.metric("Mean", f"{df_graph['velocity_mps'].mean():.3f} m/s")
+                col_s2.metric("Max", f"{df_graph['velocity_mps'].max():.3f} m/s")
+                col_s3.metric("Min", f"{df_graph['velocity_mps'].min():.3f} m/s")
+                col_s4.metric("Std Dev", f"{df_graph['velocity_mps'].std():.3f} m/s")
 
             with tab3:
-                fig_flow = px.line(df, x="timestamp", y="flow_lps",
+                fig_flow = px.line(df_graph, x="timestamp", y="flow_lps",
                                    labels={"flow_lps": "Flow (L/s)", "timestamp": "Time"})
                 fig_flow.update_traces(line=dict(color="#1D4E89", width=1.5))
                 fig_flow.update_layout(**_chart_layout)
                 fig_flow.update_yaxes(title_text="Flow Rate (L/s)")
                 st.plotly_chart(fig_flow, width="stretch")
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-                col_s1.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
-                col_s2.metric("Max", f"{df['flow_lps'].max():.1f} L/s")
-                col_s3.metric("Min", f"{df['flow_lps'].min():.1f} L/s")
-                col_s4.metric("Std Dev", f"{df['flow_lps'].std():.1f} L/s")
+                col_s1.metric("Mean", f"{df_graph['flow_lps'].mean():.1f} L/s")
+                col_s2.metric("Max", f"{df_graph['flow_lps'].max():.1f} L/s")
+                col_s3.metric("Min", f"{df_graph['flow_lps'].min():.1f} L/s")
+                col_s4.metric("Std Dev", f"{df_graph['flow_lps'].std():.1f} L/s")
 
             with tab4:
                 # ── Depth vs Velocity scatter plot ──────────────────────────
-                _df_scatter = df[["depth_mm", "velocity_mps", "flow_lps", "timestamp"]].dropna(subset=["depth_mm", "velocity_mps"])
+                _df_scatter = df_graph[["depth_mm", "velocity_mps", "flow_lps", "timestamp"]].dropna(subset=["depth_mm", "velocity_mps"])
                 if not _df_scatter.empty:
                     _scatter_col1, _scatter_col2 = st.columns([3, 1])
                     with _scatter_col2:
@@ -1058,7 +1058,7 @@ if selected_device_id:
                             st.warning(f"Could not load rainfall data: {_re}")
 
                     # ── Analysis ──────────────────────────────────────────
-                    _df_flow_r = df.copy() if not df.empty else pd.DataFrame(columns=["timestamp", "flow_lps"])
+                    _df_flow_r = df_graph.copy() if not df_graph.empty else pd.DataFrame(columns=["timestamp", "flow_lps"])
                     _baseline = compute_dry_weather_baseline(_df_flow_r, df_rain)
                     _response = detect_inflow_infiltration(_df_flow_r, df_rain, _baseline)
 
@@ -1250,10 +1250,10 @@ if selected_device_id:
                         "Water Depth</p>",
                         unsafe_allow_html=True,
                     )
-                    st.metric("Mean", f"{df['depth_mm'].mean():.1f} mm")
-                    st.metric("Median", f"{df['depth_mm'].median():.1f} mm")
-                    st.metric("Std Dev", f"{df['depth_mm'].std():.1f} mm")
-                    st.metric("Range", f"{df['depth_mm'].min():.0f} – {df['depth_mm'].max():.0f} mm")
+                    st.metric("Mean", f"{df_graph['depth_mm'].mean():.1f} mm")
+                    st.metric("Median", f"{df_graph['depth_mm'].median():.1f} mm")
+                    st.metric("Std Dev", f"{df_graph['depth_mm'].std():.1f} mm")
+                    st.metric("Range", f"{df_graph['depth_mm'].min():.0f} – {df_graph['depth_mm'].max():.0f} mm")
                 with col_sum2:
                     st.markdown(
                         "<p style='font-weight:600;color:#2A9D8F;font-size:0.9rem;"
@@ -1261,10 +1261,10 @@ if selected_device_id:
                         "Flow Velocity</p>",
                         unsafe_allow_html=True,
                     )
-                    st.metric("Mean", f"{df['velocity_mps'].mean():.3f} m/s")
-                    st.metric("Median", f"{df['velocity_mps'].median():.3f} m/s")
-                    st.metric("Std Dev", f"{df['velocity_mps'].std():.3f} m/s")
-                    st.metric("Range", f"{df['velocity_mps'].min():.3f} – {df['velocity_mps'].max():.3f} m/s")
+                    st.metric("Mean", f"{df_graph['velocity_mps'].mean():.3f} m/s")
+                    st.metric("Median", f"{df_graph['velocity_mps'].median():.3f} m/s")
+                    st.metric("Std Dev", f"{df_graph['velocity_mps'].std():.3f} m/s")
+                    st.metric("Range", f"{df_graph['velocity_mps'].min():.3f} – {df_graph['velocity_mps'].max():.3f} m/s")
                 with col_sum3:
                     st.markdown(
                         "<p style='font-weight:600;color:#1D4E89;font-size:0.9rem;"
@@ -1272,10 +1272,10 @@ if selected_device_id:
                         "Flow Rate</p>",
                         unsafe_allow_html=True,
                     )
-                    st.metric("Mean", f"{df['flow_lps'].mean():.1f} L/s")
-                    st.metric("Median", f"{df['flow_lps'].median():.1f} L/s")
-                    st.metric("Std Dev", f"{df['flow_lps'].std():.1f} L/s")
-                    st.metric("Range", f"{df['flow_lps'].min():.1f} – {df['flow_lps'].max():.1f} L/s")
+                    st.metric("Mean", f"{df_graph['flow_lps'].mean():.1f} L/s")
+                    st.metric("Median", f"{df_graph['flow_lps'].median():.1f} L/s")
+                    st.metric("Std Dev", f"{df_graph['flow_lps'].std():.1f} L/s")
+                    st.metric("Range", f"{df_graph['flow_lps'].min():.1f} – {df_graph['flow_lps'].max():.1f} L/s")
 
                 st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
                 st.markdown(
@@ -1291,21 +1291,21 @@ if selected_device_id:
                 )
                 dist_col1, dist_col2, dist_col3 = st.columns(3)
                 with dist_col1:
-                    fig_hist_d = px.histogram(df, x="depth_mm", nbins=25,
+                    fig_hist_d = px.histogram(df_graph, x="depth_mm", nbins=25,
                                               labels={"depth_mm": "Depth (mm)", "count": "Count"})
                     fig_hist_d.update_traces(marker_color="#3A7F5F", marker_line_color="#2F6B50", marker_line_width=0.5)
                     fig_hist_d.update_layout(**_hist_layout)
                     fig_hist_d.update_xaxes(title_text="Depth (mm)")
                     st.plotly_chart(fig_hist_d, width="stretch")
                 with dist_col2:
-                    fig_hist_v = px.histogram(df, x="velocity_mps", nbins=25,
+                    fig_hist_v = px.histogram(df_graph, x="velocity_mps", nbins=25,
                                               labels={"velocity_mps": "Velocity (m/s)", "count": "Count"})
                     fig_hist_v.update_traces(marker_color="#2A9D8F", marker_line_color="#1e7a6e", marker_line_width=0.5)
                     fig_hist_v.update_layout(**_hist_layout)
                     fig_hist_v.update_xaxes(title_text="Velocity (m/s)")
                     st.plotly_chart(fig_hist_v, width="stretch")
                 with dist_col3:
-                    fig_hist_f = px.histogram(df, x="flow_lps", nbins=25,
+                    fig_hist_f = px.histogram(df_graph, x="flow_lps", nbins=25,
                                               labels={"flow_lps": "Flow (L/s)", "count": "Count"})
                     fig_hist_f.update_traces(marker_color="#1D4E89", marker_line_color="#163a67", marker_line_width=0.5)
                     fig_hist_f.update_layout(**_hist_layout)
@@ -1318,17 +1318,17 @@ if selected_device_id:
                     unsafe_allow_html=True,
                 )
                 col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-                col_c1.metric("Total Records", len(df))
-                time_span_h = (df['timestamp'].max() - df['timestamp'].min()).total_seconds() / 3600
+                col_c1.metric("Total Records", len(df_graph))
+                time_span_h = (df_graph['timestamp'].max() - df_graph['timestamp'].min()).total_seconds() / 3600
                 col_c2.metric("Time Span", f"{time_span_h:.1f} h")
-                col_c3.metric("Collection Rate", f"{len(df) / max(1, time_span_h):.1f}/hr")
-                completeness = (len(df) - df[['depth_mm', 'velocity_mps', 'flow_lps']].isna().sum().max()) / max(1, len(df)) * 100
+                col_c3.metric("Collection Rate", f"{len(df_graph) / max(1, time_span_h):.1f}/hr")
+                completeness = (len(df_graph) - df_graph[['depth_mm', 'velocity_mps', 'flow_lps']].isna().sum().max()) / max(1, len(df_graph)) * 100
                 col_c4.metric("Data Completeness", f"{completeness:.0f}%")
 
             # ── Data table & export ────────────────────────────────────────
             st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
             st.markdown('<p class="section-title">Data Table & Export</p>', unsafe_allow_html=True)
-            display_df = df[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
+            display_df = df_graph[["timestamp", "depth_mm", "velocity_mps", "flow_lps"]].copy()
             display_df.columns = ["Timestamp", "Depth (mm)", "Velocity (m/s)", "Flow (L/s)"]
             display_df["Timestamp"] = display_df["Timestamp"].astype(str)
             st.dataframe(display_df, width="stretch", hide_index=True)
