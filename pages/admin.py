@@ -71,7 +71,7 @@ def render_admin_panel():
                 mime_type = uploaded_logo.type or "image/png"
                 branding_save_col, branding_preview_col = st.columns([1, 1])
                 with branding_preview_col:
-                    st.image(file_bytes, caption="Preview", use_container_width=True)
+                    st.image(file_bytes, caption="Preview", width="stretch")
                 with branding_save_col:
                     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
                     if st.button("Save Organisation Logo", type="primary", key="save_org_logo_btn"):
@@ -95,7 +95,7 @@ def render_admin_panel():
             st.image(
                 base64.b64decode(current_logo_b64),
                 caption=None,
-                use_container_width=True,
+                width="stretch",
             )
             if st.button("Remove Logo (restore default)", key="remove_org_logo_btn"):
                 auth_db.delete_setting('org_logo_b64')
@@ -300,7 +300,7 @@ def render_admin_panel():
                     help="Full URL to the USRIOT unit dashboard for this site.",
                     key="edit_site_url",
                 )
-                if st.form_submit_button("Save Changes →", use_container_width=True):
+                if st.form_submit_button("Save Changes →", width="stretch"):
                     if not _edit_name.strip():
                         st.error("Site Name cannot be empty.")
                     elif _edit_url.strip() and not _edit_url.strip().startswith("http"):

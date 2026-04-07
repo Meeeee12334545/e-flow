@@ -450,21 +450,21 @@ def _render_profiles(baseline: SiteBaseline) -> None:
             tab1, tab2, tab3 = st.tabs(["Diurnal Profile", "Day-of-Week", "Distribution"])
 
             with tab1:
-                st.plotly_chart(_diurnal_chart(var, profile), use_container_width=True)
+                st.plotly_chart(_diurnal_chart(var, profile), width="stretch")
                 st.caption(
                     "Median value (line) and interquartile bands (P25–P75, P10–P90) for each hour of the day. "
                     "All times are UTC. Use this to identify peak-flow hours and expected overnight behaviour."
                 )
 
             with tab2:
-                st.plotly_chart(_dow_chart(var, profile), use_container_width=True)
+                st.plotly_chart(_dow_chart(var, profile), width="stretch")
                 st.caption(
                     "Day-of-week median and IQR. Significant differences between weekdays and weekends "
                     "indicate catchment-specific usage patterns that should inform alarm scheduling."
                 )
 
             with tab3:
-                st.plotly_chart(_distribution_chart(var, profile), use_container_width=True)
+                st.plotly_chart(_distribution_chart(var, profile), width="stretch")
                 # Key percentile table
                 pcts = dist.percentiles
                 unit = meta.get("unit", "")
@@ -494,9 +494,9 @@ def _render_profiles(baseline: SiteBaseline) -> None:
                 }
                 col_pct, col_extra = st.columns(2)
                 with col_pct:
-                    st.dataframe(pct_data, use_container_width=True, hide_index=True)
+                    st.dataframe(pct_data, width="stretch", hide_index=True)
                 with col_extra:
-                    st.dataframe(extra, use_container_width=True, hide_index=True)
+                    st.dataframe(extra, width="stretch", hide_index=True)
 
 
 # ── Section 3: Trend Summary ───────────────────────────────────────────────────
@@ -595,7 +595,7 @@ def _render_dwf_profiles(baseline: SiteBaseline, df_all: "pd.DataFrame", df_rain
             f"({total_dry / max(total_all, 1) * 100:.0f}% of all readings)",
             expanded=(var == "flow_lps"),
         ):
-            st.plotly_chart(_dwf_diurnal_chart(var, dwf, profile), use_container_width=True)
+            st.plotly_chart(_dwf_diurnal_chart(var, dwf, profile), width="stretch")
             st.caption(
                 "Blue solid line = dry-weather-only median (rainfall ≤ 0.1 mm/hr). "
                 "Dotted line = all-data median (includes wet-weather I/I signal). "
@@ -736,7 +736,7 @@ def _render_hydraulic(df_all: "pd.DataFrame") -> None:
                 }
                 for e in report.full_bore_events
             ]
-            st.dataframe(_pd.DataFrame(rows_ev), use_container_width=True, hide_index=True)
+            st.dataframe(_pd.DataFrame(rows_ev), width="stretch", hide_index=True)
 
     st.caption(
         "Manning's equation: Q = (1/n) × A × R²/³ × S½ — where A = πD²/4, R = D/4 for a "
@@ -947,7 +947,7 @@ cached = _cached_baseline(selected_device_id)
 
 # Controls row
 with col_action:
-    if st.button("🔄 Compute Baselines", type="primary", use_container_width=True):
+    if st.button("🔄 Compute Baselines", type="primary", width="stretch"):
         if df_all.empty:
             st.error("No data found for this device.")
         else:
