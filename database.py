@@ -799,7 +799,7 @@ class FlowDatabase:
             conn = psycopg2.connect(self.pg_dsn)
             cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             try:
-                cur.execute("SELECT * FROM devices ORDER BY device_name")
+                cur.execute("SELECT * FROM devices ORDER BY created_at ASC")
                 rows = cur.fetchall()
                 return [dict(r) for r in rows]
             finally:
@@ -809,7 +809,7 @@ class FlowDatabase:
             conn = sqlite3.connect(self.db_path, timeout=30)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM devices ORDER BY device_name")
+            cursor.execute("SELECT * FROM devices ORDER BY created_at ASC")
             results = [dict(row) for row in cursor.fetchall()]
             conn.close()
             return results

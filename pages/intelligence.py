@@ -85,22 +85,27 @@ with st.sidebar:
 st.markdown("""
 <div class="page-header">
     <h1 style="margin:0; font-size:1.9rem; font-weight:700; color:#ffffff;">
-        Site Intelligence
+        FlowSense Analysis
     </h1>
     <p style="margin:0.3rem 0 0; color:rgba(255,255,255,0.85); font-size:0.95rem;">
-        Learn from historical data to generate site-specific alarm recommendations and trend insights.
+        Statistical baseline learning, diurnal profiling and alarm threshold recommendations.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
 # ── Device selector ────────────────────────────────────────────────────────────
+# Order: FIT100 first, then remaining sites in insertion (created_at) order
+_intel_device_name_list = [d["device_name"] for d in devices]
+if "FIT100" in _intel_device_name_list:
+    _intel_device_name_list = ["FIT100"] + [n for n in _intel_device_name_list if n != "FIT100"]
+
 col_sel, col_action = st.columns([2, 1])
 with col_sel:
     selected_device_name: str = st.selectbox(
         "Select Site",
-        options=sorted(device_names.keys()),
+        options=_intel_device_name_list,
         key="intel_device_selector",
     )
 selected_device_id = device_names[selected_device_name]
@@ -212,20 +217,20 @@ def _render_readiness(baseline: Optional[SiteBaseline], df: pd.DataFrame) -> Non
 
     if suf.status == "insufficient":
         st.info(
-            "ℹ️ **Data collection in progress.** FlowSense Analysis requires a minimum of "
+            "**Data collection in progress.** FlowSense Analysis requires a minimum of "
             "**7 days** of data to carry out high-level analysis. Continue collecting data "
             "and return once sufficient coverage has been reached."
         )
     else:
         st.markdown(f"""
-        <div style="background:{bg}; border:2px solid {colour}; border-radius:10px;
-                    padding:14px 18px; margin:0.5rem 0 1rem;">
-            <div style="font-size:1.05rem; font-weight:700; color:{colour}; margin-bottom:6px;">
+        <div style="background:{bg}; border-left:4px solid {colour}; border-radius:6px;
+                    padding:10px 14px; margin:0.4rem 0 0.75rem;">
+            <div style="font-size:0.95rem; font-weight:700; color:{colour}; margin-bottom:3px;">
                 {status_label}
             </div>
-            <div style="font-size:0.88rem; color:#4A4A4A;">{suf.status_description}</div>
-            <div style="font-size:0.84rem; color:#6b7280; margin-top:6px;">
-                <em>{suf.next_level_description}</em>
+            <div style="font-size:0.85rem; color:#4A4A4A; line-height:1.5;">{suf.status_description}</div>
+            <div style="font-size:0.82rem; color:#6b7280; margin-top:4px; font-style:italic;">
+                {suf.next_level_description}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -443,7 +448,7 @@ def _dwf_diurnal_chart(variable: str, dwf_profile, all_profile) -> go.Figure:
 # ── Section 2: Baseline Profiles ───────────────────────────────────────────────
 
 def _render_profiles(baseline: SiteBaseline) -> None:
-    st.markdown("### 📈 Baseline Profiles")
+    st.markdown("### Baseline Profiles")
     if not baseline.profiles:
         st.info("No sensor profiles available — collect more data to unlock profile analysis.")
         return
@@ -509,7 +514,7 @@ def _render_profiles(baseline: SiteBaseline) -> None:
 # ── Section 3: Trend Summary ───────────────────────────────────────────────────
 
 def _render_trends(baseline: SiteBaseline) -> None:
-    st.markdown("### 📉 Long-Term Trend Summary")
+    st.markdown("### Long-Term Trend Summary")
     if not baseline.profiles:
         st.info("No trend data available yet.")
         return
@@ -570,7 +575,7 @@ def _render_trends(baseline: SiteBaseline) -> None:
 
 def _render_dwf_profiles(baseline: SiteBaseline, df_all: "pd.DataFrame", df_rainfall: Optional["pd.DataFrame"]) -> None:
     """Render the Dry-Weather Flow diurnal profiles section."""
-    st.markdown("### 💧 Dry-Weather Flow Diurnal Profiles")
+    st.markdown("### Dry-Weather Flow Diurnal Profiles")
 
     if not baseline.profiles:
         st.info("No sensor profiles available for DWF analysis.")
@@ -625,12 +630,12 @@ def _render_recommendations(
     baseline: SiteBaseline,
     selected_sensitivity: str,
 ) -> None:
-    st.markdown("### 🔔 Alarm Level Recommendations")
+    st.markdown("### Alarm Level Recommendations")
 
     # Alarm recommendations require at least basic data quality
     if not baseline.sufficiency.has_basic:
         st.info(
-            f"🔒 Alarm threshold recommendations require at least **{_MIN_DAYS_BASIC} days** and "
+            f"Alarm threshold recommendations require at least **{_MIN_DAYS_BASIC} days** and "
             f"**{_MIN_READINGS_BASIC:,} readings** for statistical reliability. "
             "Keep collecting data — recommendations will unlock automatically."
         )
@@ -673,8 +678,8 @@ def _render_recommendations(
     badge_colour = "#4CAF50" if accepted_count > 0 else "#6b7280"
     st.markdown(
         f"<span style='background:{badge_colour}20; color:{badge_colour}; border:1px solid {badge_colour}; "
-        f"border-radius:20px; padding:4px 14px; font-size:0.85rem; font-weight:600;'>"
-        f"✓ {accepted_count} of {total_count} recommendations accepted</span>",
+        f"border-radius:4px; padding:4px 14px; font-size:0.85rem; font-weight:600;'>"
+        f"{accepted_count} of {total_count} recommendations accepted</span>",
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
@@ -721,12 +726,12 @@ def _render_recommendations(
             if status == "accepted":
                 card_bg = "#E8F5E9"
                 card_border = "#4CAF50"
-                status_badge = "✓ Accepted"
+                status_badge = "Accepted"
                 status_colour = "#4CAF50"
             elif status == "dismissed":
                 card_bg = "#F5F5F5"
                 card_border = "#9E9E9E"
-                status_badge = "✗ Dismissed"
+                status_badge = "Dismissed"
                 status_colour = "#9E9E9E"
             else:
                 card_bg = "#FFFFFF"
@@ -782,7 +787,7 @@ def _render_recommendations(
                             label_visibility="collapsed",
                         )
                     with col_accept:
-                        if st.button("✓ Accept", key=f"accept_{rec_id}", type="primary"):
+                        if st.button("Accept", key=f"accept_{rec_id}", type="primary"):
                             db.update_alarm_recommendation_status(
                                 rec_id=rec_id,
                                 status="accepted",
@@ -791,7 +796,7 @@ def _render_recommendations(
                             )
                             st.rerun()
                     with col_dismiss:
-                        if st.button("✗ Dismiss", key=f"dismiss_{rec_id}"):
+                        if st.button("Dismiss", key=f"dismiss_{rec_id}"):
                             db.update_alarm_recommendation_status(
                                 rec_id=rec_id,
                                 status="dismissed",
@@ -800,7 +805,7 @@ def _render_recommendations(
                             st.rerun()
 
                 elif admin and status in ("accepted", "dismissed"):
-                    if st.button("↩ Reset to Pending", key=f"reset_{rec_id}"):
+                    if st.button("Reset to Pending", key=f"reset_{rec_id}"):
                         db.update_alarm_recommendation_status(
                             rec_id=rec_id,
                             status="pending",
@@ -819,7 +824,7 @@ cached = _cached_baseline(selected_device_id)
 
 # Controls row
 with col_action:
-    if st.button("🔄 Compute Baselines", type="primary", width="stretch"):
+    if st.button("Compute Baselines", type="primary", width="stretch"):
         if df_all.empty:
             st.error("No data found for this device.")
         else:
@@ -835,7 +840,7 @@ st.divider()
 
 if cached is None or not cached.sufficiency.has_early:
     st.info(
-        "🔍 Not enough data has been collected to run a meaningful analysis yet. "
+        "Not enough data has been collected to run a meaningful analysis yet. "
         "Once you have at least **1 day** and **100 readings**, click "
         "**Compute Baselines** to unlock preliminary profile charts."
     )
@@ -844,7 +849,7 @@ if cached is None or not cached.sufficiency.has_early:
 # ── Early-stage caveat banner ──────────────────────────────────────────────────
 if cached.sufficiency.status == "early":
     st.warning(
-        "⚠️ **Early-stage analysis** — fewer than 7 days of data have been collected. "
+        "**Early-stage analysis** — fewer than 7 days of data have been collected. "
         "Distribution charts and diurnal profiles are shown for informational purposes "
         "only and **should not be used to set alarm thresholds**. "
         f"Alarm recommendations will unlock once at least **{_MIN_DAYS_BASIC} days** and "
@@ -945,7 +950,7 @@ if recs_for_pdf:
     )
     if pdf_bytes:
         st.download_button(
-            label="⬇️ Download Alarm Advisory PDF",
+            label="Download Alarm Advisory PDF",
             data=pdf_bytes,
             file_name=(
                 f"eflow_alarm_advisory_{selected_device_id}_{selected_sensitivity}_"
