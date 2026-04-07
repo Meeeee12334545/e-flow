@@ -497,63 +497,88 @@ with st.sidebar:
 # Main content area
 if selected_device_id:
     # ── Full Dashboard ──────────────────────────────────────────────────────
-    # Time range selector for the full dashboard
-    _fd_time_opts = [
-        (24, "24 hours"),
-        (48, "2 days"),
-        (72, "3 days"),
-        (168, "7 days"),
-        (720, "30 days"),
+    st.markdown(f"""
+    <div style="border-left: 4px solid #3A7F5F; padding-left: 0.85rem; margin-bottom: 1rem;">
+        <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A; font-size: 1.35rem;">
+            {selected_device_name}
+        </h2>
+        <p style="margin: 0.2rem 0 0; color: #6b7280; font-size: 0.88rem;">
+            Full Dashboard &nbsp;·&nbsp; Time-series analytics, statistics &amp; hydraulic analysis
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Global time period selector ──────────────────────────────────────────
+    # This single control drives the chart view and the data fetch limit.
+    _now_tz = datetime.now(pytz.timezone(DEFAULT_TZ))
+    _quick_opts = [
+        (24,   "24 hours"),
+        (48,   "2 days"),
+        (72,   "3 days"),
+        (168,  "7 days"),
+        (720,  "30 days"),
         (2160, "3 months"),
         (4320, "6 months"),
         (8760, "12 months"),
     ]
-    col_fd_title, col_fd_range = st.columns([2, 1])
-    with col_fd_title:
-        st.markdown(f"""
-        <div style="border-left: 4px solid #3A7F5F; padding-left: 0.85rem; margin-bottom: 0.75rem;">
-            <h2 style="margin: 0; font-weight: 700; letter-spacing: -0.02em; color: #4A4A4A; font-size: 1.35rem;">
-                {selected_device_name}
-            </h2>
-            <p style="margin: 0.2rem 0 0; color: #6b7280; font-size: 0.88rem;">
-                Full Dashboard &nbsp;·&nbsp; Time-series analytics, statistics &amp; hydraulic analysis
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_fd_range:
-        time_range, _time_label = st.selectbox(
-            "Time window",
-            options=_fd_time_opts,
-            format_func=lambda x: x[1],
-            index=3,  # Default: 7 days
-            key="fd_time_range"
+    _tp_col1, _tp_col2 = st.columns([1, 2])
+    with _tp_col1:
+        _range_mode = st.radio(
+            "Range mode",
+            options=["Quick Select", "Custom Range"],
+            index=0,
+            horizontal=True,
+            key="fd_range_mode",
+            label_visibility="collapsed",
         )
+    if _range_mode == "Quick Select":
+        with _tp_col2:
+            selected_hours, _time_label = st.selectbox(
+                "Time Period",
+                options=_quick_opts,
+                format_func=lambda x: x[1],
+                index=3,  # Default: 7 days
+                key="fd_time_period",
+            )
+        graph_start = _now_tz - timedelta(hours=selected_hours)
+        graph_end = _now_tz
+    else:
+        _default_start = _now_tz - timedelta(hours=168)
+        _cs_col1, _cs_col2 = st.columns(2)
+        with _cs_col1:
+            _start_date = st.date_input("Start date", value=_default_start.date(), key="fd_cust_start_date")
+            _start_time = st.time_input("Start time", value=_default_start.time(), key="fd_cust_start_time")
+        with _cs_col2:
+            _end_date = st.date_input("End date", value=_now_tz.date(), key="fd_cust_end_date")
+            _end_time = st.time_input("End time", value=_now_tz.time(), key="fd_cust_end_time")
+        # is_dst=False prevents AmbiguousTimeError during DST transitions
+        try:
+            graph_start = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(_start_date, _start_time), is_dst=False)
+            graph_end   = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(_end_date,   _end_time),   is_dst=False)
+        except Exception:
+            graph_start = _default_start
+            graph_end   = _now_tz
+        if graph_end <= graph_start:
+            st.error("End date/time must be after the start date/time. Please adjust the custom range.")
+            st.stop()
+        selected_hours = max(1, int((graph_end - graph_start).total_seconds() / 3600))
+        _time_label = "Custom range"
 
-    # Get measurements for selected device
-    measurements = get_cached_measurements(device_id=selected_device_id)
+    # Estimate ~25 readings/hour for delta-compressed sewer data; clamp to 3 000–50 000
+    _READINGS_PER_HOUR = 25
+    _fetch_limit = max(3000, min(50000, selected_hours * _READINGS_PER_HOUR))
+    measurements = get_cached_measurements(device_id=selected_device_id, limit=_fetch_limit)
 
     if measurements:
         df = pd.DataFrame(measurements)
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors='coerce')
         df = df.dropna(subset=["timestamp"])
 
-        # Make timestamps tz-aware (UTC) so comparison with cutoff_time works
+        # Make timestamps tz-aware (UTC) so comparison with graph_start/graph_end works
         if not df.empty and df["timestamp"].dt.tz is None:
             df["timestamp"] = df["timestamp"].dt.tz_localize(pytz.utc)
 
-        # Filter by time range
-        cutoff_time = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=time_range)
-        df_filtered = df[df["timestamp"] >= cutoff_time].sort_values("timestamp")
-
-        if df_filtered.empty and not df.empty:
-            st.warning(
-                f"No data in the last {_time_label}. "
-                f"Oldest record: {df['timestamp'].min().strftime('%Y-%m-%d %H:%M')}, "
-                f"Latest: {df['timestamp'].max().strftime('%Y-%m-%d %H:%M')}. "
-                "Try a wider time window."
-            )
-
-        df = df_filtered
+        df = df.sort_values("timestamp")
 
         if not df.empty:
             latest = df.iloc[-1]
@@ -592,7 +617,7 @@ if selected_device_id:
                 </div>
             </div>
             <p style="font-size: 0.82rem; color: #6b7280; margin: 0 0 1.5rem 4px;">
-                Last reading: {lu_str} &nbsp;·&nbsp; {_time_label} window
+                Last reading: {lu_str} &nbsp;·&nbsp; Showing {_time_label}
             </p>
             """, unsafe_allow_html=True)
 
@@ -600,47 +625,6 @@ if selected_device_id:
             st.markdown("""
             <p class="section-title" style="margin-top: 0.5rem;">Flow Rate Analysis</p>
             """, unsafe_allow_html=True)
-
-            col_range1, col_range2 = st.columns([1, 2])
-            with col_range1:
-                range_mode = st.radio(
-                    "Date Range Mode",
-                    options=["Quick Select", "Custom Range"],
-                    index=0,
-                    horizontal=True
-                )
-
-            default_start = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=24)
-            default_end = datetime.now(pytz.timezone(DEFAULT_TZ))
-
-            if range_mode == "Quick Select":
-                with col_range2:
-                    quick_options = [
-                        (24, "24 hours"),
-                        (48, "2 days"),
-                        (72, "3 days"),
-                        (168, "7 days"),
-                        (720, "30 days"),
-                    ]
-                    selected_hours, _ = st.selectbox(
-                        "Chart window",
-                        options=quick_options,
-                        format_func=lambda x: x[1],
-                        index=0,
-                        key="quick_select_graph"
-                    )
-                    graph_start = datetime.now(pytz.timezone(DEFAULT_TZ)) - timedelta(hours=selected_hours)
-                    graph_end = datetime.now(pytz.timezone(DEFAULT_TZ))
-            else:
-                col_custom1, col_custom2 = st.columns(2)
-                with col_custom1:
-                    start_date = st.date_input("Start Date", value=default_start.date(), key="custom_start_date")
-                    start_time = st.time_input("Start Time", value=default_start.time(), key="custom_start_time")
-                    graph_start = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(start_date, start_time))
-                with col_custom2:
-                    end_date = st.date_input("End Date", value=default_end.date(), key="custom_end_date")
-                    end_time = st.time_input("End Time", value=default_end.time(), key="custom_end_time")
-                    graph_end = pytz.timezone(DEFAULT_TZ).localize(datetime.combine(end_date, end_time))
 
             df_graph = df[(df["timestamp"] >= graph_start) & (df["timestamp"] <= graph_end)].sort_values("timestamp")
 
@@ -895,7 +879,7 @@ if selected_device_id:
                     )
 
                     # ── Combined chart ─────────────────────────────────────
-                    if not df_rain.empty and not df.empty:
+                    if not df_rain.empty and not df_graph.empty:
                         _fig_rain = make_subplots(
                             specs=[[{"secondary_y": True}]],
                             shared_xaxes=True,
@@ -914,8 +898,8 @@ if selected_device_id:
                         # Flow line (primary y)
                         _fig_rain.add_trace(
                             go.Scatter(
-                                x=df["timestamp"],
-                                y=df["flow_lps"],
+                                x=df_graph["timestamp"],
+                                y=df_graph["flow_lps"],
                                 name="Flow (L/s)",
                                 line=dict(color="#1D4E89", width=1.5),
                                 fill="tozeroy",
@@ -962,13 +946,13 @@ if selected_device_id:
                             autorange="reversed",
                         )
                         st.plotly_chart(_fig_rain, width="stretch")
-                    elif df.empty:
-                        st.info("No flow data available for the selected window.")
+                    elif df_graph.empty:
+                        st.info("No flow data available for the selected time period.")
                     else:
                         st.info(
                             "No rainfall data available for this period. "
                             "The system will attempt to fetch data from BOM or Open-Meteo. "
-                            "Try refreshing or widen the time window."
+                            "Try refreshing or selecting a different time period."
                         )
 
                     # ── Rain events table ──────────────────────────────────
@@ -1154,8 +1138,8 @@ if selected_device_id:
         else:
             st.markdown("""
             <div style="background: #ffffff; border: 1px solid #D9D9D9; border-radius: 12px; padding: 40px; text-align: center; margin: 2rem 0;">
-                <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">No data in selected window</h3>
-                <p style="color: #6b7280; margin: 0;">Try a wider time window, or start the <code>monitor.py</code> service to collect data.</p>
+                <h3 style="color: #4A4A4A; margin: 0 0 0.5rem;">No data in selected time period</h3>
+                <p style="color: #6b7280; margin: 0;">Try a different time period or date range, or start the <code>monitor.py</code> service to collect data.</p>
             </div>
             """, unsafe_allow_html=True)
     else:
