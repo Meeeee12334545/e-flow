@@ -34,6 +34,8 @@ from baseline_learning import (
     _SENSOR_META,
     _LEVEL_LABELS,
     _SENSITIVITY_LABELS,
+    _MIN_DAYS_BASIC,
+    _MIN_READINGS_BASIC,
 )
 from database import FlowDatabase
 from shared_styles import apply_styles
@@ -683,15 +685,15 @@ def _render_hydraulic(df_all: "pd.DataFrame") -> None:
         unsafe_allow_html=True,
     )
 
-    report = compute_hydraulic_utilisation(df_all, qfull)
+    report = compute_hydraulic_utilisation(
+        df_all, qfull,
+        pipe_diameter_mm=float(diameter_mm),
+        manning_n=manning_n,
+        slope_pct=slope_pct,
+    )
     if report is None:
         st.info("Insufficient flow data to compute hydraulic utilisation.")
         return
-
-    # Patch pipe params into the report for display
-    report.pipe_diameter_mm = float(diameter_mm)
-    report.manning_n        = manning_n
-    report.slope_pct        = slope_pct
 
     # Metric row
     m1, m2, m3, m4, m5 = st.columns(5)
@@ -756,8 +758,8 @@ def _render_recommendations(
     # Alarm recommendations require at least basic data quality
     if not baseline.sufficiency.has_basic:
         st.info(
-            "🔒 Alarm threshold recommendations require at least **7 days** and "
-            "**5,000 readings** for statistical reliability. "
+            f"🔒 Alarm threshold recommendations require at least **{_MIN_DAYS_BASIC} days** and "
+            f"**{_MIN_READINGS_BASIC:,} readings** for statistical reliability. "
             "Keep collecting data — recommendations will unlock automatically."
         )
         return
@@ -973,8 +975,8 @@ if cached.sufficiency.status == "early":
         "⚠️ **Early-stage analysis** — fewer than 7 days of data have been collected. "
         "Distribution charts and diurnal profiles are shown for informational purposes "
         "only and **should not be used to set alarm thresholds**. "
-        f"Alarm recommendations will unlock once at least **{7} days** and "
-        f"**{5_000:,} readings** are available."
+        f"Alarm recommendations will unlock once at least **{_MIN_DAYS_BASIC} days** and "
+        f"**{_MIN_READINGS_BASIC:,} readings** are available."
     )
 
 # ── Sensitivity selector ───────────────────────────────────────────────────────

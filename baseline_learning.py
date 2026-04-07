@@ -466,7 +466,11 @@ def compute_dwf_diurnal_profile(
         if flow_ts_naive.dt.tz is not None:
             flow_ts_naive = flow_ts_naive.dt.tz_convert("UTC").dt.tz_localize(None)
 
-        # Forward-fill hourly rainfall onto each flow reading
+        # Forward-fill hourly rainfall sum onto each flow reading.
+        # Gaps in the rainfall record are treated as zero (no rain data = assume dry).
+        # Flow readings during periods of missing rainfall data are therefore
+        # *included* in the dry-weather filter; engineers should verify rainfall
+        # data coverage before relying on this profile.
         flow_hours = flow_ts_naive.dt.floor("1h")
         rain_for_flow = flow_hours.map(rain_hourly).fillna(0.0)
         dry_mask = (ts.notna()) & (s.notna()) & (rain_for_flow <= dry_cap_mm)
@@ -491,7 +495,7 @@ def compute_dwf_diurnal_profile(
             cnt_l.append(len(v))
         else:
             for lst in (median_l, p10_l, p25_l, p75_l, p90_l):
-                lst.append(float("nan"))
+                lst.append(np.nan)
             cnt_l.append(0)
 
     return DiurnalProfile(

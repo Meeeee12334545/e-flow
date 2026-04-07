@@ -45,6 +45,7 @@ _MIN_DRY_READINGS          = 10      # minimum dry readings to compute baseline
 _EVENT_MERGE_GAP_HOURS     = 3       # merge rain events closer than this many hours
 _POST_RAIN_WINDOW_HOURS    = 6       # hours after rain stops to monitor flow
 _Z_SCORE_CONFIDENCE_SCALE  = 10.0    # maps z-score to 0-100 confidence boost
+_INFLOW_LAG_THRESHOLD_HOURS = 2      # lag ≤ this → direct inflow; > this → groundwater infiltration
 
 
 @dataclass
@@ -528,7 +529,7 @@ def compute_flow_rainfall_correlation(
         interp_parts.append(
             f"Flow is most strongly correlated with rainfall {best_lag} hour(s) earlier "
             f"(cross-correlation {best_corr:.3f}) — consistent with "
-            + ("inflow" if best_lag <= 2 else "groundwater infiltration") + " response."
+            + ("inflow" if best_lag <= _INFLOW_LAG_THRESHOLD_HOURS else "groundwater infiltration") + " response."
         )
 
     return FlowRainfallCorrelation(

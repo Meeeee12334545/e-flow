@@ -248,7 +248,6 @@ class ContinuousMonitor:
                 # Check when the baseline was last computed
                 existing = self.db.get_device_baseline(device_id)
                 if existing and existing.get("computed_at"):
-                    from datetime import timezone as _tz
                     import pandas as _pd
                     last = _pd.to_datetime(existing["computed_at"], utc=True, errors="coerce")
                     if last is not _pd.NaT:

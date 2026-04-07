@@ -94,6 +94,9 @@ def compute_hydraulic_utilisation(
     df: pd.DataFrame,
     qfull_lps: float,
     full_bore_threshold_pct: float = _FULL_BORE_THRESHOLD_PCT,
+    pipe_diameter_mm: float = 0.0,
+    manning_n: float = _DEFAULT_MANNING_N,
+    slope_pct: float = _DEFAULT_SLOPE_PCT,
 ) -> Optional[HydraulicReport]:
     """Compute pipe utilisation statistics and detect full-bore / surcharge events.
 
@@ -102,6 +105,9 @@ def compute_hydraulic_utilisation(
     df : DataFrame with at minimum columns [timestamp, flow_lps]
     qfull_lps : theoretical full-bore capacity in L/s (from compute_pipe_capacity)
     full_bore_threshold_pct : utilisation level (%) above which to flag surcharge risk
+    pipe_diameter_mm : internal diameter (mm) — stored in the report for reference
+    manning_n : roughness coefficient — stored in the report for reference
+    slope_pct : longitudinal slope (%) — stored in the report for reference
 
     Returns
     -------
@@ -199,9 +205,9 @@ def compute_hydraulic_utilisation(
         )
 
     return HydraulicReport(
-        pipe_diameter_mm=0.0,   # caller should set after creation if needed
-        manning_n=0.0,
-        slope_pct=0.0,
+        pipe_diameter_mm=float(pipe_diameter_mm),
+        manning_n=float(manning_n),
+        slope_pct=float(slope_pct),
         qfull_lps=round(qfull_lps, 2),
         mean_utilisation_pct=round(mean_u, 1),
         median_utilisation_pct=round(median_u, 1),

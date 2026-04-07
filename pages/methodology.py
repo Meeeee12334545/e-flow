@@ -154,9 +154,11 @@ reveals daily usage patterns such as morning peak flows or overnight low-flow
 periods.
 
 **All-data diurnal** uses every reading regardless of weather conditions.  
-**Dry-weather flow (DWF) diurnal** filters out readings where the concurrent
-hourly rainfall exceeds 0.1 mm/hr (WMO measurable-rain threshold), removing
-the wet-weather I/I signal and producing a cleaner baseline for alarm design.
+**Dry-weather flow (DWF) diurnal** filters out readings where the rainfall
+in the same hourly period (1-hour bucket) exceeds 0.1 mm/hr (WMO measurable-rain threshold),
+removing the wet-weather I/I signal and producing a cleaner baseline for alarm design.
+Periods with missing rainfall data are treated as dry (no-rain assumed);
+engineers should verify rainfall data coverage before relying on this profile.
 """)
 
 st.markdown("#### 2.3 Day-of-Week Profile")
