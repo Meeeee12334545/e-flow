@@ -33,6 +33,7 @@ from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_pa
 # set_page_config MUST be the first Streamlit command in the script
 st.set_page_config(
     page_title="EDS FlowSense | Hydrological Analytics",
+    page_icon="💧",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -1123,7 +1124,7 @@ if selected_device_id:
             _ts = pd.to_datetime(display_df["Timestamp"])
             if _ts.dt.tz is None:
                 _ts = _ts.dt.tz_localize(pytz.utc)
-            display_df["Timestamp"] = _ts.dt.tz_convert(pytz.timezone(DEFAULT_TZ)).dt.strftime('%Y-%m-%d %H:%M:%S%z')
+            display_df["Timestamp"] = _ts.dt.tz_convert(pytz.timezone(DEFAULT_TZ)).dt.strftime('%d/%m/%Y %H:%M:%S')
             st.dataframe(display_df, width="stretch", hide_index=True)
 
             col_dl1, _ = st.columns([1, 3])
