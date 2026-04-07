@@ -43,6 +43,7 @@ if not is_authenticated():
 
 st.set_page_config(
     page_title="EDS FlowSense | Reports",
+    page_icon="💧",
     layout="wide",
     initial_sidebar_state="expanded",
 )
