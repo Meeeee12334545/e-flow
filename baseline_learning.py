@@ -4,6 +4,7 @@ Site baseline learning and alarm advisory engine for EDS FlowSense (EDS-FS).
 Analyses the long-term history of a monitoring site and produces:
   - Data sufficiency assessment (how much data exists and what analyses are unlocked)
   - Per-variable diurnal profiles (24-hour median / IQR bands)
+  - Dry-weather-flow (DWF) diurnal profiles (rainfall-masked)
   - Day-of-week profiles (weekly pattern detection)
   - Full distribution statistics (P5 … P99)
   - Linear trend analysis per variable
@@ -13,6 +14,7 @@ Public API
 ----------
 check_data_sufficiency(df)                          → DataSufficiency
 compute_site_baseline(df, device_id)                → SiteBaseline
+compute_dwf_diurnal_profile(df, variable, df_rain)  → DiurnalProfile | None
 generate_alarm_recommendations(site_baseline)        → List[AlarmRecommendation]
 baseline_to_json(site_baseline)                      → str
 baseline_from_json(json_str)                         → SiteBaseline
@@ -36,6 +38,8 @@ from scipy import stats as scipy_stats
 logger = logging.getLogger(__name__)
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
+_MIN_READINGS_EARLY = 100           # ≥100 readings + ≥1 day → early analysis
+_MIN_DAYS_EARLY     = 1.0
 _MIN_READINGS_BASIC = 5_000
 _MIN_DAYS_BASIC     = 7
 _MIN_DAYS_FULL      = 30
@@ -73,10 +77,11 @@ class DataSufficiency:
     total_readings: int
     days_covered: float
     readings_per_day: float
+    has_early: bool        # ≥ 1 day & ≥ 100 readings — preliminary stats only
     has_basic: bool        # ≥ 7 days & ≥ 5,000 readings
     has_full: bool         # ≥ 30 days
     has_seasonal: bool     # ≥ 90 days
-    status: str            # insufficient | basic | full | seasonal
+    status: str            # insufficient | early | basic | full | seasonal
     status_description: str
     next_level_description: str
     estimated_days_to_next: Optional[int]
@@ -175,9 +180,26 @@ class SiteBaseline:
 
 # ── Serialisation helpers ─────────────────────────────────────────────────────
 
+def _sanitize_for_json(obj):
+    """Recursively replace NaN/inf floats with None for safe JSON serialisation."""
+    if isinstance(obj, float):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
+
+
 def baseline_to_json(baseline: SiteBaseline) -> str:
-    """Serialise a SiteBaseline to a compact JSON string."""
-    return json.dumps(asdict(baseline), allow_nan=False, default=_json_default)
+    """Serialise a SiteBaseline to a compact JSON string.
+
+    NaN and inf float values are replaced with ``null`` before encoding so
+    the result is always valid JSON (handles early-stage sparse profiles).
+    """
+    return json.dumps(_sanitize_for_json(asdict(baseline)))
 
 
 def _json_default(obj):
@@ -190,8 +212,11 @@ def baseline_from_json(json_str: str) -> Optional[SiteBaseline]:
     """Deserialise a SiteBaseline from a JSON string. Returns None on failure."""
     try:
         d = json.loads(json_str)
-        # Reconstruct nested dataclasses from dict
-        suf = DataSufficiency(**d["sufficiency"])
+        # Reconstruct nested dataclasses from dict — handle schema additions gracefully
+        suf_d = d["sufficiency"]
+        # Backward-compat: older baselines pre-date the has_early field
+        suf_d.setdefault("has_early", suf_d.get("has_basic", False))
+        suf = DataSufficiency(**suf_d)
         profiles: Dict[str, BaselineProfile] = {}
         for var, pd_dict in d.get("profiles", {}).items():
             dist_d = pd_dict["distribution"]
@@ -227,16 +252,20 @@ def check_data_sufficiency(df: pd.DataFrame) -> DataSufficiency:
     """Return a DataSufficiency summary for *df*.
 
     *df* must contain a ``timestamp`` column (any format accepted by pd.to_datetime).
+
+    Status progression:
+        insufficient → early (≥1 day, ≥100 readings) → basic (≥7 days, ≥5 000 readings)
+                     → full (≥30 days) → seasonal (≥90 days)
     """
     empty = DataSufficiency(
         total_readings=0, days_covered=0.0, readings_per_day=0.0,
-        has_basic=False, has_full=False, has_seasonal=False,
+        has_early=False, has_basic=False, has_full=False, has_seasonal=False,
         status="insufficient",
         status_description=(
             "No data is available for this device yet. Start data collection to enable site intelligence analysis."
         ),
         next_level_description=(
-            f"Collect at least {_MIN_DAYS_BASIC} days and {_MIN_READINGS_BASIC:,} readings to unlock basic analysis."
+            f"Collect at least 1 day and {_MIN_READINGS_EARLY:,} readings to unlock early-stage analysis."
         ),
         estimated_days_to_next=None,
     )
@@ -252,6 +281,7 @@ def check_data_sufficiency(df: pd.DataFrame) -> DataSufficiency:
     days = (ts.max() - ts.min()).total_seconds() / 86400.0
     rpd = total / max(days, 0.01)
 
+    has_early    = days >= _MIN_DAYS_EARLY and total >= _MIN_READINGS_EARLY
     has_basic    = days >= _MIN_DAYS_BASIC and total >= _MIN_READINGS_BASIC
     has_full     = days >= _MIN_DAYS_FULL
     has_seasonal = days >= _MIN_DAYS_SEASONAL
@@ -282,18 +312,37 @@ def check_data_sufficiency(df: pd.DataFrame) -> DataSufficiency:
         days_needed = max(1, int(_MIN_DAYS_FULL - days))
         next_desc = f"Collect {days_needed} more days to unlock full diurnal pattern analysis."
         days_to_next = days_needed
-    else:
-        status = "insufficient"
+    elif has_early:
+        status = "early"
         days_needed = max(1, int(_MIN_DAYS_BASIC - days))
         readings_needed = max(0, _MIN_READINGS_BASIC - total)
         status_desc = (
-            f"Insufficient data — {total:,} readings covering {days:.1f} days. "
-            f"A minimum of {_MIN_DAYS_BASIC} days and {_MIN_READINGS_BASIC:,} readings is required for basic analysis."
+            f"Early-stage analysis available — {total:,} readings covering {days:.1f} day(s). "
+            f"Preliminary diurnal profiles and statistics are shown with caveats. "
+            f"Alarm threshold recommendations require at least {_MIN_DAYS_BASIC} days and "
+            f"{_MIN_READINGS_BASIC:,} readings for statistical reliability."
         )
         if rpd > 0:
             days_to_next = max(days_needed, max(1, int(readings_needed / rpd)))
             next_desc = (
                 f"At the current collection rate ({rpd:.0f} readings/day), basic analysis will be "
+                f"available in approximately {days_to_next} more day(s)."
+            )
+        else:
+            days_to_next = days_needed
+            next_desc = f"Collect {days_needed} more days to unlock basic analysis."
+    else:
+        status = "insufficient"
+        days_needed = max(1, int(_MIN_DAYS_EARLY - days + 1))
+        readings_needed = max(0, _MIN_READINGS_EARLY - total)
+        status_desc = (
+            f"Insufficient data — {total:,} readings covering {days:.1f} days. "
+            f"A minimum of 1 day and {_MIN_READINGS_EARLY:,} readings is required for early analysis."
+        )
+        if rpd > 0:
+            days_to_next = max(days_needed, max(1, int(readings_needed / rpd)))
+            next_desc = (
+                f"At the current collection rate ({rpd:.0f} readings/day), early analysis will be "
                 f"available in approximately {days_to_next} more day(s)."
             )
         else:
@@ -304,6 +353,7 @@ def check_data_sufficiency(df: pd.DataFrame) -> DataSufficiency:
         total_readings=total,
         days_covered=round(days, 2),
         readings_per_day=round(rpd, 1),
+        has_early=has_early,
         has_basic=has_basic,
         has_full=has_full,
         has_seasonal=has_seasonal,
@@ -350,6 +400,84 @@ def _compute_diurnal_profile(df: pd.DataFrame, variable: str) -> DiurnalProfile:
     mask = ts.notna() & s.notna()
     hour_series = ts[mask].dt.hour
     val_series  = s[mask]
+
+    median_l, p10_l, p25_l, p75_l, p90_l, cnt_l = [], [], [], [], [], []
+    for h in range(24):
+        v = val_series[hour_series == h].values
+        if len(v) > 0:
+            median_l.append(float(np.median(v)))
+            p10_l.append(_safe_pct(v, 10))
+            p25_l.append(_safe_pct(v, 25))
+            p75_l.append(_safe_pct(v, 75))
+            p90_l.append(_safe_pct(v, 90))
+            cnt_l.append(len(v))
+        else:
+            for lst in (median_l, p10_l, p25_l, p75_l, p90_l):
+                lst.append(float("nan"))
+            cnt_l.append(0)
+
+    return DiurnalProfile(
+        variable=variable,
+        hours=list(range(24)),
+        median=median_l, p10=p10_l, p25=p25_l, p75=p75_l, p90=p90_l,
+        counts=cnt_l,
+    )
+
+
+def compute_dwf_diurnal_profile(
+    df: pd.DataFrame,
+    variable: str,
+    df_rainfall: Optional[pd.DataFrame] = None,
+    dry_cap_mm: float = 0.1,
+) -> Optional[DiurnalProfile]:
+    """Compute a dry-weather-flow (DWF) diurnal profile for *variable*.
+
+    Filters the dataset to periods where hourly rainfall ≤ *dry_cap_mm*
+    (WMO measurable-rain threshold) before computing the profile.  This
+    removes wet-weather I/I signal from the baseline.
+
+    If *df_rainfall* is not provided, or has fewer dry periods than 24 × 3
+    (minimum three readings per hour), falls back to the full-dataset profile.
+
+    Returns None if there are fewer than 24 readings after dry filtering.
+    """
+    if variable not in df.columns:
+        return None
+
+    ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+    s  = pd.to_numeric(df[variable], errors="coerce")
+
+    if df_rainfall is not None and not df_rainfall.empty and "rainfall_mm" in df_rainfall.columns:
+        # Convert rainfall timestamps to UTC-naive for merging
+        rain_ts = pd.to_datetime(df_rainfall["timestamp"], errors="coerce")
+        if rain_ts.dt.tz is not None:
+            rain_ts = rain_ts.dt.tz_convert("UTC").dt.tz_localize(None)
+
+        # Build an hourly dry/wet mask
+        rain_hourly = (
+            df_rainfall.assign(_t=rain_ts)
+            .set_index("_t")
+            .sort_index()["rainfall_mm"]
+            .resample("1h")
+            .sum()
+        )
+        # Strip flow timestamps for comparison
+        flow_ts_naive = ts.copy()
+        if flow_ts_naive.dt.tz is not None:
+            flow_ts_naive = flow_ts_naive.dt.tz_convert("UTC").dt.tz_localize(None)
+
+        # Forward-fill hourly rainfall onto each flow reading
+        flow_hours = flow_ts_naive.dt.floor("1h")
+        rain_for_flow = flow_hours.map(rain_hourly).fillna(0.0)
+        dry_mask = (ts.notna()) & (s.notna()) & (rain_for_flow <= dry_cap_mm)
+    else:
+        dry_mask = ts.notna() & s.notna()
+
+    hour_series = ts[dry_mask].dt.hour
+    val_series  = s[dry_mask]
+
+    if len(val_series) < 24:
+        return None
 
     median_l, p10_l, p25_l, p75_l, p90_l, cnt_l = [], [], [], [], [], []
     for h in range(24):
@@ -481,15 +609,22 @@ def compute_site_baseline(df: pd.DataFrame, device_id: str) -> SiteBaseline:
 
     Always returns a SiteBaseline even if data is insufficient — callers should
     check ``baseline.sufficiency.status`` before trusting the profile statistics.
+
+    Early-stage analysis (has_early, not yet has_basic) computes distribution
+    statistics and a preliminary diurnal profile with fewer than 7 days of data.
+    Alarm recommendations are only generated when has_basic is True.
     """
     sufficiency = check_data_sufficiency(df)
     profiles: Dict[str, BaselineProfile] = {}
 
-    if sufficiency.has_basic:
+    # Compute profiles whenever we have early-stage data or better.
+    # For early-stage we require only 20 readings per variable.
+    min_readings_for_profile = 20 if not sufficiency.has_basic else 100
+    if sufficiency.has_early:
         available_vars = [v for v in SENSOR_VARIABLES if v in df.columns]
         for var in available_vars:
             series = pd.to_numeric(df[var], errors="coerce")
-            if series.notna().sum() < 100:
+            if series.notna().sum() < min_readings_for_profile:
                 continue
             try:
                 dist    = _compute_distribution(series, var)

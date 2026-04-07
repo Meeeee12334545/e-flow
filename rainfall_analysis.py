@@ -3,9 +3,10 @@ Rainfall analysis and AI Inflow/Infiltration (I/I) detection module for EDS Flow
 
 Public API
 ----------
-compute_dry_weather_baseline(df_flow, df_rainfall)  → float
-detect_rain_events(df_rainfall, threshold_mm)        → List[RainEvent]
+compute_dry_weather_baseline(df_flow, df_rainfall)       → float
+detect_rain_events(df_rainfall, threshold_mm)             → List[RainEvent]
 detect_inflow_infiltration(df_flow, df_rainfall, baseline) → RainfallResponse
+compute_flow_rainfall_correlation(df_flow, df_rainfall)   → FlowRainfallCorrelation | None
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
+from scipy import stats as scipy_stats
 
 logger = logging.getLogger(__name__)
 
@@ -424,3 +426,118 @@ def detect_inflow_infiltration(
         )
 
     return result
+
+
+# ── Flow–Rainfall Correlation ─────────────────────────────────────────────────
+
+@dataclass
+class FlowRainfallCorrelation:
+    """Cross-correlation analysis between flow rate and rainfall."""
+    pearson_r: float           # instantaneous (lag-0) Pearson correlation
+    r_squared: float           # R² at lag-0
+    p_value: float             # two-tailed p-value for lag-0 Pearson test
+    best_lag_hours: float      # lag (hours) that maximises |cross-correlation|
+    correlation_at_best_lag: float
+    sample_size: int           # number of matched hourly samples
+    quality_label: str         # None / Weak / Moderate / Strong
+    interpretation: str        # plain-English summary
+
+
+def compute_flow_rainfall_correlation(
+    df_flow: pd.DataFrame,
+    df_rainfall: pd.DataFrame,
+    max_lag_hours: int = 24,
+) -> Optional[FlowRainfallCorrelation]:
+    """Compute Pearson correlation and cross-correlation between flow and rainfall.
+
+    Both time series are resampled to 1-hour buckets.  A lagged cross-correlation
+    is then computed for lags 0 … *max_lag_hours* hours (rainfall leads flow) to
+    identify the lag at which the correlation is strongest.
+
+    Parameters
+    ----------
+    df_flow : DataFrame with columns [timestamp, flow_lps]
+    df_rainfall : DataFrame with columns [timestamp, rainfall_mm]
+    max_lag_hours : upper bound for the lag search
+
+    Returns
+    -------
+    FlowRainfallCorrelation, or None if there is insufficient data.
+    """
+    if df_flow is None or df_flow.empty or "flow_lps" not in df_flow.columns:
+        return None
+    if df_rainfall is None or df_rainfall.empty or "rainfall_mm" not in df_rainfall.columns:
+        return None
+
+    # Convert and clean
+    df_f = df_flow[["timestamp", "flow_lps"]].copy()
+    df_f["timestamp"] = _to_utc_naive(df_f["timestamp"])
+    df_f = df_f.dropna(subset=["timestamp", "flow_lps"]).set_index("timestamp").sort_index()
+
+    df_r = df_rainfall[["timestamp", "rainfall_mm"]].copy()
+    df_r["timestamp"] = _to_utc_naive(df_r["timestamp"])
+    df_r = df_r.dropna(subset=["timestamp"]).set_index("timestamp").sort_index()
+
+    # Resample both to hourly (sum rainfall, mean flow)
+    flow_h = df_f["flow_lps"].resample("1h").mean().dropna()
+    rain_h = df_r["rainfall_mm"].resample("1h").sum()
+
+    # Align on common index
+    combined = pd.DataFrame({"flow": flow_h, "rain": rain_h}).dropna()
+    if len(combined) < 10:
+        return None
+
+    flow_vals = combined["flow"].values
+    rain_vals = combined["rain"].values
+
+    # Lag-0 Pearson
+    r, p_value = scipy_stats.pearsonr(rain_vals, flow_vals)
+    r_sq = r ** 2
+
+    # Cross-correlation: find lag where rainfall best predicts future flow
+    best_lag = 0
+    best_corr = abs(r)
+    for lag in range(1, min(max_lag_hours + 1, len(combined) - 1)):
+        r_lag, _ = scipy_stats.pearsonr(rain_vals[:-lag], flow_vals[lag:])
+        if abs(r_lag) > best_corr:
+            best_corr = abs(r_lag)
+            best_lag = lag
+
+    # Quality label
+    abs_r = abs(r)
+    if abs_r >= 0.7:
+        quality = "Strong"
+    elif abs_r >= 0.4:
+        quality = "Moderate"
+    elif abs_r >= 0.2:
+        quality = "Weak"
+    else:
+        quality = "None"
+
+    direction = "positive" if r >= 0 else "negative"
+    interp_parts = [
+        f"Pearson r = {r:.3f} ({quality.lower()} {direction} correlation, R² = {r_sq:.3f}, "
+        f"p {'< 0.001' if p_value < 0.001 else f'= {p_value:.3f}'})."
+    ]
+    if best_lag == 0:
+        interp_parts.append(
+            "Flow responds with no measurable lag — suggests direct surface inflow or "
+            "very short hydraulic travel time in the catchment."
+        )
+    else:
+        interp_parts.append(
+            f"Flow is most strongly correlated with rainfall {best_lag} hour(s) earlier "
+            f"(cross-correlation {best_corr:.3f}) — consistent with "
+            + ("inflow" if best_lag <= 2 else "groundwater infiltration") + " response."
+        )
+
+    return FlowRainfallCorrelation(
+        pearson_r=round(float(r), 4),
+        r_squared=round(float(r_sq), 4),
+        p_value=round(float(p_value), 6),
+        best_lag_hours=float(best_lag),
+        correlation_at_best_lag=round(float(best_corr), 4),
+        sample_size=len(combined),
+        quality_label=quality,
+        interpretation=" ".join(interp_parts),
+    )

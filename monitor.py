@@ -221,6 +221,89 @@ class ContinuousMonitor:
         if refreshed:
             logger.info("Rainfall data refreshed for %d device(s)", refreshed)
 
+    def auto_retrain_baselines(self):
+        """Nightly job: recompute site baselines for all devices with sufficient data.
+
+        Skips devices whose stored baseline was computed within the last 20 hours to
+        avoid unnecessary recomputation when the scheduler overlaps with a manual run.
+        """
+        try:
+            from baseline_learning import (
+                compute_site_baseline,
+                baseline_to_json,
+                generate_alarm_recommendations,
+                check_data_sufficiency,
+            )
+        except ImportError:
+            logger.warning("baseline_learning module not available; skipping auto-retrain")
+            return
+
+        devices = self.db.get_devices()
+        retrained = 0
+        skipped = 0
+
+        for device in devices:
+            device_id = device["device_id"]
+            try:
+                # Check when the baseline was last computed
+                existing = self.db.get_device_baseline(device_id)
+                if existing and existing.get("computed_at"):
+                    from datetime import timezone as _tz
+                    import pandas as _pd
+                    last = _pd.to_datetime(existing["computed_at"], utc=True, errors="coerce")
+                    if last is not _pd.NaT:
+                        age_h = (
+                            datetime.now(pytz.utc) - last.to_pydatetime()
+                        ).total_seconds() / 3600.0
+                        if age_h < 20:
+                            skipped += 1
+                            continue
+
+                rows = self.db.get_measurements(device_id=device_id, limit=200_000)
+                if not rows:
+                    continue
+                import pandas as _pd
+                df = _pd.DataFrame(rows)
+                df["timestamp"] = _pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+                df.sort_values("timestamp", inplace=True)
+
+                suf = check_data_sufficiency(df)
+                if not suf.has_early:
+                    continue
+
+                baseline = compute_site_baseline(df, device_id)
+                self.db.save_device_baseline(
+                    device_id=device_id,
+                    computed_at=baseline.computed_at,
+                    readings_used=baseline.readings_used,
+                    days_covered=baseline.days_covered,
+                    baseline_json=baseline_to_json(baseline),
+                    status=baseline.status,
+                )
+                recs = generate_alarm_recommendations(baseline)
+                if recs:
+                    rec_dicts = [
+                        {
+                            "variable":          r.variable,
+                            "direction":         r.direction,
+                            "level_name":        r.level_name,
+                            "recommended_value": r.recommended_value,
+                            "sensitivity":       r.sensitivity,
+                            "basis":             r.basis,
+                            "estimated_fp_pct":  r.estimated_fp_pct,
+                        }
+                        for r in recs
+                    ]
+                    self.db.save_alarm_recommendations(device_id, rec_dicts)
+                retrained += 1
+                logger.info("Auto-retrained baseline for device %s (status: %s)", device_id, baseline.status)
+            except Exception as exc:
+                logger.warning("Auto-retrain failed for device %s: %s", device_id, exc)
+
+        logger.info(
+            "Baseline auto-retrain complete: %d retrained, %d skipped (recent)", retrained, skipped
+        )
+
     async def check_for_updates_with_retry(self):
         """Check for updates with automatic retry logic."""
         for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
@@ -503,6 +586,16 @@ class ContinuousMonitor:
             name='Refresh rainfall cache',
             replace_existing=True,
         )
+
+        # Schedule the baseline auto-retrain job (every 24 hours)
+        self.scheduler.add_job(
+            self.auto_retrain_baselines,
+            IntervalTrigger(hours=24),
+            id='baseline_retrain_job',
+            name='Nightly site baseline retraining',
+            replace_existing=True,
+        )
+        logger.info("Baseline auto-retrain scheduled: every 24 hours")
         
         try:
             self.scheduler.start()
