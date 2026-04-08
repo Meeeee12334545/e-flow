@@ -592,21 +592,21 @@ _CSS = """
 
     /* ── "How Does FlowSense™ Work" — tiny disclaimer-style link ── */
     .methodology-nav {
-        margin-top: -0.55rem !important;
+        margin-top: -1.25rem !important;
     }
     .methodology-nav .stButton > button {
         background: transparent !important;
         color: var(--muted) !important;
         border: none !important;
         box-shadow: none !important;
-        font-size: 0.62rem !important;
+        font-size: 0.60rem !important;
         font-weight: 400 !important;
-        padding: 0.05rem 0.25rem !important;
+        padding: 0.02rem 0.2rem !important;
         min-height: unset !important;
         height: auto !important;
         width: fit-content !important;
         margin: 0 auto !important;
-        line-height: 1.2 !important;
+        line-height: 1.1 !important;
         text-decoration: underline !important;
         text-underline-offset: 2px !important;
         justify-content: center !important;
