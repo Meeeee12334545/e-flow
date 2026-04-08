@@ -466,6 +466,4 @@ st.markdown("""
 | **Australian BOM JSON feeds** | Primary observed rainfall data (real-time station network) |
 
 ---
-*EDS FlowSense™ Methodology Reference — Engineering Document*  
-*Environmental Data Solutions Pty Ltd*
 """)
