@@ -263,43 +263,28 @@ def render_auth_header():
 
             # Navigation links
             st.markdown("<div style='height: 0.25rem'></div>", unsafe_allow_html=True)
-            st.markdown(
-                "<p style='font-size:0.68rem;font-weight:700;color:#9ca3af;"
-                "text-transform:uppercase;letter-spacing:0.1em;"
-                "margin:0.9rem 0 0.35rem 0;'>Navigation</p>",
-                unsafe_allow_html=True,
-            )
-            if st.button("📊  Dashboard", width="stretch", key="nav_dashboard"):
-                st.switch_page("app.py")
-            if st.button("📈  Reports", width="stretch", key="nav_reports"):
-                st.switch_page("pages/reports.py")
-            if st.button("🧠  Site Intelligence", width="stretch", key="nav_intelligence"):
-                st.switch_page("pages/intelligence.py")
-            if st.button("📖  Methodology", width="stretch", key="nav_methodology"):
-                st.switch_page("pages/methodology.py")
             if is_admin():
-                st.markdown(
-                    "<p style='font-size:0.68rem;font-weight:700;color:#9ca3af;"
-                    "text-transform:uppercase;letter-spacing:0.1em;"
-                    "margin:0.9rem 0 0.35rem 0;'>Account</p>",
-                    unsafe_allow_html=True,
-                )
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("⚙️ Admin", width="stretch", key="nav_admin"):
+                    if st.button("Admin", width="stretch", key="nav_admin"):
                         st.switch_page("pages/admin.py")
                 with col2:
-                    if st.button("👤 Profile", width="stretch", key="nav_profile"):
+                    if st.button("Profile", width="stretch", key="nav_profile"):
                         st.switch_page("pages/profile.py")
             else:
-                st.markdown(
-                    "<p style='font-size:0.68rem;font-weight:700;color:#9ca3af;"
-                    "text-transform:uppercase;letter-spacing:0.1em;"
-                    "margin:0.9rem 0 0.35rem 0;'>Account</p>",
-                    unsafe_allow_html=True,
-                )
-                if st.button("👤  My Profile", width="stretch", key="nav_profile_user"):
+                if st.button("My Profile", width="stretch", key="nav_profile_user"):
                     st.switch_page("pages/profile.py")
+            if st.button("Reports", width="stretch", key="nav_reports"):
+                st.switch_page("pages/reports.py")
+            if st.button("FlowSense™ Analysis", width="stretch", key="nav_intelligence"):
+                st.switch_page("pages/intelligence.py")
+            st.markdown(
+                "<div style='margin-top:0.6rem;text-align:right;'>"
+                "<a href='./methodology' target='_self' "
+                "style='font-size:0.72rem;color:#9ca3af;text-decoration:none;'>"
+                "Methodology</a></div>",
+                unsafe_allow_html=True,
+            )
         else:
             st.markdown(
                 '<p style="font-size:0.85rem;color:#9ca3af;margin:0;">Not signed in</p>',
