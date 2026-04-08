@@ -278,13 +278,8 @@ def render_auth_header():
                 st.switch_page("pages/reports.py")
             if st.button("FlowSense™ Analysis", width="stretch", key="nav_intelligence"):
                 st.switch_page("pages/intelligence.py")
-            st.markdown(
-                "<div style='margin-top:0.6rem;text-align:right;'>"
-                "<a href='./methodology' target='_self' "
-                "style='font-size:0.72rem;color:#9ca3af;text-decoration:none;'>"
-                "Methodology</a></div>",
-                unsafe_allow_html=True,
-            )
+            if st.button("Methodology", width="stretch", key="nav_methodology"):
+                st.switch_page("pages/methodology.py")
         else:
             st.markdown(
                 '<p style="font-size:0.85rem;color:#9ca3af;margin:0;">Not signed in</p>',
