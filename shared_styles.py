@@ -553,19 +553,55 @@ _CSS = """
     }
 
     section[data-testid="stSidebar"] > div {
-        padding-top: 1rem !important;
+        padding-top: 0.75rem !important;
     }
 
     /* Section headers in sidebar — refined rule, applied after the first */
     section[data-testid="stSidebar"] h2 {
-        font-size: 0.7rem !important;
+        font-size: 0.68rem !important;
         font-weight: 700 !important;
         color: var(--muted) !important;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        margin: 1.1rem 0 0.5rem 0 !important;
+        margin: 1.1rem 0 0.4rem 0 !important;
         padding-top: 1rem !important;
         border-top: 1px solid var(--border) !important;
+    }
+
+    /* ── Sidebar navigation buttons ── */
+    section[data-testid="stSidebar"] .stButton > button {
+        background: transparent !important;
+        color: var(--text) !important;
+        border: none !important;
+        box-shadow: none !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+        padding: 0.5rem 0.75rem !important;
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        border-radius: var(--radius-sm) !important;
+        transition: background 0.15s ease, color 0.15s ease !important;
+    }
+
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: var(--primary-soft) !important;
+        color: var(--primary) !important;
+        box-shadow: none !important;
+    }
+
+    /* Sign Out button — keep it distinct */
+    section[data-testid="stSidebar"] .stButton > button[data-testid*="logout"] {
+        background: transparent !important;
+        color: var(--muted) !important;
+        border: 1px solid var(--border) !important;
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+    }
+
+    section[data-testid="stSidebar"] .stButton > button[data-testid*="logout"]:hover {
+        background: var(--danger-soft) !important;
+        color: var(--danger) !important;
+        border-color: var(--danger) !important;
     }
 
     /* ── Sidebar user card ── */

@@ -977,6 +977,16 @@ if selected_device_id:
                         with st.expander(f"I/I Flags ({len(_response.ii_flags)})", expanded=True):
                             for _flag in _response.ii_flags:
                                 _col = _sev_color.get(_flag.severity, "#555")
+                                _extra_parts = []
+                                if _flag.api_class:
+                                    _extra_parts.append(f"API: {_flag.api_value:.1f} mm ({_flag.api_class})")
+                                if _flag.excess_volume_m3 > 0:
+                                    _extra_parts.append(f"Excess vol: {_flag.excess_volume_m3:.2f} m³")
+                                if _flag.quickflow_fraction > 0:
+                                    _extra_parts.append(f"Quickflow: {_flag.quickflow_fraction*100:.0f}%")
+                                if _flag.recession_type:
+                                    _extra_parts.append(f"Recession: {_flag.recession_type}")
+                                _extra_str = (" &nbsp;·&nbsp; ".join(_extra_parts) + "&nbsp;&nbsp;" if _extra_parts else "")
                                 st.markdown(
                                     f"<span style='font-weight:600;color:{_col};'>{_flag.severity.upper()}</span> — "
                                     f"{_flag.description}  \n"
@@ -984,10 +994,28 @@ if selected_device_id:
                                     f"Peak: {_flag.peak_flow_lps:.1f} L/s &nbsp;·&nbsp; "
                                     f"Ratio: {_flag.response_ratio:.1f}× &nbsp;·&nbsp; "
                                     f"Lag: {_flag.lag_hours:.1f} h &nbsp;·&nbsp; "
-                                    f"Confidence: {_flag.confidence:.0f}%</span>",
+                                    f"Confidence: {_flag.confidence:.0f}%</span>"
+                                    + (f"  \n<span style='font-size:0.78rem;color:#9ca3af;'>{_extra_str}</span>" if _extra_str else ""),
                                     unsafe_allow_html=True,
                                 )
                                 st.markdown("<div style='height:0.25rem'></div>", unsafe_allow_html=True)
+
+                        # ── Pathway summary ─────────────────────────────────
+                        if _response.dominant_pathway:
+                            _pathway_col = {"Inflow": "#1D4E89", "Infiltration": "#2A9D8F", "Mixed": "#F4B400"}.get(_response.dominant_pathway, "#6b7280")
+                            _pathway_parts = [
+                                f"<strong>Dominant pathway:</strong> {_response.dominant_pathway}",
+                            ]
+                            if _response.mean_api_at_events > 0:
+                                _pathway_parts.append(f"Mean API at events: {_response.mean_api_at_events:.1f} mm")
+                            if _response.mean_baseflow_fraction > 0:
+                                _pathway_parts.append(f"Mean baseflow fraction: {_response.mean_baseflow_fraction*100:.0f}%")
+                            st.markdown(
+                                f"<div style='background:{_pathway_col}10;border-left:3px solid {_pathway_col};"
+                                f"padding:8px 12px;border-radius:6px;font-size:0.85rem;margin-bottom:0.75rem;'>"
+                                + " &nbsp;·&nbsp; ".join(_pathway_parts) + "</div>",
+                                unsafe_allow_html=True,
+                            )
 
                     # ── Recommendations ────────────────────────────────────
                     if _response.recommendations:
@@ -1006,14 +1034,16 @@ if selected_device_id:
                                 "Weak": "#E65100",
                                 "None": "#9E9E9E",
                             }.get(_corr.quality_label, "#9E9E9E")
-                            _cc1, _cc2, _cc3, _cc4 = st.columns(4)
+                            _cc1, _cc2, _cc3, _cc4, _cc5 = st.columns(5)
                             _cc1.metric("Pearson r", f"{_corr.pearson_r:.3f}",
-                                        help="Linear correlation at zero lag (rainfall vs flow)")
-                            _cc2.metric("R²", f"{_corr.r_squared:.3f}",
+                                        help=f"Linear correlation at zero lag (rainfall vs flow). 95% CI: [{_corr.pearson_ci_low:.3f}, {_corr.pearson_ci_high:.3f}]")
+                            _cc2.metric("Spearman ρ", f"{_corr.spearman_r:.3f}",
+                                        help="Rank correlation — robust to non-linear relationships and flow outliers")
+                            _cc3.metric("R²", f"{_corr.r_squared:.3f}",
                                         help="Proportion of flow variance explained by rainfall at zero lag")
-                            _cc3.metric("Best Lag", f"{_corr.best_lag_hours:.0f} h",
+                            _cc4.metric("Best Lag", f"{_corr.best_lag_hours:.0f} h",
                                         help="Lag (hours) at which flow-rainfall cross-correlation is highest")
-                            _cc4.metric("Samples", f"{_corr.sample_size:,}",
+                            _cc5.metric("Samples", f"{_corr.sample_size:,}",
                                         help="Number of hourly paired flow/rainfall readings used")
                             st.markdown(
                                 f"<span style='background:{_corr_qual_colour}20; color:{_corr_qual_colour}; "
@@ -1027,6 +1057,7 @@ if selected_device_id:
                                 f"{_corr.interpretation}</p>",
                                 unsafe_allow_html=True,
                             )
+
 
             with tab6:
                 st.markdown(

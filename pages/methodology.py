@@ -247,22 +247,79 @@ reanalysis as a fallback.  Data is cached in the local database.
 
 #### 4.1 Rain Event Detection
 """)
-_param("Rainfall threshold", "0.1 mm/hr", "WMO minimum measurable-rain threshold")
+_param("Rainfall threshold", "0.1 mm/hr", "WMO minimum measurable-rain threshold (WMO No. 8)")
 _param("Merge gap", "3 hours", "Dry intervals shorter than this are bridged into one event")
 _param("Post-rain window", "6 hours", "Flow is monitored this long after rain ends for I/I response")
 
 st.markdown("""
-#### 4.2 Dry-Weather Flow Baseline
+#### 4.2 Dry-Weather Flow (DWF) Baseline
 """)
 _param("Lookback window", "7 days", "Only data within this rolling window is used for baseline")
 _param("Dry threshold", "0.1 mm/hr", "Hourly rainfall at or below this is classified as dry")
 _param("Min dry readings", "10", "Minimum dry-period readings to compute a baseline; falls back to overall median")
 
 st.markdown("""
-The baseline is the median of dry-weather readings, trimmed to the P10–P90
+The baseline is the **median of dry-weather readings** trimmed to the P10–P90
 range to exclude outliers.
 
-#### 4.3 I/I Detection
+#### 4.3 Antecedent Precipitation Index (API)
+
+The Linsley (1958) exponential decay model tracks accumulated moisture at the
+start of each rain event:
+
+$$\\text{API}(t) = P(t) + k^{\\Delta t} \\cdot \\text{API}(t-1)$$
+
+where:
+- $P(t)$ — hourly rainfall (mm)
+- $k = 0.85$ per day — decay coefficient (~6–7 day half-life); converted to the
+  sub-daily timestep as $k_{\\text{hourly}} = 0.85^{1/24}$
+- $\\Delta t$ — timestep in days
+
+**Antecedent Moisture Condition (AMC) classification:**
+
+| AMC class | API range | Expected I/I sensitivity |
+|---|---|---|
+| **I  — Dry** | ≤ 12 mm | Low; soils and pipe voids unsaturated |
+| **II — Moist** | 12–28 mm | Moderate |
+| **III — Wet** | > 28 mm | High; pipe surrounds saturated, groundwater elevated |
+
+A wetter AMC increases the confidence score for any detected I/I flag and
+triggers a separate recommendation when events occur under AMC-III conditions.
+
+#### 4.4 Eckhardt Baseflow Separation
+
+The **Eckhardt (2005) recursive digital filter** decomposes total sewer flow
+into two components:
+
+- **Baseflow** (slow) — represents steady groundwater **infiltration** through
+  deteriorated pipe joints, cracks, and defective manhole seals.
+- **Quickflow** (fast) — total flow minus baseflow; represents rapid surface
+  **inflow** from stormwater cross-connections, roof drainage, or open
+  manhole lids.
+
+Filter equation (Eckhardt, Hydrological Processes, 2005):
+
+$$b(i) = \\frac{(1-\\text{BFI}_{\\max})\\,\\alpha\\,b(i-1) + (1-\\alpha)\\,\\text{BFI}_{\\max}\\,Q(i)}{1 - \\alpha\\,\\text{BFI}_{\\max}}$$
+
+where:
+- $\\alpha$ — baseflow recession constant (calibrated at daily scale: 0.925;
+  converted to sub-daily as $\\alpha_{\\text{hourly}} = 0.925^{\\Delta t/24}$)
+- $\\text{BFI}_{\\max}$ — maximum long-term baseflow index (default: **0.50** for
+  combined sewers); engineers should calibrate this against dry-weather flow
+  records from the specific catchment
+
+**Quickflow fraction** at each event peak is reported as an indicator of the
+dominant pathway: values approaching 1.0 indicate predominantly surface inflow;
+lower values indicate a significant infiltration (baseflow) component.
+""")
+
+_param("Eckhardt α (daily)", "0.925", "Baseflow recession constant — literature value for perennial streams; adjust for site conditions")
+_param("BFI_max", "0.50", "Maximum baseflow index for combined sewer applications")
+
+st.markdown("""
+#### 4.5 I/I Detection and Severity
+
+Flow exceeding the DWF baseline by the I/I multiplier triggers a flag.
 """)
 _param("I/I multiplier", "1.5×", "Flow exceeding baseline × this triggers an I/I flag")
 
@@ -274,31 +331,67 @@ st.markdown("""
 | High | 2.5× – 4× |
 | Critical | > 4× |
 
-**Lag time** (rain start → peak flow) is used to distinguish inflow from
-infiltration:
-- Short lag (< 1 hour): likely direct surface inflow — check stormwater connections.
-- Long lag (> 6 hours): likely groundwater infiltration — inspect pipe joints and manholes.
+**Excess flow volume** (m³) is computed by integrating the flow above the
+DWF baseline over the full event monitoring window, providing a volumetric
+measure of the extraneous flow entering the sewer per event.
 
-**Confidence** is estimated from the Z-score of peak flow relative to the
-overall flow distribution:
-`confidence = clip(50 + Z × 10, 10, 100)`
-""")
+**Lag time** (rain start → peak flow) distinguishes the dominant entry pathway:
+- < 1 hour: direct surface inflow — likely open manhole lids or cross-connections
+- 1–2 hours: rapid inflow — stormwater or roof drainage connections
+- > 6 hours: groundwater infiltration — structural pipe or manhole defects
 
-st.markdown("#### 4.4 Flow–Rainfall Correlation")
-st.markdown("""
+#### 4.6 Recession Coefficient Analysis
+
+The post-peak falling limb is fitted with an exponential decay:
+
+$$Q(t) = Q_{\\text{peak}} \\cdot \\exp(-k \\cdot (t - t_{\\text{peak}}))$$
+
+OLS regression on $\\ln(Q/Q_{\\text{peak}})$ versus time yields the recession
+coefficient $k$ (hr⁻¹):
+
+| Recession type | k (hr⁻¹) | Interpretation |
+|---|---|---|
+| **Fast** | ≥ 0.10 | Flow drains quickly — consistent with direct surface inflow |
+| **Moderate** | 0.02–0.10 | Mixed response |
+| **Slow** | < 0.02 | Prolonged elevated flow — consistent with groundwater infiltration |
+
+#### 4.7 Multi-Factor Confidence Score
+
+The confidence score (0–100) combines three sources of evidence:
+
+1. **Z-score** of peak flow relative to the full distribution:
+   `base = clip(50 + Z × 10, 10, 100)`
+2. **API boost** — wetter antecedent conditions add up to +8 points
+   (Wet: +8, Moist: +4, Dry: 0)
+3. **Ratio penalty** — events with response ratio < 1.5× × 1.2 are penalised
+   −10 points to reduce false positives near the threshold
+
+#### 4.8 Flow–Rainfall Correlation
+
 Both time series are resampled to 1-hour buckets (rainfall summed, flow averaged).
-A Pearson correlation coefficient is computed at zero lag, and a lagged
-cross-correlation search finds the lag (0–24 hours) at which the correlation
-is strongest.
 
-| Quality label | |r| |
+**Pearson correlation** (linear, parametric, Pearson 1895):
+""")
+_param("Null hypothesis", "r = 0", "Two-tailed test; p < 0.05 = statistically significant linear association")
+
+st.markdown("""
+**95% confidence interval** for Pearson r is computed via the Fisher Z
+transformation (Fisher, 1915):
+$z = \\tanh^{-1}(r)$, CI: $z \\pm 1.96/\\sqrt{n-3}$, back-transformed.
+
+**Spearman rank correlation** (ρ) is computed as a complementary non-parametric
+measure — robust to non-linear relationships and resistant to flow outliers
+(Helsel & Hirsch, 2002, USGS TWRI Book 4, Chapter A3).
+
+A **lagged cross-correlation** search (0–24 hours) identifies the lag at which
+rainfall most strongly predicts future flow.
+
+| Quality label | |r| (Pearson) |
 |---|---|
 | None | < 0.2 |
 | Weak | 0.2 – 0.4 |
 | Moderate | 0.4 – 0.7 |
 | Strong | ≥ 0.7 |
-
-The p-value is the two-tailed Pearson significance test at zero lag.
 """)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -360,10 +453,15 @@ st.markdown("""
 |---|---|
 | **WSAA WSA 02-2014** Water Services Association of Australia — *Sewerage Code of Australia* | Manning's n values for sewer pipes; design grades |
 | **ISO 15747:2011** — *Measurement of liquid flow in closed conduits* | General flow measurement principles |
-| **WMO No. 8** — *Guide to Meteorological Instruments and Methods of Observation* | Rainfall measurement and minimum threshold |
+| **WMO No. 8** — *Guide to Meteorological Instruments and Methods of Observation* | Rainfall measurement and minimum threshold (0.1 mm/hr) |
 | **Melbourne Water Design Guidelines** | Sewer capacity and surcharge risk definitions |
-| **Scipy `stats.linregress`** | OLS trend regression implementation |
-| **Scipy `stats.pearsonr`** | Pearson correlation and significance test |
+| **Eckhardt, K. (2005)** "How to construct recursive digital baseflow separation filters." *Hydrological Processes*, 19(2):507–515. | Baseflow separation filter (α, BFI_max parameters) |
+| **Linsley, R.K., Kohler, M.A. & Paulhus, J.L.H. (1958)** *Hydrology for Engineers.* McGraw-Hill. | Antecedent Precipitation Index (API) exponential decay model |
+| **Helsel, D.R. & Hirsch, R.M. (2002)** *Statistical Methods in Water Resources.* USGS TWRI Book 4, Chapter A3. | Spearman rank correlation for hydrological data; non-parametric methods |
+| **Fisher, R.A. (1915)** "Frequency distribution of the values of the correlation coefficient." *Biometrika*, 10:507–521. | Fisher Z transformation for Pearson r confidence intervals |
+| **Pearson, K. (1895)** "Notes on regression and inheritance in the case of two parents." *Proceedings of the Royal Society of London*, 58:240–242. | Pearson product-moment correlation coefficient |
+| **Scipy `stats.linregress`** | OLS trend regression and recession coefficient implementation |
+| **Scipy `stats.pearsonr`, `stats.spearmanr`** | Pearson and Spearman correlation with significance tests |
 | **Open-Meteo ERA5 API** | Fallback gridded rainfall data |
 | **Australian BOM JSON feeds** | Primary observed rainfall data (real-time station network) |
 
