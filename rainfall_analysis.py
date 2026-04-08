@@ -63,6 +63,13 @@ _API_DECAY_DAILY            = 0.85  # per-day decay coefficient (~6-7 day half-l
 _ECKHARDT_ALPHA_DAILY       = 0.925  # baseflow recession constant (per day, daily calibration)
 _ECKHARDT_BFI_MAX           = 0.50   # max baseflow index for combined sewer applications
 
+# Unit conversion
+_LITERS_PER_CUBIC_METER     = 1000.0  # L → m³ conversion factor
+
+# Statistics
+_FISHER_Z_CLIP              = 0.9999  # clamp |r| away from ±1 before arctanh
+_Z_SCORE_95_CI              = 1.96    # z-score for 95% confidence interval (two-tailed)
+
 
 @dataclass
 class RainEvent:
@@ -160,12 +167,12 @@ def compute_antecedent_precipitation_index(
         return pd.Series(dtype=float)
 
     # Compute per-hour decay factor from daily coefficient
-    k_hourly = decay_daily ** (1.0 / 24.0)
+    decay_hourly = decay_daily ** (1.0 / 24.0)
 
     api = np.zeros(len(rain_h))
     rain_vals = rain_h.values
     for i in range(1, len(rain_vals)):
-        api[i] = rain_vals[i] + k_hourly * api[i - 1]
+        api[i] = rain_vals[i] + decay_hourly * api[i - 1]
 
     return pd.Series(api, index=rain_h.index, name="api_mm")
 
@@ -623,7 +630,7 @@ def detect_inflow_infiltration(
                 .dt.total_seconds()
                 .fillna(0.0)
             )
-            excess_vol_m3 = round(float((excess * dt_s).sum()) / 1000.0, 2)  # L/s × s → L → /1000 → m³
+            excess_vol_m3 = round(float((excess * dt_s).sum()) / _LITERS_PER_CUBIC_METER, 2)  # L/s × s → L → m³
 
         # ── Recession coefficient ────────────────────────────────────────
         flow_win_idx = df_f_indexed["flow_lps"].loc[
@@ -882,10 +889,10 @@ def compute_flow_rainfall_correlation(
     # 95% confidence interval via Fisher Z transformation
     # z = arctanh(r), CI: z ± 1.96 / sqrt(n-3), then back-transform
     if n > 3:
-        z_fisher = np.arctanh(np.clip(r, -0.9999, 0.9999))
+        z_fisher = np.arctanh(np.clip(r, -_FISHER_Z_CLIP, _FISHER_Z_CLIP))
         se = 1.0 / np.sqrt(n - 3)
-        ci_low = float(np.tanh(z_fisher - 1.96 * se))
-        ci_high = float(np.tanh(z_fisher + 1.96 * se))
+        ci_low = float(np.tanh(z_fisher - _Z_SCORE_95_CI * se))
+        ci_high = float(np.tanh(z_fisher + _Z_SCORE_95_CI * se))
     else:
         ci_low = float(r)
         ci_high = float(r)
