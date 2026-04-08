@@ -38,7 +38,7 @@ from baseline_learning import (
     _MIN_READINGS_BASIC,
 )
 from database import FlowDatabase
-from shared_styles import apply_styles
+from shared_styles import apply_styles, render_footer
 from streamlit_auth import (
     filter_devices_for_user,
     get_current_user,
@@ -964,3 +964,5 @@ if recs_for_pdf:
         st.info("PDF generation requires reportlab to be installed.")
 else:
     st.info("Run baseline computation first to enable PDF download.")
+
+render_footer()

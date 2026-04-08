@@ -590,32 +590,28 @@ _CSS = """
         box-shadow: none !important;
     }
 
-    /* ── "How Does FlowSense™ Work" — tiny disclaimer-style link ── */
+    /* ── "How Does FlowSense™ Work" — tiny disclaimer-style page link ── */
     .methodology-nav {
-        margin-top: -1.25rem !important;
+        margin-top: 0.1rem !important;
+        text-align: center !important;
     }
-    .methodology-nav .stButton > button {
-        background: transparent !important;
+    .methodology-nav [data-testid="stPageLink"],
+    .methodology-nav [data-testid="stPageLink"] a {
+        font-size: 0.70rem !important;
         color: var(--muted) !important;
-        border: none !important;
-        box-shadow: none !important;
-        font-size: 0.60rem !important;
-        font-weight: 400 !important;
-        padding: 0.02rem 0.2rem !important;
-        min-height: unset !important;
-        height: auto !important;
-        width: fit-content !important;
-        margin: 0 auto !important;
-        line-height: 1.1 !important;
         text-decoration: underline !important;
         text-underline-offset: 2px !important;
-        justify-content: center !important;
-    }
-
-    .methodology-nav .stButton > button:hover {
+        font-weight: 400 !important;
+        padding: 0 !important;
         background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        line-height: 1.2 !important;
+    }
+    .methodology-nav [data-testid="stPageLink"]:hover,
+    .methodology-nav [data-testid="stPageLink"] a:hover {
         color: var(--primary) !important;
-        border-color: transparent !important;
+        background: transparent !important;
     }
 
     /* Sign Out button — keep it distinct */
@@ -905,6 +901,29 @@ _CSS = """
         display: none !important;
     }
 
+    /* ── Hide all Streamlit branding / UI chrome ── */
+    /* Hamburger / main menu */
+    #MainMenu { visibility: hidden !important; display: none !important; }
+
+    /* "Made with Streamlit" footer watermark */
+    footer { visibility: hidden !important; }
+    footer::after { content: "" !important; }
+
+    /* Top-right toolbar (deploy, settings, share buttons) */
+    [data-testid="stToolbar"],
+    [data-testid="stToolbarActions"],
+    [data-testid="stDeployButton"],
+    .stDeployButton { display: none !important; }
+
+    /* Coloured decoration bar at the very top of the page */
+    [data-testid="stDecoration"] { display: none !important; }
+
+    /* Top app header bar (contains menu + toolbar on some versions) */
+    [data-testid="stHeader"] { background: transparent !important; }
+
+    /* Status widget (running spinner shown in bottom-right on older versions) */
+    [data-testid="stStatusWidget"] { display: none !important; }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
         .block-container { padding: 1rem 1rem 2rem !important; }
@@ -922,3 +941,16 @@ _CSS = """
 def apply_styles() -> None:
     """Inject the shared design system CSS into the current Streamlit page."""
     st.markdown(_CSS, unsafe_allow_html=True)
+
+
+def render_footer() -> None:
+    """Render the EDS branded footer at the bottom of any page."""
+    st.markdown("""
+<div class="app-footer">
+    <span class="app-footer-brand">Environmental Data Services</span>
+    <span class="app-footer-meta">
+        <a href="https://www.e-d-s.com.au" target="_blank"
+           style="color:inherit; text-decoration:none;">www.e-d-s.com.au</a>
+    </span>
+</div>
+""", unsafe_allow_html=True)

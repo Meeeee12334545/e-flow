@@ -8,7 +8,7 @@ import base64
 import streamlit as st
 from pathlib import Path
 from database import FlowDatabase
-from shared_styles import apply_styles
+from shared_styles import apply_styles, render_footer
 from streamlit_auth import (
     init_auth_state, is_authenticated, is_admin, get_current_user,
     get_sidebar_logo_path, get_user_avatar_data_uri, get_org_logo_data_uri,
@@ -257,6 +257,8 @@ def render_profile_page():
             <strong>Session token:</strong> <code>{(st.session_state.session_id or '')[:20]}…</code>
         </div>
         """, unsafe_allow_html=True)
+
+    render_footer()
 
 
 if __name__ == "__main__":

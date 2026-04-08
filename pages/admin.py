@@ -14,7 +14,7 @@ import pandas as pd
 from pathlib import Path
 from auth import AuthDatabase
 from database import FlowDatabase
-from shared_styles import apply_styles
+from shared_styles import apply_styles, render_footer
 from streamlit_auth import init_auth_state, is_authenticated, is_admin, get_current_user, get_sidebar_logo_path
 
 _ASSETS = Path(__file__).parent.parent / "assets"
@@ -788,6 +788,8 @@ def render_admin_panel():
             )
         else:
             st.info("No regular users to display.")
+
+    render_footer()
 
 
 if __name__ == "__main__":
