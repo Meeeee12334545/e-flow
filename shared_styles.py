@@ -590,15 +590,21 @@ _CSS = """
         box-shadow: none !important;
     }
 
-    /* ── "How Does FlowSense™ Work" — discreet small link style ── */
+    /* ── "How Does FlowSense™ Work" — tiny disclaimer-style link ── */
+    .methodology-nav {
+        margin-top: -0.55rem !important;
+    }
     .methodology-nav .stButton > button {
         background: transparent !important;
         color: var(--muted) !important;
         border: none !important;
         box-shadow: none !important;
-        font-size: 0.72rem !important;
+        font-size: 0.62rem !important;
         font-weight: 400 !important;
-        padding: 0.15rem 0.4rem !important;
+        padding: 0.05rem 0.25rem !important;
+        min-height: unset !important;
+        height: auto !important;
+        line-height: 1.2 !important;
         text-decoration: underline !important;
         text-underline-offset: 2px !important;
         justify-content: center !important;
