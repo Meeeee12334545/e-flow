@@ -329,14 +329,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Monitor status
-    if _monitor_proc is not None:
-        st.success("Monitor service: running (auto-collecting data)")
-    elif MONITOR_ENABLED:
-        st.success("Monitor service: active")
-    else:
-        st.info("Monitor service: not running. Start monitor.py to collect data.")
-
     # Build device mapping from database
     devices = db.get_devices()
     
