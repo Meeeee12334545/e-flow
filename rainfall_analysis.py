@@ -46,13 +46,13 @@ def _to_utc_naive(series: pd.Series) -> pd.Series:
 
 
 # ── Thresholds (adjustable via keyword args) ──────────────────────────────────
-_DEFAULT_RAIN_THRESHOLD_MM  = 0.1    # WMO measurable-rain threshold (mm/hr)
+_DEFAULT_RAIN_THRESHOLD_MM  = 1.0    # industry-standard event threshold (mm/hr); BOM/ARR 2019
 _DEFAULT_II_MULTIPLIER      = 1.5    # flow > baseline × this → I/I flag
-_DRY_DAY_PRECIP_CAP_MM      = 0.1   # hourly mm/hr ≤ this → classified as dry
+_DRY_DAY_PRECIP_CAP_MM      = 1.0   # hourly mm/hr ≤ this → classified as dry (consistent with event threshold)
 _BASELINE_LOOKBACK_DAYS     = 7     # rolling window for dry-weather baseline
 _MIN_DRY_READINGS           = 10    # min dry readings to compute baseline
-_EVENT_MERGE_GAP_HOURS      = 3     # merge rain events closer than this many hours
-_POST_RAIN_WINDOW_HOURS     = 6     # hours after rain stops to monitor flow
+_EVENT_MERGE_GAP_HOURS      = 6     # merge rain events closer than this many hours (ARR 2019)
+_POST_RAIN_WINDOW_HOURS     = 24    # hours after rain stops to monitor flow (WSAA WSA 02 standard)
 _Z_SCORE_CONFIDENCE_SCALE   = 10.0  # maps z-score to 0-100 confidence boost
 _INFLOW_LAG_THRESHOLD_HOURS = 2     # lag ≤ this → direct inflow; > this → infiltration
 
