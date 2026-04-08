@@ -27,7 +27,7 @@ if not is_authenticated():
     st.stop()
 
 st.set_page_config(
-    page_title="EDS FlowSense | Methodology",
+    page_title="EDS FlowSense | How Does FlowSense™ Work",
     page_icon="💧",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -44,7 +44,7 @@ with st.sidebar:
 st.markdown("""
 <div class="page-header">
     <h1 style="margin:0; font-size:1.9rem; font-weight:700; color:#ffffff;">
-        FlowSense™ Analytical Methodology
+        How Does FlowSense™ Work
     </h1>
     <p style="margin:0.3rem 0 0; color:rgba(255,255,255,0.85); font-size:0.95rem;">
         Engineering reference: algorithms, thresholds, and standards used in every analysis.

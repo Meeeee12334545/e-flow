@@ -570,17 +570,17 @@ _CSS = """
 
     /* ── Sidebar navigation buttons ── */
     section[data-testid="stSidebar"] .stButton > button {
-        background: #ffffff !important;
-        color: var(--text) !important;
-        border: 1px solid var(--border) !important;
+        background: transparent !important;
+        color: var(--muted) !important;
+        border: none !important;
         box-shadow: none !important;
         text-align: left !important;
         justify-content: flex-start !important;
-        padding: 0.5rem 0.75rem !important;
-        font-weight: 500 !important;
-        font-size: 0.875rem !important;
+        padding: 0.25rem 0.5rem !important;
+        font-weight: 400 !important;
+        font-size: 0.78rem !important;
         border-radius: var(--radius-sm) !important;
-        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
+        transition: background 0.15s ease, color 0.15s ease !important;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
