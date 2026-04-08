@@ -570,17 +570,17 @@ _CSS = """
 
     /* ── Sidebar navigation buttons ── */
     section[data-testid="stSidebar"] .stButton > button {
-        background: transparent !important;
-        color: var(--muted) !important;
-        border: none !important;
+        background: #ffffff !important;
+        color: var(--text) !important;
+        border: 1px solid var(--border) !important;
         box-shadow: none !important;
         text-align: left !important;
         justify-content: flex-start !important;
-        padding: 0.25rem 0.5rem !important;
-        font-weight: 400 !important;
+        padding: 0.3rem 0.6rem !important;
+        font-weight: 500 !important;
         font-size: 0.78rem !important;
         border-radius: var(--radius-sm) !important;
-        transition: background 0.15s ease, color 0.15s ease !important;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
@@ -588,6 +588,26 @@ _CSS = """
         color: var(--primary) !important;
         border-color: var(--primary) !important;
         box-shadow: none !important;
+    }
+
+    /* ── "How Does FlowSense™ Work" — discreet small link style ── */
+    .methodology-nav .stButton > button {
+        background: transparent !important;
+        color: var(--muted) !important;
+        border: none !important;
+        box-shadow: none !important;
+        font-size: 0.72rem !important;
+        font-weight: 400 !important;
+        padding: 0.15rem 0.4rem !important;
+        text-decoration: underline !important;
+        text-underline-offset: 2px !important;
+        justify-content: center !important;
+    }
+
+    .methodology-nav .stButton > button:hover {
+        background: transparent !important;
+        color: var(--primary) !important;
+        border-color: transparent !important;
     }
 
     /* Sign Out button — keep it distinct */
