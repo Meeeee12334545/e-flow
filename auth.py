@@ -1106,7 +1106,8 @@ class AuthDatabase:
                 finally:
                     conn.close()
         except Exception:
-            pass  # Activity logging must never crash the application
+            import logging as _logging
+            _logging.getLogger(__name__).warning("Activity logging failed", exc_info=True)
 
     def get_activity_log(
         self,

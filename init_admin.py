@@ -25,9 +25,12 @@ def init_with_default_admin():
     admin_password = os.getenv("ADMIN_INIT_PASSWORD", "")
     if not admin_password:
         admin_password = secrets.token_urlsafe(16)
-        print(f"\n  ⚠ ADMIN_INIT_PASSWORD not set — generated a random password.")
-        print(f"  ⚠ Save this now, it will NOT be shown again:\n")
-        print(f"     Admin password: {admin_password}\n")
+        # Write to stderr so the credential is not captured in log files
+        import sys as _sys
+        _sys.stderr.write("\n  ⚠ ADMIN_INIT_PASSWORD not set — generated a random password.\n")
+        _sys.stderr.write("  ⚠ Save this now, it will NOT be shown again.\n\n")
+        _sys.stderr.write(f"     Admin password: {admin_password}\n\n")
+        _sys.stderr.flush()
 
     # Initialize databases
     flow_db = FlowDatabase()

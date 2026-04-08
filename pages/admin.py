@@ -888,7 +888,9 @@ def render_admin_panel():
                 st.info("No activity recorded yet.")
 
     except Exception as _exc:
-        st.error(f"Could not load analytics: {_exc}")
+        import logging as _logging
+        _logging.getLogger(__name__).error("Analytics load error", exc_info=True)
+        st.error("Could not load analytics. Please check the server logs for details.")
 
     render_footer()
 

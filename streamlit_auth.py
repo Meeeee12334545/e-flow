@@ -241,7 +241,9 @@ def log_page_view(page: str) -> None:
     that each page is counted only once per Streamlit script execution
     (Streamlit re-runs the script on every widget interaction).
     """
-    flag = f"_page_logged_{page}"
+    # Use a stable, sanitized key (only alphanumeric + underscores)
+    safe_key = "".join(c if c.isalnum() else "_" for c in page)
+    flag = f"_page_logged_{safe_key}"
     if st.session_state.get(flag):
         return
     st.session_state[flag] = True
