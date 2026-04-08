@@ -28,6 +28,7 @@ from streamlit_auth import (
     init_auth_state,
     is_authenticated,
     is_admin,
+    log_page_view,
     login_page,
     render_auth_header,
     filter_devices_for_user,
@@ -40,6 +41,8 @@ init_auth_state()
 if not is_authenticated():
     login_page()
     st.stop()
+
+log_page_view("Reports")
 
 st.set_page_config(
     page_title="EDS FlowSense | Reports",

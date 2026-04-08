@@ -28,7 +28,7 @@ from rainfall_analysis import (
     compute_flow_rainfall_correlation,
 )
 
-from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user, get_org_logo_data_uri, get_sidebar_logo_path
+from streamlit_auth import init_auth_state, is_authenticated, is_admin, login_page, render_auth_header, filter_devices_for_user, get_org_logo_data_uri, get_sidebar_logo_path, log_page_view
 
 # set_page_config MUST be the first Streamlit command in the script
 st.set_page_config(
@@ -45,6 +45,8 @@ init_auth_state()
 if not is_authenticated():
     login_page()
     st.stop()
+
+log_page_view("Dashboard")
 
 # Ensure Playwright browsers are installed for Streamlit Cloud
 @st.cache_resource

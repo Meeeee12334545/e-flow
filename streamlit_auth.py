@@ -181,6 +181,11 @@ def login_page():
                         session_id = st.session_state.auth_db.create_session(user_info['user_id'])
                         st.session_state.user = user_info
                         st.session_state.session_id = session_id
+                        st.session_state.auth_db.log_activity(
+                            username=user_info['username'],
+                            event_type='login',
+                            user_id=user_info['user_id'],
+                        )
                         st.success("✅ Login successful!")
                         st.rerun()
                     else:
@@ -198,6 +203,13 @@ def login_page():
 
 def logout():
     """Logout current user."""
+    user = st.session_state.get('user')
+    if user:
+        st.session_state.auth_db.log_activity(
+            username=user['username'],
+            event_type='logout',
+            user_id=user.get('user_id'),
+        )
     if st.session_state.session_id:
         st.session_state.auth_db.delete_session(st.session_state.session_id)
 
@@ -219,6 +231,29 @@ def is_admin() -> bool:
 def get_current_user() -> dict:
     """Get current authenticated user info."""
     return st.session_state.user or {}
+
+
+def log_page_view(page: str) -> None:
+    """Record a page-view event for the currently logged-in user.
+
+    Call this once near the top of each Streamlit page to track which
+    pages are being visited and by whom.  Uses a session-state flag so
+    that each page is counted only once per Streamlit script execution
+    (Streamlit re-runs the script on every widget interaction).
+    """
+    flag = f"_page_logged_{page}"
+    if st.session_state.get(flag):
+        return
+    st.session_state[flag] = True
+    auth_db = st.session_state.get('auth_db')
+    user = st.session_state.get('user')
+    if auth_db and user:
+        auth_db.log_activity(
+            username=user['username'],
+            event_type='page_view',
+            page=page,
+            user_id=user.get('user_id'),
+        )
 
 
 def render_auth_header():
