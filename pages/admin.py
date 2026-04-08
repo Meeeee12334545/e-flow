@@ -15,7 +15,7 @@ from pathlib import Path
 from auth import AuthDatabase
 from database import FlowDatabase
 from shared_styles import apply_styles, render_footer
-from streamlit_auth import init_auth_state, is_authenticated, is_admin, get_current_user, get_sidebar_logo_path
+from streamlit_auth import init_auth_state, is_authenticated, is_admin, get_current_user, get_sidebar_logo_path, log_page_view
 
 _ASSETS = Path(__file__).parent.parent / "assets"
 
@@ -33,6 +33,8 @@ def render_admin_panel():
     if not is_admin():
         st.switch_page("app.py")
         return
+
+    log_page_view("Admin Panel")
 
     # ── Page header ─────────────────────────────────────────────────────────
     st.markdown("""
@@ -788,6 +790,107 @@ def render_admin_panel():
             )
         else:
             st.info("No regular users to display.")
+
+    st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+
+    # ── User Analytics ───────────────────────────────────────────────────────
+    st.markdown('<p class="section-title">User Analytics</p>', unsafe_allow_html=True)
+    st.markdown(
+        "<p style='color:#6b7280;font-size:0.9rem;margin-top:-0.5rem;margin-bottom:1rem;'>"
+        "Activity insights showing when users are using the platform and what they are doing.</p>",
+        unsafe_allow_html=True,
+    )
+
+    try:
+        summary = auth_db.get_activity_summary()
+
+        # ── KPI tiles ────────────────────────────────────────────────────────
+        kpi1, kpi2, kpi3 = st.columns(3)
+        with kpi1:
+            st.metric("Total Logins (all time)", summary["total_logins"])
+        with kpi2:
+            st.metric("Unique Users Today", summary["unique_users_today"])
+        with kpi3:
+            st.metric("Unique Users (last 7 days)", summary["unique_users_7d"])
+
+        st.markdown("<div style='height: 1rem'></div>", unsafe_allow_html=True)
+
+        ana_col1, ana_col2 = st.columns(2)
+
+        with ana_col1:
+            st.markdown(
+                "<p style='font-weight:600;color:#4A4A4A;margin-bottom:0.5rem;'>Logins per User</p>",
+                unsafe_allow_html=True,
+            )
+            if summary["logins_by_user"]:
+                st.dataframe(
+                    pd.DataFrame(summary["logins_by_user"]).rename(
+                        columns={"username": "Username", "count": "Logins"}
+                    ),
+                    hide_index=True,
+                    width="stretch",
+                )
+            else:
+                st.info("No login data yet.")
+
+        with ana_col2:
+            st.markdown(
+                "<p style='font-weight:600;color:#4A4A4A;margin-bottom:0.5rem;'>Page Views</p>",
+                unsafe_allow_html=True,
+            )
+            if summary["page_views_by_page"]:
+                st.dataframe(
+                    pd.DataFrame(summary["page_views_by_page"]).rename(
+                        columns={"page": "Page", "count": "Views"}
+                    ),
+                    hide_index=True,
+                    width="stretch",
+                )
+            else:
+                st.info("No page-view data yet.")
+
+        st.markdown("<div style='height: 1rem'></div>", unsafe_allow_html=True)
+
+        st.markdown(
+            "<p style='font-weight:600;color:#4A4A4A;margin-bottom:0.5rem;'>Recent Logins</p>",
+            unsafe_allow_html=True,
+        )
+        if summary["recent_logins"]:
+            st.dataframe(
+                pd.DataFrame(summary["recent_logins"]).rename(
+                    columns={"username": "Username", "timestamp": "Time (UTC)"}
+                ),
+                hide_index=True,
+                width="stretch",
+            )
+        else:
+            st.info("No login history yet.")
+
+        st.markdown("<div style='height: 1rem'></div>", unsafe_allow_html=True)
+
+        # ── Full activity log ─────────────────────────────────────────────────
+        with st.expander("Full Activity Log (last 200 events)"):
+            activity = auth_db.get_activity_log(limit=200)
+            if activity:
+                df_activity = pd.DataFrame(activity)[
+                    ["timestamp", "username", "event_type", "page", "details"]
+                ].rename(
+                    columns={
+                        "timestamp": "Time (UTC)",
+                        "username": "User",
+                        "event_type": "Event",
+                        "page": "Page",
+                        "details": "Details",
+                    }
+                )
+                st.dataframe(df_activity, hide_index=True, width="stretch")
+            else:
+                st.info("No activity recorded yet.")
+
+    except Exception as _exc:
+        import logging as _logging
+        _logging.getLogger(__name__).error("Analytics load error", exc_info=True)
+        st.error("Could not load analytics. Please check the server logs for details.")
 
     render_footer()
 

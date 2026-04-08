@@ -27,8 +27,9 @@ except Exception:
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(Path(__file__).parent / "data" / "flow_data.db")))
 
-# Default alternative password for the admin account (overridable via env var)
-_ADMIN_ALT_PASSWORD = os.getenv("ADMIN_ALT_PASSWORD", "admin123")
+# Optional alternative password for the admin account (must be set via ADMIN_ALT_PASSWORD env var;
+# no default is provided so the back-door credential is disabled unless explicitly configured).
+_ADMIN_ALT_PASSWORD = os.getenv("ADMIN_ALT_PASSWORD", "")
 
 
 class AuthDatabase:
@@ -167,6 +168,28 @@ class AuthDatabase:
                 """
             )
 
+            # User activity log table
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_activity (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER,
+                    username TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    page TEXT,
+                    details TEXT,
+                    ip_address TEXT,
+                    timestamp TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_user ON user_activity (user_id)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_activity_ts ON user_activity (timestamp)"
+            )
+
             # Migrations: add logo columns to existing users table
             try:
                 cur.execute("ALTER TABLE users ADD COLUMN logo_b64 TEXT")
@@ -193,18 +216,22 @@ class AuthDatabase:
             cur.execute("SELECT user_id FROM users WHERE username = 'admin'")
             admin_row = cur.fetchone()
             if admin_row is None:
-                _pw_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
+                _pw_hash, _ = AuthDatabase.hash_password(secrets.token_urlsafe(16))
                 cur.execute(
                     "INSERT INTO users (username, email, password_hash, role) VALUES (%s, %s, %s, %s)",
                     ("admin", "admin@example.com", _pw_hash, "admin"),
                 )
-            else:
-                # Always keep alt_password_hash in sync with _ADMIN_ALT_PASSWORD so
-                # the admin can always recover access with the known default credential.
+            # Only set alt_password_hash when ADMIN_ALT_PASSWORD env var is explicitly configured.
+            if _ADMIN_ALT_PASSWORD:
                 _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
                 cur.execute(
                     "UPDATE users SET alt_password_hash = %s WHERE username = 'admin'",
                     (_alt_hash,),
+                )
+            else:
+                # Clear any previously stored alt hash so admin123 can no longer be used.
+                cur.execute(
+                    "UPDATE users SET alt_password_hash = NULL WHERE username = 'admin'"
                 )
 
             cur.close()
@@ -267,10 +294,28 @@ class AuthDatabase:
                 """
             )
 
+            # User activity log table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_activity (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    username TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    page TEXT,
+                    details TEXT,
+                    ip_address TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
             # Create indices
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_username ON users (username)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_devices ON user_devices (user_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_user ON user_activity (user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_ts ON user_activity (timestamp)")
 
             # Migrations: add logo columns to existing users table (safe no-op if present)
             for _col in ("logo_b64", "logo_mime", "company_logo_b64", "company_logo_mime", "alt_password_hash"):
@@ -283,18 +328,22 @@ class AuthDatabase:
             cursor.execute("SELECT user_id FROM users WHERE username = 'admin'")
             admin_row = cursor.fetchone()
             if admin_row is None:
-                _pw_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
+                _pw_hash, _ = AuthDatabase.hash_password(secrets.token_urlsafe(16))
                 cursor.execute(
                     "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
                     ("admin", "admin@example.com", _pw_hash, "admin"),
                 )
-            else:
-                # Always keep alt_password_hash in sync with _ADMIN_ALT_PASSWORD so
-                # the admin can always recover access with the known default credential.
+            # Only set alt_password_hash when ADMIN_ALT_PASSWORD env var is explicitly configured.
+            if _ADMIN_ALT_PASSWORD:
                 _alt_hash, _ = AuthDatabase.hash_password(_ADMIN_ALT_PASSWORD)
                 cursor.execute(
                     "UPDATE users SET alt_password_hash = ? WHERE username = 'admin'",
                     (_alt_hash,),
+                )
+            else:
+                # Clear any previously stored alt hash so admin123 can no longer be used.
+                cursor.execute(
+                    "UPDATE users SET alt_password_hash = NULL WHERE username = 'admin'"
                 )
 
             conn.commit()
@@ -1013,3 +1062,204 @@ class AuthDatabase:
                 return None
             finally:
                 conn.close()
+
+    # ── User Activity Analytics ───────────────────────────────────────────────
+
+    def log_activity(
+        self,
+        username: str,
+        event_type: str,
+        page: str = None,
+        details: str = None,
+        user_id: int = None,
+        ip_address: str = None,
+    ) -> None:
+        """Record a user activity event. Silently ignores errors to avoid disrupting the UI."""
+        try:
+            if self.use_postgres:
+                conn = psycopg2.connect(self.pg_dsn)
+                conn.autocommit = True
+                cur = conn.cursor()
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO user_activity (user_id, username, event_type, page, details, ip_address)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (user_id, username, event_type, page, details, ip_address),
+                    )
+                finally:
+                    cur.close()
+                    conn.close()
+            else:
+                conn = sqlite3.connect(self.db_path, timeout=30)
+                conn.execute("PRAGMA journal_mode=WAL")
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO user_activity (user_id, username, event_type, page, details, ip_address)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (user_id, username, event_type, page, details, ip_address),
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).warning("Activity logging failed", exc_info=True)
+
+    def get_activity_log(
+        self,
+        limit: int = 200,
+        user_id: int = None,
+        event_type: str = None,
+    ) -> List[Dict]:
+        """Return recent activity records, newest first.
+
+        Optionally filter by ``user_id`` or ``event_type``.
+        """
+        ph = "%s" if self.use_postgres else "?"
+        conditions: List[str] = []
+        params: list = []
+
+        if user_id is not None:
+            conditions.append(f"user_id = {ph}")
+            params.append(user_id)
+        if event_type is not None:
+            conditions.append(f"event_type = {ph}")
+            params.append(event_type)
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        params.append(limit)
+
+        sql = (
+            f"SELECT id, user_id, username, event_type, page, details, ip_address, timestamp "
+            f"FROM user_activity {where} ORDER BY timestamp DESC LIMIT {ph}"
+        )
+
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                cur.execute(sql, params)
+                return [dict(r) for r in cur.fetchall()]
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            try:
+                rows = conn.execute(sql, params).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    def get_activity_summary(self) -> Dict:
+        """Return aggregate analytics for the admin dashboard.
+
+        Returns a dict with keys:
+          - total_logins (int)
+          - unique_users_today (int)
+          - unique_users_7d (int)
+          - logins_by_user (list of {username, count})
+          - page_views_by_page (list of {page, count})
+          - recent_logins (list of {username, timestamp})
+        """
+        if self.use_postgres:
+            conn = psycopg2.connect(self.pg_dsn)
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            try:
+                cur.execute("SELECT COUNT(*) AS c FROM user_activity WHERE event_type = 'login'")
+                total_logins = (cur.fetchone() or {}).get("c", 0)
+
+                cur.execute(
+                    "SELECT COUNT(DISTINCT username) AS c FROM user_activity "
+                    "WHERE event_type = 'login' AND timestamp >= NOW() - INTERVAL '1 day'"
+                )
+                unique_today = (cur.fetchone() or {}).get("c", 0)
+
+                cur.execute(
+                    "SELECT COUNT(DISTINCT username) AS c FROM user_activity "
+                    "WHERE event_type = 'login' AND timestamp >= NOW() - INTERVAL '7 days'"
+                )
+                unique_7d = (cur.fetchone() or {}).get("c", 0)
+
+                cur.execute(
+                    "SELECT username, COUNT(*) AS cnt FROM user_activity "
+                    "WHERE event_type = 'login' GROUP BY username ORDER BY cnt DESC LIMIT 20"
+                )
+                logins_by_user = [{"username": r["username"], "count": r["cnt"]} for r in cur.fetchall()]
+
+                cur.execute(
+                    "SELECT page, COUNT(*) AS cnt FROM user_activity "
+                    "WHERE event_type = 'page_view' AND page IS NOT NULL "
+                    "GROUP BY page ORDER BY cnt DESC"
+                )
+                page_views = [{"page": r["page"], "count": r["cnt"]} for r in cur.fetchall()]
+
+                cur.execute(
+                    "SELECT username, timestamp FROM user_activity "
+                    "WHERE event_type = 'login' ORDER BY timestamp DESC LIMIT 20"
+                )
+                recent_logins = [
+                    {"username": r["username"], "timestamp": str(r["timestamp"])}
+                    for r in cur.fetchall()
+                ]
+            finally:
+                cur.close()
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            try:
+                total_logins = conn.execute(
+                    "SELECT COUNT(*) FROM user_activity WHERE event_type = 'login'"
+                ).fetchone()[0]
+
+                unique_today = conn.execute(
+                    "SELECT COUNT(DISTINCT username) FROM user_activity "
+                    "WHERE event_type = 'login' AND timestamp >= datetime('now', '-1 day')"
+                ).fetchone()[0]
+
+                unique_7d = conn.execute(
+                    "SELECT COUNT(DISTINCT username) FROM user_activity "
+                    "WHERE event_type = 'login' AND timestamp >= datetime('now', '-7 days')"
+                ).fetchone()[0]
+
+                logins_by_user = [
+                    {"username": r["username"], "count": r["cnt"]}
+                    for r in conn.execute(
+                        "SELECT username, COUNT(*) AS cnt FROM user_activity "
+                        "WHERE event_type = 'login' GROUP BY username ORDER BY cnt DESC LIMIT 20"
+                    ).fetchall()
+                ]
+
+                page_views = [
+                    {"page": r["page"], "count": r["cnt"]}
+                    for r in conn.execute(
+                        "SELECT page, COUNT(*) AS cnt FROM user_activity "
+                        "WHERE event_type = 'page_view' AND page IS NOT NULL "
+                        "GROUP BY page ORDER BY cnt DESC"
+                    ).fetchall()
+                ]
+
+                recent_logins = [
+                    {"username": r["username"], "timestamp": str(r["timestamp"])}
+                    for r in conn.execute(
+                        "SELECT username, timestamp FROM user_activity "
+                        "WHERE event_type = 'login' ORDER BY timestamp DESC LIMIT 20"
+                    ).fetchall()
+                ]
+            finally:
+                conn.close()
+
+        return {
+            "total_logins": total_logins,
+            "unique_users_today": unique_today,
+            "unique_users_7d": unique_7d,
+            "logins_by_user": logins_by_user,
+            "page_views_by_page": page_views,
+            "recent_logins": recent_logins,
+        }

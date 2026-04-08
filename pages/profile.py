@@ -12,6 +12,7 @@ from shared_styles import apply_styles, render_footer
 from streamlit_auth import (
     init_auth_state, is_authenticated, is_admin, get_current_user,
     get_sidebar_logo_path, get_user_avatar_data_uri, get_org_logo_data_uri,
+    log_page_view,
 )
 
 _ASSETS = Path(__file__).parent.parent / "assets"
@@ -25,6 +26,8 @@ def render_profile_page():
     if not is_authenticated():
         st.error("You must be logged in")
         return
+
+    log_page_view("Profile")
 
     user = get_current_user()
     role = user.get('role', 'user')
