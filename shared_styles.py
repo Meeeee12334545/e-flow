@@ -570,9 +570,9 @@ _CSS = """
 
     /* ── Sidebar navigation buttons ── */
     section[data-testid="stSidebar"] .stButton > button {
-        background: transparent !important;
+        background: #ffffff !important;
         color: var(--text) !important;
-        border: none !important;
+        border: 1px solid var(--border) !important;
         box-shadow: none !important;
         text-align: left !important;
         justify-content: flex-start !important;
@@ -580,18 +580,19 @@ _CSS = """
         font-weight: 500 !important;
         font-size: 0.875rem !important;
         border-radius: var(--radius-sm) !important;
-        transition: background 0.15s ease, color 0.15s ease !important;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
         background: var(--primary-soft) !important;
         color: var(--primary) !important;
+        border-color: var(--primary) !important;
         box-shadow: none !important;
     }
 
     /* Sign Out button — keep it distinct */
     section[data-testid="stSidebar"] .stButton > button[data-testid*="logout"] {
-        background: transparent !important;
+        background: #ffffff !important;
         color: var(--muted) !important;
         border: 1px solid var(--border) !important;
         font-size: 0.82rem !important;
