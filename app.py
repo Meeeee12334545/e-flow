@@ -1181,11 +1181,13 @@ else:
 now_footer = datetime.now(pytz.timezone(DEFAULT_TZ))
 st.markdown(f"""
 <div class="app-footer">
-    <span class="app-footer-brand">EDS FlowSense™</span>
+    <span class="app-footer-brand">Environmental Data Services</span>
     <span class="app-footer-meta">
+        <a href="https://www.e-d-s.com.au" target="_blank"
+           style="color:inherit; text-decoration:none;">www.e-d-s.com.au</a>
+        &nbsp;·&nbsp;
         {now_footer.strftime('%Y-%m-%d %H:%M %Z')} &nbsp;·&nbsp;
-        Timezone: {DEFAULT_TZ} &nbsp;·&nbsp;
-        Monitor service: {'enabled' if MONITOR_ENABLED else 'disabled'}
+        Timezone: {DEFAULT_TZ}
     </span>
 </div>
 """, unsafe_allow_html=True)

@@ -23,7 +23,7 @@ from reporting import (
     create_charts,
     build_pdf_report,
 )
-from shared_styles import apply_styles
+from shared_styles import apply_styles, render_footer
 from streamlit_auth import (
     init_auth_state,
     is_authenticated,
@@ -415,3 +415,5 @@ with st.expander("View recent anomaly flags for this device", expanded=False):
                     st.error("Flag not found.")
     else:
         st.info("No anomaly flags stored for this device yet.")
+
+render_footer()

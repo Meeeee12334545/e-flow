@@ -901,6 +901,29 @@ _CSS = """
         display: none !important;
     }
 
+    /* ── Hide all Streamlit branding / UI chrome ── */
+    /* Hamburger / main menu */
+    #MainMenu { visibility: hidden !important; display: none !important; }
+
+    /* "Made with Streamlit" footer watermark */
+    footer { visibility: hidden !important; }
+    footer::after { content: "" !important; }
+
+    /* Top-right toolbar (deploy, settings, share buttons) */
+    [data-testid="stToolbar"],
+    [data-testid="stToolbarActions"],
+    [data-testid="stDeployButton"],
+    .stDeployButton { display: none !important; }
+
+    /* Coloured decoration bar at the very top of the page */
+    [data-testid="stDecoration"] { display: none !important; }
+
+    /* Top app header bar (contains menu + toolbar on some versions) */
+    [data-testid="stHeader"] { background: transparent !important; }
+
+    /* Status widget (running spinner shown in bottom-right on older versions) */
+    [data-testid="stStatusWidget"] { display: none !important; }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
         .block-container { padding: 1rem 1rem 2rem !important; }

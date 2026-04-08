@@ -11,7 +11,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from shared_styles import apply_styles
+from shared_styles import apply_styles, render_footer
 from streamlit_auth import (
     get_sidebar_logo_path,
     init_auth_state,
@@ -467,3 +467,5 @@ st.markdown("""
 
 ---
 """)
+
+render_footer()
