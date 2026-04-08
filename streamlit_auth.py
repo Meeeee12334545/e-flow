@@ -279,7 +279,7 @@ def render_auth_header():
             if st.button("FlowSense™ Analysis", width="stretch", key="nav_intelligence"):
                 st.switch_page("pages/intelligence.py")
             st.markdown('<div class="methodology-nav">', unsafe_allow_html=True)
-            if st.button("How Does FlowSense™ Work", width="stretch", key="nav_methodology"):
+            if st.button("How Does FlowSense™ Work", key="nav_methodology"):
                 st.switch_page("pages/methodology.py")
             st.markdown('</div>', unsafe_allow_html=True)
         else:

@@ -604,6 +604,8 @@ _CSS = """
         padding: 0.05rem 0.25rem !important;
         min-height: unset !important;
         height: auto !important;
+        width: fit-content !important;
+        margin: 0 auto !important;
         line-height: 1.2 !important;
         text-decoration: underline !important;
         text-underline-offset: 2px !important;
