@@ -48,10 +48,16 @@ if not is_authenticated():
 
 log_page_view("Dashboard")
 
-# Ensure Playwright browsers are installed for Streamlit Cloud
+# Ensure Playwright browsers are installed for Streamlit Cloud.
+# When PLAYWRIGHT_BROWSERS_PATH is set (Docker), Chromium was already installed
+# at image-build time — skip the blocking install to avoid a multi-minute delay
+# on every cold start.
 @st.cache_resource
 def ensure_playwright_installed():
-    """Install Playwright browsers if not already installed."""
+    """Install Playwright browsers if not already present (Streamlit Cloud only)."""
+    if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        # Chromium pre-installed in Docker image — nothing to do.
+        return True
     try:
         # Ensure system deps (libnspr4, libnss3, etc.) and browser are present
         subprocess.run(
@@ -64,11 +70,11 @@ def ensure_playwright_installed():
             capture_output=True,
             timeout=120
         )
-    except Exception as e:
+    except Exception:
         pass  # Silent fail - monitoring happens elsewhere
     return True
 
-# Install on startup (cached so only runs once)
+# Install on startup (cached so only runs once per process)
 ensure_playwright_installed()
 
 

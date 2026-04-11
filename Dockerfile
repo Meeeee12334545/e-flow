@@ -47,7 +47,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 EXPOSE 8501
 
 # ── Health check ──────────────────────────────────────────────────────────────
-HEALTHCHECK --interval=5m --timeout=30s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=5m --timeout=30s --start-period=15s --retries=3 \
     CMD python health.py || exit 1
 
 # ── Default entrypoint ────────────────────────────────────────────────────────
